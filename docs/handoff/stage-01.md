@@ -1,6 +1,7 @@
 === HANDOFF PACKET · Stage 1 → Stage 2 ===
 PROJECT: Foreman
-APPROVED BY: Billy Ribeiro on 2026-10-19 (approved in chat: "Get everything that can be done done here")
+APPROVED BY: Billy Ribeiro on 2026-10-19
+SIGNED VIA: Claude Code, on Billy's explicit instruction and permission in chat (2026-10-19 19:02-19:04 ET)
 
 APP: Foreman — a macOS desktop workspace that runs the Claude Build
      Blueprint for you, stage by stage, from first idea to Certificate of
