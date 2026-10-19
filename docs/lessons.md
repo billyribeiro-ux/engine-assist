@@ -76,3 +76,33 @@ FIX (proposed): blueprint 2.6, before "Then output the MASTER SPEC PACKET", add:
 FIX (applied): project only (r5b)
 STATUS: applied
 
+
+## L-007 · Stage 3 · 2026-10-19 · The requirements missed the terminal as an attack surface
+WHAT HAPPENED: The first draft of `docs/requirements.md` had no rule for text sent into the Claude TUI. The security review found that a pasted `ESC[201~` ends bracketed paste and types keystrokes into Claude, which is a blocker. It also found 16 major gaps: git filter drivers, read-side symlinks, the APFS case variants of protected names, opening files by type, and fingerprint coverage.
+CAUGHT BY: security-reviewer
+SHOULD HAVE BEEN CAUGHT BY: the Stage 3 author, by listing every channel through which data reaches each child process (argv, PTY input, clipboard, environment, files) and checking each one against the library's actual source
+ROOT CAUSE: prompt
+COST: one review round; about a third of the requirements rewritten
+FIX (proposed): blueprint 3.2, add to the prompt: "For every program the app runs, list every channel that carries data into it (argv, stdin/PTY, environment, files it reads, clipboard) and write a requirement for each. Have the security-reviewer read the published source of the libraries on each channel."
+FIX (applied): project only
+STATUS: open
+
+## L-008 · Stage 4 · 2026-10-19 · Parallel authors drifted from each other and from later decisions
+WHAT HAPPENED: Scope, the design doc with its ADRs, the design system, the threat model, the contracts and the tickets were written by parallel agents while the requirements were still changing (SvelteKit decision, security review, threat-model findings). The independent review found 12 major contradictions between them, among them webview approval flags left over after native confirmations were adopted, git status and diff still listed after they were forbidden, and IPC commands missing for acceptance criteria.
+CAUGHT BY: design-reviewer
+SHOULD HAVE BEEN CAUGHT BY: the chair, by freezing the inputs (requirements, stack) before starting the parallel 4.x authors, and by sending each change to every author still running
+ROOT CAUSE: missing gate
+COST: one fix pass across 30+ files
+FIX (proposed): blueprint Stage 4 preamble, add: "Don't start 4.2 to 4.6 until the Stage 3 packet is signed. If an input changes mid-stage, re-run the affected documents in order, then run 4.7."
+FIX (applied): project only
+STATUS: open
+
+## L-009 · Stage 4 · 2026-10-19 · Stages ran ahead of signatures
+WHAT HAPPENED: Stages 3 and 4 were drafted while the Stage 2 and 3 packets were unsigned, because Billy said "Get everything that can be done done here". The independent review rated this a blocker: the decisions downstream rest on approvals that don't exist yet.
+CAUGHT BY: design-reviewer
+SHOULD HAVE BEEN CAUGHT BY: the chair
+ROOT CAUSE: missing gate
+COST: none yet; the risk is rework if Billy rejects something at a sign
+FIX (proposed): none to the blueprint. Working ahead was Billy's explicit choice for this session; the packets record it and are signed in order before any merge.
+FIX (applied): rejected (deliberate, recorded)
+STATUS: rejected
