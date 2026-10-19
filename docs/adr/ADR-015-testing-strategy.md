@@ -1,0 +1,69 @@
+# ADR-015: Layered testing; real-app E2E is a thin WDIO smoke because tauri-driver doesn't support macOS
+
+## Status
+Proposed
+
+## Date
+2026-10-19
+
+## Context
+
+Requirements:
+
+- NFR-47: every rule (tags and conditions, packets, resolver, signing) has unit tests; the parser has goldens and property tests.
+- NFR-48: the TradeLog harness.
+- NFR-10/11: crash and kill tests.
+- NFR-31: axe zero violations.
+- SR tests are named in `docs/requirements.md`.
+
+The official Tauri WebDriver docs say `tauri-driver` desktop support is Windows and Linux only ("macOS has no WKWebView driver tool"). `@wdio/tauri-service` with the embedded `tauri-plugin-wdio-webdriver` supports macOS (r1 §A3). CrabNebula's macOS driver needs a paid key. Real `claude` can't run in CI (subscription login).
+
+## Decision
+
+Six layers, cheapest first. Each SR and NFR test lives at the lowest layer that can prove it.
+
+| Layer | Tools (pinned) | Scope | Runs |
+|---|---|---|---|
+| 1. Core | `cargo test` + `proptest` 1.12.0 + `insta` 1.49.0 | All of `foreman-core`: goldens on the real v2.2 blueprint, property tests (grammar round-trip, applicable path never drops core, argv invariants, signable gate), crash injection on `store`, the F-003 TradeLog harness (Stages 1–2 in M1, 1–5 in M4) | CI (Linux + macOS) |
+| 2. App integration | Tauri `test` feature (`mock_builder`, `mock_app`, `get_ipc_response`, `assert_ipc_response`, verified in tauri 2.12.4 `src/test/mod.rs`) + `fake-claude` + fixture git repos | Commands, DTO validation and fuzz, spawn, PTY lifecycle, re-arm, git and signing, watcher, sensor ingest | CI (macOS) |
+| 3. Component | Vitest 5.0.5 browser mode (`@vitest/browser-playwright` 5.0.5, `vitest-browser-svelte` 3.1.0) with `MockIpcClient`; `@tauri-apps/api/mocks` (`mockIPC` with `shouldMockEvents`, `clearMocks`) for the client adapter | Components, stores, keyboard registry, token contrast table (NFR-35), IPC contract (ADR-004) | CI |
+| 4. Flow | `@playwright/test` 1.64.1, WebKit project, against `vite preview` with `VITE_IPC=mock`; `@axe-core/playwright` 4.14.0 | P1 keyboard-only loop, ⌘K (P2), focus order, axe, CSP injection test, reload on deep routes | CI |
+| 5. Real-app smoke | `@wdio/tauri-service` 1.5.0 + `tauri-plugin-wdio-webdriver` 1.5.0 (cargo feature `e2e` only) + webdriverio 9.32.0 | About 5 paths in the real WKWebView with fake-claude: launch, open project, run a step, packet lands, sign (P2) | Locally on Billy's Mac, before each stage gate |
+| 6. Benchmarks | `criterion` 0.8.2 | NFR-02/03/04, sensor exit time | Locally + CI trend (no gate on shared runners) |
+
+- **fake-claude** (`crates/fake-claude`):
+  - records argv, cwd and env to a JSON file named by `FOREMAN_RUN_ID`;
+  - plays scripted TUI output (alternate screen, colors);
+  - honors resize;
+  - responds to `\x03` and `/exit`;
+  - emulates `-v`, `auth status` (each `authMethod`) and `--init-only` outcomes;
+  - writes transcript files.
+- **Spikes** with a real `claude` (S-0, S-1′, S-3, S-7′, S-8, S-12, S-23) run on Billy's Mac in M0 and produce `docs/spikes/S-*.md`.
+- The `e2e` feature is never in release builds. CI check `release::no_webdriver` greps the release binary's linked crates (`cargo tree -e normal --no-default-features --features …`) and fails if `tauri-plugin-wdio-webdriver` or `axum` appears.
+- CI also runs: `pnpm verify` (svelte-check `--fail-on-warnings`, eslint, prettier `--check`, vitest), `cargo fmt --check`, clippy, `cargo deny`, `cargo audit`, `pnpm audit`, CodeQL (or Semgrep), secret scanning, SBOM, and the bindings drift check (SR-63). The Stage 5 gate proves that a planted type error, a planted secret and a vulnerable dependency each fail CI.
+
+## Alternatives considered
+
+- **`tauri-driver`.** No macOS support.
+- **CrabNebula's driver.** Paid on macOS; an external service dependency.
+- **Playwright `_electron`-style driving of the real app.** Not applicable to WKWebView.
+- **Real `claude` in CI.** Needs a subscription login in CI (not allowed by the brief) and costs usage. The contract is covered by fake-claude, version floors and contract probes.
+
+## Consequences
+
+- WKWebView-only bugs are caught by layer 5 and the spikes, not CI. Layer 4's WebKit project is a close proxy (r1 noted this as UNVERIFIED against WKWebView; S-0 checks the CSP and key-routing differences in the real app).
+- The mock client must be kept in step with Rust; ADR-004's contract test enforces it.
+
+## Verification
+
+- Coverage reports for `foreman-core` (line ≥ 90 %, rules modules 100 % of branches), reviewed at the M1 gate.
+- Every SR test name in `docs/requirements.md` exists in the tree; `scripts/check-sr-tests` greps for them at each stage gate.
+
+## Revisit when
+
+- Tauri ships official macOS WebDriver support.
+- WDIO's plugin goes unmaintained.
+
+## Exit path
+
+Layer 5 is replaceable on its own: its five smoke paths are scripted against WebDriver, so any compliant driver works. If none is available, layer 5 becomes a manual checklist run at stage gates.

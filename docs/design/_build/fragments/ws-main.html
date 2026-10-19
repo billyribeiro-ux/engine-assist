@@ -1,0 +1,128 @@
+<main class="main" id="main" aria-labelledby="stage-title">
+  <div class="stage-head">
+    <div>
+      <h1 class="stage-title" id="stage-title">Architect's Design Studio</h1>
+      <p class="stage-sub">Design the entire product. Council in Claude Code, then freeze the Master Spec.</p>
+    </div>
+    <div class="title-block p2" role="group" aria-label="Title block">
+      <div class="tb-sheet"><span class="tb-label">Sheet</span><span class="tb-value">2<span class="of"> of 19</span></span></div>
+      <div><span class="tb-label">Project</span><span class="tb-value">TradeLog</span></div>
+      <div><span class="tb-label">Revision</span><span class="tb-value">Blueprint 2.2, a3f9c1</span></div>
+      <div><span class="tb-label">DRI</span><span class="tb-value">Billy Ribeiro</span></div>
+      <div><span class="tb-label">Status</span><span class="tb-value">In progress, 4 of 9</span></div>
+    </div>
+  </div>
+
+  <div class="banner" role="status" aria-live="polite">
+    {{i:warn}}
+    <div><span class="banner-title">Claude Code configuration in spec/ changed.</span>
+      <span class="muted"> principal-engineer.md was edited at 13:52. Review it before 2.4 launches.</span></div>
+    <div class="banner-actions"><button class="btn">Review diff</button><button class="btn">Acknowledge</button></div>
+  </div>
+
+  <ol class="steps" aria-label="Steps in Stage 2">
+    <li class="step is-done" id="step-setup">
+      <span class="callout" aria-hidden="true">2.0</span>
+      <div class="step-head"><h2 class="step-title">Council setup</h2>
+        <span class="step-state pass">{{g:check:pass}}Done, wrote 4 agents</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+      {{spec:Action|Foreman writes spec/.claude/agents/|—}}
+    </li>
+    <li class="step is-na" id="step-2-1">
+      <span class="callout" aria-hidden="true">2.1</span>
+      <div class="step-head"><h2 class="step-title">Competitor teardown</h2>
+        <p class="na-reason">Not applicable: TradeLog isn't sold, so there's no market to tear down <span class="muted">(commercial = no)</span></p>
+        <span class="step-state">{{g:hatch}}Not applicable</span></div>
+    </li>
+    <li class="step is-done" id="step-2-2">
+      <span class="callout" aria-hidden="true">2.2</span>
+      <div class="step-head"><h2 class="step-title">Convene the council</h2>
+        <span class="step-state pass">{{g:check:pass}}Done, 8 files</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+      {{spec:CLI in spec/|Fable 5.1|high|Plan, then Accept edits|4 agents}}
+    </li>
+    <li class="step is-quiet" id="step-2-3">
+      <span class="callout" aria-hidden="true">2.3</span>
+      <div class="step-head"><h2 class="step-title">Feature specifications</h2>
+        <span class="step-state accent">{{g:dot:accent}}Running in fm-tradelog-s02-2.3</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+      {{spec:CLI, continues 2.2|Fable 5.1|high|Accept edits}}
+    </li>
+    <li class="insert" aria-hidden="false"><button aria-label="Add to Stage 2 after 2.3: prompt or inspection item, this project only" title="Add prompt or inspection item (this project only)"><svg viewBox="0 0 16 16"><use href="#i-plus"/></svg></button></li>
+    <li class="step is-selected p2" id="step-2-4" aria-current="step">
+      <span class="callout" aria-hidden="true">2.4</span>
+      <div class="step-head"><h2 class="step-title"><button aria-expanded="true" aria-controls="body-2-4">Stack decision, evidence first</button></h2>
+        <span class="step-state">{{g:clock}}Next, waits for 2.3</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+      {{spec:CLI, continues 2.2|Fable 5.1|high|Accept edits|principal-engineer|market-analyst not applicable}}
+      <div class="step-body" id="body-2-4">
+        <div class="actions">
+          <button class="btn primary" disabled aria-describedby="why-2-4">{{i:play}}Run in terminal<kbd>⌘↵</kbd></button>
+          <button class="btn">{{i:copy}}Copy prompt</button>
+          <button class="btn ghost">Copy command</button>
+          <span class="reason" id="why-2-4">Waits for 2.3: Claude is still working in this session. Run re-arms it with Accept edits when it's idle.</span>
+        </div>
+        <div class="prompt-wrap">
+          <div class="prompt-cap"><span>Resolved prompt</span><span class="remap">Variables from .foreman/project.json</span></div>
+<pre class="prompt is-clipped" id="prompt-2-4" aria-label="Resolved prompt for 2.4">Recommend the best stack for <span class="tok" title="APP_NAME from project.json">TradeLog</span>, layer by layer: frontend,
+backend, data, cache/queue, search, file storage, auth, payments,
+email, hosting, observability, CI/CD.
+
+PART 1, evidence-first (ignore my preferences): for each layer, list the
+requirements it must meet (from the feature specs and non-functional
+needs), the 2-3 strongest candidates, and the winner. …
+
+PART 2, compare with my preference: <span class="tok" title="PREFERRED_STACK from project.json">SvelteKit + Rust/Axum + Postgres</span>.
+For each layer where you differ, say what I'd gain, what I'd lose, and
+your confidence (high / medium / low). …
+-&gt; council/r7-stack.md</pre>
+          <button class="btn ghost prompt-more" aria-controls="prompt-2-4" aria-expanded="false">Show all 21 lines</button>
+        </div>
+        <details class="argv">
+          <summary>{{i:chev}}<span class="chev-label">Show the exact command</span></summary>
+<pre>/opt/homebrew/bin/claude --resume 7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871
+  --model fable --effort high --permission-mode acceptEdits
+  --name fm-tradelog-s02-2.4
+  --settings ~/Library/Application Support/dev.foreman/runs/r_0193/settings.json
+  "Recommend the best stack for TradeLog, layer by layer: …"</pre>
+        </details>
+        <p class="step-note lockline">{{g:lock}}Core: protects production quality. Change it in the blueprint with a Change Request.</p>
+      </div>
+    </li>
+    <li class="insert"><button aria-label="Add to Stage 2 after 2.4" title="Add prompt or inspection item (this project only)"><svg viewBox="0 0 16 16"><use href="#i-plus"/></svg></button></li>
+    <li class="step is-quiet p2" id="step-x-2-1">
+      <span class="callout" aria-hidden="true">x‑2‑1</span>
+      <div class="step-head"><h2 class="step-title">Re-rank pain with interview notes</h2>
+        <span class="badge-added">Added for this project</span>
+        <span class="step-state">{{g:ring}}Not started, optional</span></div>
+      {{spec:CLI, continues 2.2|Fable 5.1|high|Accept edits|user-advocate}}
+      <div class="step-body">
+        <div class="run-inputs">
+          <div class="field">
+            <label for="in-notes">Interview notes <span class="muted">(run input, remembered for TradeLog)</span></label>
+            <textarea class="textarea" id="in-notes" rows="2">Spoke with 6 members of the trading room on 16 Oct. 4 of 6 keep their journal in a spreadsheet; all 6 skip it after a losing day.</textarea>
+          </div>
+          <label class="toggle"><span class="switch" role="switch" aria-checked="true" tabindex="0" aria-label="Include the optional part: ask user-advocate to re-rank the pain map"></span>Include optional part: ask user-advocate to re-rank the pain map</label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" disabled aria-describedby="why-x">{{i:play}}Run in terminal</button>
+          <span class="reason" id="why-x">Added steps always confirm before running.</span>
+        </div>
+      </div>
+    </li>
+    <li class="step is-quiet" id="step-2-5">
+      <span class="callout" aria-hidden="true">2.5</span>
+      <div class="step-head"><h2 class="step-title">Non-functional requirements</h2>
+        <span class="step-state">{{g:ring}}Not started</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+      {{spec:CLI, continues 2.2|Fable 5.1|high|Accept edits}}
+    </li>
+    <li class="step is-quiet" id="step-2-6">
+      <span class="callout" aria-hidden="true">2.6</span>
+      <div class="step-head"><h2 class="step-title">Freeze the Master Spec</h2>
+        <span class="step-state">{{g:ring}}Not started, writes the packet</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+      {{spec:CLI, continues 2.2|Fable 5.1|high|Manual}}
+    </li>
+    <li class="step is-quiet" id="step-f2">
+      <span class="callout" aria-hidden="true">F.2</span>
+      <div class="step-head"><h2 class="step-title">Lessons capture</h2>
+        <span class="step-state">{{g:ring}}After the inspection items</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+      {{spec:CLI, continues 2.2|Fable 5.1|high|Accept edits|writes docs/lessons.md}}
+    </li>
+  </ol>
+</main>

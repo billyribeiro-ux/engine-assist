@@ -1,0 +1,75 @@
+<!-- title: Foreman mockup: Today -->
+<style>
+.inbox li { display: grid; grid-template-columns: 20px 112px minmax(0, 1fr) auto; gap: var(--space-4); align-items: center; padding: 10px var(--space-3) 10px var(--space-2); border-bottom: var(--hairline) solid var(--rule); }
+.inbox li.is-focus-row { background: var(--sheet-raised); }
+.inbox .proj { font-weight: var(--weight-medium); }
+.inbox .what { min-width: 0; }
+.inbox .what small { display: block; color: var(--ink-muted); font-size: var(--text-12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.next li { display: grid; grid-template-columns: 196px minmax(0, 1fr) auto; gap: var(--space-5); align-items: center; padding: 14px var(--space-3) 14px var(--space-2); border-bottom: var(--hairline) solid var(--rule); }
+.next li.is-top { background: var(--sheet-raised); box-shadow: inset 2px 0 0 var(--accent-ink); }
+.next .proj { display: grid; gap: 6px; }
+.next .proj b { font-size: var(--text-15); font-weight: var(--weight-semibold); }
+.next .stepname { font-weight: var(--weight-medium); }
+.next .stepname .muted { font-weight: var(--weight-regular); }
+.next .right { display: grid; justify-items: end; gap: 4px; }
+.hintline { display: flex; gap: var(--space-5); margin-top: var(--space-3); font-size: var(--text-12); color: var(--ink-muted); }
+</style>
+<div class="app">
+  {{sidebar:today}}
+  <div class="window no-strip">
+    {{titlebar:Today||}}
+    <main class="main" id="main" aria-labelledby="today-title">
+      <div class="page">
+        <h1 class="page-title" id="today-title">Today</h1>
+        <p class="page-sub">5 things are waiting on you across 3 projects. Press ⌘⇧↵ from anywhere to run the top next step.</p>
+
+        <section class="section p2" aria-labelledby="inbox-h">
+          <div class="section-head"><h2 class="section-title" id="inbox-h">Waiting on you</h2><span class="muted">J and K move, Return does the action</span><span class="right">{{p2}}</span></div>
+          <ol class="inbox" aria-label="Waiting on you, in priority order">
+            <li class="is-focus-row" tabindex="0">{{g:warn:attention}}<span class="proj">TradeLog</span>
+              <span class="what">Claude is asking for permission in 2.3 Feature specifications<small>Bash(pnpm view @sveltejs/kit version) in fm-tradelog-s02-2.3, 2 min ago</small></span>
+              <button class="btn">{{i:terminal}}Open terminal</button></li>
+            <li tabindex="-1">{{g:cross:fail}}<span class="proj">Foreman</span>
+              <span class="what">Stage 4 packet has 2 problems<small>OPEN ITEMS isn't "none"; BLUEPRINT VERSION says 2.1, the lock says 2.2</small></span>
+              <button class="btn">Open packet</button></li>
+            <li tabindex="-1">{{g:stamp:attention}}<span class="proj">Swings</span>
+              <span class="what">Stage 7 packet is valid and ready to sign<small>docs/handoff/stage-07.md, gate passed 4 of 4, lessons found (L-031)</small></span>
+              <button class="btn">Review and sign</button></li>
+            <li tabindex="-1">{{g:warn:attention}}<span class="proj">TradeLog</span>
+              <span class="what">.foreman/overlay.json changed outside Foreman<small>1 skip added while fm-tradelog-s02-2.3 was running. It has no effect until you accept it.</small></span>
+              <button class="btn">Review change</button></li>
+            <li tabindex="-1">{{g:broken}}<span class="proj">Swings</span>
+              <span class="what">7.1 Skeleton plan can't resume<small>Its conversation no longer exists: Claude Code removes transcripts after 30 days (cleanupPeriodDays)</small></span>
+              <button class="btn">Start a fresh chain with context</button></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="next-h">
+          <div class="section-head"><h2 class="section-title" id="next-h">Next step in each project</h2></div>
+          <ol class="next">
+            <li class="is-top">
+              <div class="proj"><b>Foreman</b>{{mini:nsssclaaaaaaaaaaaaa,Stage 4 of 19 in progress; stages 1 to 3 signed}}</div>
+              <div><div class="stepname">4.5 Design system and key screens <span class="muted">Stage 4, Construction Drawings</span></div>
+                {{spec:Chat, new conversation in Project Foreman|Opus 5.5|adaptive|—|Research off}}</div>
+              <div class="right"><button class="btn primary is-focus">{{i:copy}}Copy and open<kbd>⌘↵</kbd></button><kbd>Do next ⌘⇧↵</kbd></div>
+            </li>
+            <li>
+              <div class="proj"><b>TradeLog</b>{{mini:nsclllaaaaaaaaaaaaa,Stage 2 of 19 in progress; stage 1 signed}}</div>
+              <div><div class="stepname">2.4 Stack decision, evidence first <span class="muted">continues the council session</span></div>
+                {{spec:CLI in spec/|Fable 5.1|high|Accept edits|principal-engineer}}</div>
+              <div class="right"><button class="btn primary" disabled>{{i:play}}Run in terminal</button><span class="reason">Waits for 2.3 to finish</span></div>
+            </li>
+            <li>
+              <div class="proj"><b>Swings</b>{{mini:nssssssclllllllllll,Stage 7 of 19, packet waiting for your signature}}</div>
+              <div><div class="stepname">Sign the Stage 7 packet <span class="muted">Framing close-out</span></div>
+                <p class="muted" style="font-size:var(--text-12)">Gate A passed, Gate B wrote the packet, Gate C found lessons.</p></div>
+              <div class="right"><button class="btn">{{i:pen}}Review and sign</button></div>
+            </li>
+          </ol>
+          <p class="hintline"><span>New project ⌘N</span><span>Commands ⌘K</span></p>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+{{legend:}}

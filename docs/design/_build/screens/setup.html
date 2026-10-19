@@ -1,0 +1,99 @@
+<!-- title: Foreman mockup: New project -->
+<style>
+.setup { display: grid; grid-template-columns: minmax(0, 620px) minmax(280px, 380px); gap: var(--space-7); padding: var(--space-6) var(--space-7) var(--space-8); }
+.form-sec { margin-top: var(--space-6); display: grid; gap: var(--space-4); }
+.form-sec > h2 { font-size: var(--text-15); font-weight: var(--weight-semibold); padding-bottom: var(--space-3); border-bottom: var(--hairline) solid var(--rule); }
+.cond { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--space-5); align-items: center; padding: 6px 0; border-bottom: var(--hairline) solid var(--rule); }
+.cond b { font-weight: var(--weight-medium); }
+.cond code { font-size: var(--text-12); color: var(--ink-muted); }
+.cond p { grid-column: 1; font-size: var(--text-12); color: var(--ink-muted); }
+.cond .seg { grid-row: 1 / span 2; grid-column: 2; }
+.review { position: sticky; top: var(--space-6); align-self: start; border: var(--hairline) solid var(--rule); background: var(--ground); padding: var(--space-5); display: grid; gap: var(--space-4); }
+.review h2 { font-size: var(--text-15); font-weight: var(--weight-semibold); }
+.writes-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: var(--space-3); font-size: var(--text-12); padding: 3px 0; }
+.writes-list code { font-size: var(--text-12); }
+.writes-list .why { display: block; color: var(--ink-muted); }
+.group-label { font-size: var(--text-12); font-weight: var(--weight-semibold); color: var(--ink-muted); margin-top: var(--space-2); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+</style>
+<div class="app">
+  {{sidebar:setup}}
+  <div class="window no-strip">
+    {{titlebar:New project|One form; the wizard replaces it in P2|}}
+    <main class="main" id="main" aria-labelledby="setup-title">
+      <form class="setup" aria-labelledby="setup-title">
+        <div>
+          <h1 class="page-title" id="setup-title">New project</h1>
+          <p class="page-sub">Foreman pins the blueprint, tailors the stages to your answers, and creates the files below. Nothing is written until you press Create project.</p>
+
+          <div class="form-sec">
+            <h2>Name and folder</h2>
+            <div class="field"><label for="f-name">Name</label><input class="input" id="f-name" value="TradeLog"></div>
+            <div class="field">
+              <label for="f-folder">Folder</label>
+              <div class="input-row"><input class="input mono" id="f-folder" value="~/Code/tradelog" aria-invalid="true" aria-describedby="f-folder-err"><button class="btn" type="button">Choose…</button></div>
+              <p class="err" id="f-folder-err">{{g:cross:fail}}<span>~/Code/tradelog is inside another Foreman project (~/Code/swings-platform). Choose a folder outside it, for example ~/Code/tradelog-app.</span></p>
+            </div>
+            <div class="field"><label for="f-url">claude.ai Project link</label><input class="input mono" id="f-url" value="https://claude.ai/project/01a7…e2" aria-describedby="f-url-hint"><p class="hint" id="f-url-hint">Copy and open uses it to start new conversations in the right Project.</p></div>
+          </div>
+
+          <div class="form-sec">
+            <h2>Variables</h2>
+            <div class="field"><label for="v-idea">Rough idea <code>[ROUGH_IDEA]</code></label><textarea class="textarea" id="v-idea" rows="2">A trading journal that imports fills from my broker and shows which setups actually make money.</textarea></div>
+            <div class="field"><label for="v-users">Who it's for <code>[TARGET_USERS]</code></label>
+              <input class="input" id="v-users" value="&lt;who it's for&gt;" aria-invalid="true" aria-describedby="v-users-err">
+              <p class="err" id="v-users-err">{{g:cross:fail}}<span>This is still the blueprint's placeholder. Describe who it's for in your words.</span></p></div>
+            <div class="two">
+              <div class="field"><label for="v-stack">Preferred stack <code>[PREFERRED_STACK]</code></label><input class="input" id="v-stack" value="SvelteKit + Rust/Axum + Postgres"><p class="hint">From your defaults in Settings</p></div>
+              <div class="field"><label for="v-bar">Quality bar <code>[QUALITY_BAR]</code></label><input class="input" id="v-bar" value="Principal-engineer strict"><p class="hint">From your defaults in Settings</p></div>
+            </div>
+          </div>
+
+          <div class="form-sec" role="group" aria-labelledby="cond-h">
+            <h2 id="cond-h">Conditions</h2>
+            <p class="hint muted" style="font-size:var(--text-12)">Each one decides which steps apply. You can change them until the Stage 2 packet is signed; undecided blocks that sign.</p>
+            <div class="cond"><span><b>You already know the idea</b> <code>idea_known</code></span><p>Yes skips Stage 0, Land Survey.</p>
+              <div class="seg" role="radiogroup" aria-label="idea_known"><button type="button" role="radio" aria-checked="true">Yes</button><button type="button" role="radio" aria-checked="false">No</button><button type="button" role="radio" aria-checked="false">Undecided</button></div></div>
+            <div class="cond"><span><b>You'll sell it</b> <code>commercial</code></span><p>Adds the demand test, competitor teardown, pricing and marketing pages.</p>
+              <div class="seg" role="radiogroup" aria-label="commercial"><button type="button" role="radio" aria-checked="false">Yes</button><button type="button" role="radio" aria-checked="true">No</button><button type="button" role="radio" aria-checked="false">Undecided</button></div></div>
+            <div class="cond"><span><b>It takes payments</b> <code>payments</code></span><p>Adds Stage 10, Electrical, and live payments at launch.</p>
+              <div class="seg" role="radiogroup" aria-label="payments"><button type="button" role="radio" aria-checked="false">Yes</button><button type="button" role="radio" aria-checked="false">No</button><button type="button" role="radio" aria-checked="true">Undecided</button></div></div>
+            <div class="cond"><span><b>More than one person signs in</b> <code>multi_user</code></span><p>Adds authentication, onboarding, the beta ring and analytics.</p>
+              <div class="seg" role="radiogroup" aria-label="multi_user"><button type="button" role="radio" aria-checked="true">Yes</button><button type="button" role="radio" aria-checked="false">No</button><button type="button" role="radio" aria-checked="false">Undecided</button></div></div>
+            <div class="cond"><span><b>Anyone on the internet can reach it</b> <code>public</code></span><p>Adds authentication hardening and public-facing reviews.</p>
+              <div class="seg" role="radiogroup" aria-label="public"><button type="button" role="radio" aria-checked="true">Yes</button><button type="button" role="radio" aria-checked="false">No</button><button type="button" role="radio" aria-checked="false">Undecided</button></div></div>
+            <div class="cond"><span><b>It has a user interface</b> <code>has_ui</code></span><p>Adds 4.5 design system and Stage 13 accessibility.</p>
+              <div class="seg" role="radiogroup" aria-label="has_ui"><button type="button" role="radio" aria-checked="true">Yes</button><button type="button" role="radio" aria-checked="false">No</button><button type="button" role="radio" aria-checked="false">Undecided</button></div></div>
+            <div class="cond"><span><b>It stores other people's data</b> <code>others_data</code></span><p>Adds the legal part of 3.2 and legal pages.</p>
+              <div class="seg" role="radiogroup" aria-label="others_data"><button type="button" role="radio" aria-checked="true">Yes</button><button type="button" role="radio" aria-checked="false">No</button><button type="button" role="radio" aria-checked="false">Undecided</button></div></div>
+            <div class="cond"><span><b>It runs on a server</b> <code>server</code></span><p>Adds the staging pipeline, SLOs and load tests.</p>
+              <div class="seg" role="radiogroup" aria-label="server"><button type="button" role="radio" aria-checked="true">Yes</button><button type="button" role="radio" aria-checked="false">No</button><button type="button" role="radio" aria-checked="false">Undecided</button></div></div>
+          </div>
+        </div>
+
+        <aside class="review" aria-labelledby="review-h">
+          <h2 id="review-h">What Foreman will write</h2>
+          <div class="kv"><dt>Blueprint</dt><dd>2.2 at a3f9c1, clean working tree</dd><dt>Path</dt><dd>16 of 19 stages apply; 0 and 10 don't yet</dd></div>
+          <p class="group-label">Create</p>
+          <ul class="writes-list">
+            <li>{{g:plus:pass}}<span><code>.foreman/</code> project, overlay, lock</span></li>
+            <li>{{g:plus:pass}}<span><code>docs/handoff/</code>, <code>docs/templates/</code></span></li>
+            <li>{{g:plus:pass}}<span><code>docs/change-requests/</code>, <code>docs/postmortems/</code>, <code>spec/</code></span></li>
+          </ul>
+          <p class="group-label">Leave alone</p>
+          <ul class="writes-list">
+            <li>{{g:check:muted}}<span><code>docs/lessons.md</code><span class="why">Already exists; Foreman never overwrites it.</span></span></li>
+            <li>{{g:check:muted}}<span><code>.git/</code><span class="why">Already a repository on branch main.</span></span></li>
+          </ul>
+          <p class="group-label">Refuse to overwrite</p>
+          <ul class="writes-list">
+            <li>{{g:cross:fail}}<span><code>docs/templates/handoff-packet.md</code><span class="why">Differs from the pinned kit. Move it aside to let Foreman write it.</span></span></li>
+          </ul>
+          <div class="actions"><button class="btn primary lg" type="submit" disabled aria-describedby="create-why">Create project</button></div>
+          <p class="reason" id="create-why">Fix 2 fields first: Folder, Who it's for.</p>
+        </aside>
+      </form>
+    </main>
+  </div>
+</div>
+{{legend:Whole screen is P1; the P2 wizard replaces it}}

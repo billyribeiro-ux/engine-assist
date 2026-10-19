@@ -1,0 +1,79 @@
+# ADR-016: No-network policy enforced by cargo-deny bans on the macOS graph, CSP, git protocol lock, and a blocked-network test
+
+## Status
+Proposed
+
+## Date
+2026-10-19
+
+## Context
+
+SR-60, NFR-39 and PR-01: Foreman makes no network requests of its own: no telemetry, update checks, crash upload, remote fonts or assets. "The Rust dependency tree contains no HTTP client; checked by `cargo deny`." SR-61 adds advisories, licenses and sources (crates.io only), `cargo audit` and `pnpm audit`. Opening a URL in the default browser isn't a Foreman request (SR-25).
+
+Checked 2026-10-19:
+
+- `tauri` 2.12.4 depends on `reqwest` 0.13, **but only** under `[target.'cfg(any(target_os = "android", all(target_vendor = "apple", not(target_os = "macos"))))'.dependencies]` (mobile dev-server proxying in `src/protocol/tauri.rs`). It isn't in the macOS graph.
+- `tauri-plugin-wdio-webdriver` 1.5.0 depends on `axum` (an HTTP server on `127.0.0.1:4445`).
+- `cargo-deny` 0.20.2 (2026-07-09) template: `[graph] targets = [...]`, `[bans] deny = [{ crate = "…", reason = "…" }]`.
+
+## Decision
+
+1. **`deny.toml`:**
+   ```toml
+   [graph]
+   targets = ["aarch64-apple-darwin"]
+   all-features = false
+   no-default-features = false        # default features; `e2e` and `ts` are off
+   [advisories]
+   yanked = "deny"
+   [licenses]
+   allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause",
+            "ISC", "Unicode-3.0", "Zlib", "MPL-2.0", "CC0-1.0"]   # final list fixed at M0 from the real graph
+   [sources]
+   unknown-registry = "deny"
+   unknown-git = "deny"
+   [bans]
+   multiple-versions = "warn"
+   deny = [
+     { crate = "reqwest", reason = "SR-60: no HTTP client" },
+     { crate = "hyper", reason = "SR-60" }, { crate = "hyper-util", reason = "SR-60" },
+     { crate = "ureq", reason = "SR-60" }, { crate = "isahc", reason = "SR-60" },
+     { crate = "curl", reason = "SR-60" }, { crate = "surf", reason = "SR-60" },
+     { crate = "attohttpc", reason = "SR-60" }, { crate = "h2", reason = "SR-60" },
+     { crate = "quinn", reason = "SR-60" }, { crate = "tungstenite", reason = "SR-60" },
+     { crate = "axum", reason = "SR-60: only under the e2e feature" },
+     { crate = "openssl", reason = "SR-60: no TLS stack needed" }, { crate = "rustls", reason = "SR-60" },
+     { crate = "native-tls", reason = "SR-60" }, { crate = "git2", reason = "ADR-012" },
+     { crate = "keyring", reason = "SR-51" },
+   ]
+   ```
+2. CI job `deny`: `cargo deny --workspace check` with the default config. A second job, `deny-e2e`, runs with `--features e2e` and an `e2e` exception file that allows `axum`/`hyper` only as dependencies of `tauri-plugin-wdio-webdriver` (`wrappers`), proving the server enters only through that plugin.
+3. **Webview:** CSP `connect-src ipc: http://ipc.localhost` and `default-src 'self'` (ADR-014); no remote fonts or images.
+4. **Git:** `-c protocol.allow=never` on every call (ADR-012).
+5. **JS:** `pnpm audit --prod` in CI. No runtime package may call `fetch`/`XMLHttpRequest`/`WebSocket` to a non-IPC origin (the CSP blocks it; a Playwright test asserts zero requests outside `ipc:` during the P1 flow).
+6. **Behavioral test:** `network::blocked_network_run`. The WDIO smoke runs with the macOS application firewall or a `pf` anchor denying Foreman's outbound traffic (on Billy's Mac before the M5 security gate), with no errors and full function.
+7. A new dependency needs a line in the ADR log saying why (SR-61). `cargo deny` licenses are reviewed at each stage gate.
+
+## Alternatives considered
+
+- **A runtime egress check only** (Little Snitch or the firewall). Catches behavior, not dependencies; manual and late. Kept as the behavioral test, not the main control.
+- **Banning by feature flags instead of crates** (for example denying `tauri/native-tls`). Brittle: a transitive crate can bring an HTTP client without any tauri feature. Crate bans fail closed.
+- **cargo-deny over all targets.** Would ban `tauri` itself, because of the mobile-only `reqwest`. The target filter is correct because Foreman ships only `aarch64-apple-darwin`.
+
+## Consequences
+
+- An upgrade that adds an HTTP crate to the macOS graph fails CI with a named reason, which forces a decision.
+- `openssl`/`rustls` bans assume no crate needs TLS for local work. If a legitimate need appears, it's an ADR amendment.
+
+## Verification
+
+CI jobs `deny`, `deny-e2e`, `audit` (`cargo audit`), `pnpm-audit`; the Playwright zero-external-requests assertion; `network::blocked_network_run` at the M5 gate.
+
+## Revisit when
+
+- Tauri moves an HTTP client into the macOS graph.
+- Foreman v1.1+ ever needs a network feature (it would need a spec change first).
+
+## Exit path
+
+The policy is configuration. Relaxing it for a specific crate is a `[bans]` exception with a `wrappers` scope and a reason, reviewed like code.
