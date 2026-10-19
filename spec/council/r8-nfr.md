@@ -17,7 +17,7 @@ The success metric that matters most: **starting any step takes under 10 seconds
 |---|---|---|---|
 | NFR-01 | Cold start to an interactive Today screen | p95 ≤ 1.5 s | Timestamp from process start to first Today render, in the run log; checked in CI-equivalent local perf test |
 | NFR-02 | Warm switch between projects | p95 ≤ 300 ms for a project with 200 tickets and 19 stages | Rust benchmark (`criterion`) on the load path + frontend mark |
-| NFR-03 | Template load (parse + infer + validate the full blueprint) | p95 ≤ 50 ms; cached by file hash, so most loads are ≤ 5 ms | `criterion` benchmark against the golden blueprint (r1-engineering measured comrak at 1.7 ms for the parse alone) |
+| NFR-03 | Template load (parse + validate + prose lint of the full blueprint) | p95 ≤ 50 ms; cached by file hash, so most loads are ≤ 5 ms | `criterion` benchmark against the golden blueprint (r1-engineering measured comrak at 1.7 ms for the parse alone) |
 | NFR-04 | Prompt resolution and `prepare_launch` checks | p95 ≤ 50 ms | `criterion` |
 | NFR-05 | Launch: keystroke to the `claude` process spawned in the PTY | p95 ≤ 250 ms (excludes Claude Code's own startup) | Run-log timestamps |
 | NFR-06 | Packet visible in the UI after the file is written | p95 ≤ 1 s (debounce ~250 ms) | Integration test with a fake writer |
@@ -34,7 +34,7 @@ There's no service to keep up. Availability means: Foreman never stands between 
 | NFR-10 | **No data loss or corruption, ever.** Every write is atomic (temp file in the same directory, `fsync`, rename, `fsync` of the directory). Tested by killing the process at every write point. | Fault-injection tests in Rust |
 | NFR-11 | **Crash-safe run state.** A run record is written at launch (status `running`) and updated at exit. After a crash or force quit, the next start lists interrupted sessions with one-click Resume. Zero sessions lost. | Integration test: kill Foreman with a live fake-`claude` child; restart; assert the session is listed |
 | NFR-12 | **External edits win.** If a file changed on disk after Foreman read it, Foreman refuses to write and shows the conflict. Foreman never overwrites a newer file. | Property test on the write path with interleaved external edits |
-| NFR-13 | **Degrade, don't block.** If the session sensor, file watcher, Doctor checks, or headless gate fail, the step still runs by hand with one extra confirmation. Foreman's failure never blocks starting a step. | Tests for each fallback path (P-06, P-14) |
+| NFR-13 | **Degrade, don't block.** If the session sensor, file watcher, Doctor checks, or contract probes fail, the step still runs by hand with one extra confirmation. Foreman's failure never blocks starting a step. | Tests for each fallback path (P-06, P-14) |
 | NFR-14 | **Escape hatch.** Every stage can be exported as a Markdown run sheet (resolved prompts and exact commands), so the blueprint can always be run without Foreman. | Golden test of the export |
 | NFR-15 | Stability target: zero crashes per week of daily use after the first month. Any crash produces a local crash report (no upload) and a run-log entry. | Run log + macOS crash reports |
 
@@ -110,7 +110,7 @@ The detailed SR-NN list is written in Stage 3.2 (`docs/requirements.md`).
 | ID | Requirement |
 |---|---|
 | NFR-43 | Infrastructure cost: $0. No servers, no paid services. |
-| NFR-44 | Claude usage: Foreman adds no usage of its own except headless gate inspections, which Billy starts explicitly. Each shows its model and effort before running, and its cost (from the JSON result) is recorded in the run log. Foreman never starts a Claude run without an explicit action. |
+| NFR-44 | Claude usage: Foreman never starts a Claude run without an explicit action from Billy. Contract probes (`--init-only`, argv parsing) use no tokens. Any `claude -p` call Foreman makes (packet capture in v1, headless Gate A in v1.1) shows its model and effort before running, and its cost from the JSON result is recorded in the run log. |
 
 ## 10. Engineering quality
 

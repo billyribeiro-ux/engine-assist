@@ -26,7 +26,15 @@ Every change below makes the blueprint more precise. None changes the order of s
 
 ### Grammar
 
-Two directives, each a block-level HTML comment on its own lines.
+Revised after the council's red team (`spec/council/r5-resolution.md`, R-05, R-06, R-26): **annotations are the only source** of every field Foreman acts on. Foreman still reads the prose, but only to warn when the prose and the annotation disagree. Every step Foreman runs must carry a full `fm:step`, and inspection items have explicit IDs.
+
+The first line after the title is the grammar version:
+
+```text
+<!-- fm:grammar v=1 -->
+```
+
+Two more directives, each a block-level HTML comment on its own lines.
 
 `fm:step` goes directly under a RUN WITH blockquote, with no blank line between them:
 
@@ -40,39 +48,41 @@ Two directives, each a block-level HTML comment on its own lines.
      [out=<path>[,<path>…]] [appends=<path>] [requires=<path>[,<path>…]] -->
 ```
 
-`fm:verify` goes directly under an INSPECTION blockquote, one entry per item, in order:
+`fm:verify` goes directly under an INSPECTION blockquote, one entry per item, in bullet order, each with an explicit item ID:
 
 ```text
-<!-- fm:verify 1=auto:cmd=<verify-id> 2=attest 3=time:7d>attest … -->
+<!-- fm:verify fresh-clone=attest ci-gates=attest staging=attest adr-check=auto:cmd=adr-check -->
 ```
 
 Rules:
 
-- Values contain no spaces. Lists are comma-separated. Paths are relative to the step's `cwd`.
+- Values contain no spaces. Lists are comma-separated. Paths are relative to the step's `cwd`, repo-relative, with no `..`.
 - `when` is an expression over condition IDs, using `!`, `&`, `|`, and parentheses (for example `when=has_payments&!internal_only`).
 - `<mode>` is one of `plan`, `default`, `acceptEdits`, `auto`, `dontAsk`. Chat steps omit the mode.
-- `fm:verify` kinds: `auto` (a verify command Foreman runs, named in `.foreman/project.json`), `attest` (Billy confirms), `time:<n>d` (a waiting period, then `>attest` or `>auto`). An item without an entry is `attest`.
-- An unknown directive or key is an error. When an annotation and the prose disagree (for example, the prose says "same session" and the annotation says `session=fresh`), Foreman reports the line number and refuses to load the template.
+- A `session=continue` step inherits its chain's `cwd`; declaring a different one is an error.
+- `fm:verify` kinds: `auto:cmd=<verify-id>` (Foreman runs that approved command itself and records the exit code; `cmd` is required), `attest` (Billy confirms, or records "not applicable" with a reason), `time:<n>d` (a waiting period, then `>attest` or `>auto:cmd=…`). The number of entries must equal the number of bullets.
+- Item IDs are stable: Foreman stores a normalized hash of each bullet's text in the lock. If a bullet's text changes, Foreman asks to re-confirm its kind. A retro that reorders bullets keeps each ID with its bullet.
+- An unknown directive or key is an error within a grammar version and a warning across versions.
 - Reserved for v1.1, parsed but not applied: `<!-- fm:if <expr> -->` … `<!-- fm:end -->` around a conditional part of a prompt.
 
 ### What to annotate
 
-Annotate only where Foreman can't infer the value from the prose. Inference already covers: `same session` / `same chat` (continue), `fresh session` / `new conversation` (fresh), `in [app]-spec/`, `X first, then Y`, `Shift+Tab → Y`, `/model` and `/effort` lines, `— or` alternatives, and `Save the result to <path>`.
+Every step Foreman runs in v1 gets a complete `fm:step`, and every inspection list in those stages gets an `fm:verify`. A step without one shows in Foreman as "not runnable: needs annotation". The prose is unchanged; Foreman uses it only to warn about disagreements (for example, the prose says "same session" and the annotation says `session=new`).
 
-Required for v1:
+Required for v1 (about 40 comment lines):
 
 | Location | What the annotations add |
 |---|---|
-| Stage 0 (0.1, 0.2) | IDs; 0.2 `in=paste numbers` isn't needed (0.2 takes no input); tag `optional` for Stage 0 as a whole (an idea can arrive already chosen) |
+| Stage 0 (0.1, 0.2) | Full `fm:step` on each; tag `optional` with `when=!idea_known` (an idea can arrive already chosen) |
 | Stage 1 (1.1 to 1.4) | `in=X:text` on 1.1, `in=changes:text` on 1.2, `in=paste_numbers:text` on 1.4; the 7-day wait as `kind=wait` after 1.3; tags (B-5) |
 | Stage 2 (2.1 to 2.6, Council setup) | `out=` for 2.1 and every council round; Council setup as `kind=action`; the manual "record your final choice" in 2.4 as `kind=manual`; 2.6 `out=MASTER-SPEC.md` plus the packet path (B-2) |
 | Stage 3 (3.1, 3.2) | `in=jurisdictions:text:remember`; tags (3.1 `conditional`, `when=has_payments`) |
-| Stage 4 (4.1 to 4.8) | `session=fresh` is already in the prose; `out=` per document; 4.7 `kind=prompt` with an independent-review note; late conditions asked at the 4.8 sign |
+| Stage 4 (4.1 to 4.8) | `session=new` on each; `out=` per document; tags (4.5 `conditional`, `when=has_ui`); late conditions asked at the 4.8 sign |
 | Stage 5 (5.1 to 5.5, gate) | `start`/`switch` for the opusplan → Opus → Sonnet sequence; `fm:verify` on the gate |
 | Stage Gate (A, B, C) | `kind=prompt`, `chain` for B and C; A's headless eligibility comes from `fm:verify` on each stage's inspection list |
 | F.2 | `kind=prompt`, `session=continue`, `appends=docs/lessons.md` |
 
-The remaining stages (6–18) load on inference alone; Foreman's Template health screen lists their gaps. Annotating them is a later v2.x change.
+The remaining stages (6–18) show as "needs annotation" in Foreman's Template health screen until a later v2.x change annotates them.
 
 ### Worked examples
 
@@ -80,8 +90,17 @@ Stage 2.2, the council (annotation under the existing RUN WITH):
 
 ```markdown
 > **RUN WITH** · Claude Code CLI in `spec/` · Chair: **Fable 5.1** · effort **high** (Max plan) — or **Opus 5.5** · effort **xhigh** (Pro plan / to save usage) · **Plan** mode first, then **Accept edits** · agents: all six council agents
-<!-- fm:step id=2.2 tag=core cwd=spec session=new
+<!-- fm:step id=2.2 kind=prompt tag=core surface=cli cwd=spec session=new
+     start=fable@high/plan switch=plan-approved:fable@high/acceptEdits alt=pro-plan:opus@xhigh
      out=council/r1-market.md,council/r1-users.md,council/r2-features.md,council/r2-growth.md,council/r2-feasibility.md,council/r3-synthesis.md,council/r4-redteam.md,council/r5-resolution.md -->
+```
+
+Stage 2.3, a continuing step:
+
+```markdown
+> **RUN WITH** · same session · same chair model · effort unchanged · **Accept edits**
+<!-- fm:step id=2.3 kind=followup tag=core surface=cli session=continue chain=2.2
+     start=fable@high/acceptEdits alt=pro-plan:opus@xhigh out=council/r6-feature-specs.md -->
 ```
 
 The Stage 5 gate:
@@ -93,10 +112,10 @@ The Stage 5 gate:
 > - CI is green, and an intentional type error, a planted fake secret, and a known-vulnerable dependency each fail it (prove the gates work, then revert)
 > - Staging deploys automatically, and a rollback has actually been run once
 > - The ADR reality check has no CONTRADICTED left open
-<!-- fm:verify 1=auto:cmd=fresh-clone 2=attest 3=attest 4=auto:cmd=adr-check -->
+<!-- fm:verify fresh-clone=attest ci-gates=attest staging=attest adr-check=attest -->
 ```
 
-Item 2 stays `attest` because proving that CI fails needs pushes and reverts, which a read-only headless inspection must not do.
+All four stay `attest` in the shared blueprint. A fresh clone, CI failures and a staging rollback can't be checked by a command run in place, and "no CONTRADICTED left open" is judged by reading. A project can add its own `auto:cmd=` checks through its overlay.
 
 The full annotated text for Stages 0–5 is produced by a Foreman Stage 6 ticket, because only Foreman's parser can prove each annotation loads cleanly. This proposal fixes the grammar and the coverage list.
 
