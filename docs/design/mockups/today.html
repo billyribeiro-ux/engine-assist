@@ -354,7 +354,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .side-item .icon { color: var(--ink-muted); }
 .side-item[aria-current] .icon { color: var(--accent-ink); }
 .side-stages { margin: 2px 0 var(--space-3) 0; }
-.side-stage { display: grid; grid-template-columns: 14px 30px minmax(0, 1fr); align-items: center; gap: 6px; padding: 2px var(--space-3) 2px 22px; font-size: var(--text-12); color: var(--ink-muted); border-radius: var(--radius-control); }
+.side-stage { display: grid; grid-template-columns: 14px 30px minmax(0, 1fr); align-items: center; gap: 6px; min-height: 24px; padding: 2px var(--space-3) 2px 22px; font-size: var(--text-12); color: var(--ink-muted); border-radius: var(--radius-control); }
 .side-stage .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .side-stage > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-stage[aria-current] { color: var(--ink); background: color-mix(in srgb, var(--selected) 60%, transparent); }
@@ -426,8 +426,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .phase-dim > span::before, .phase-dim > span::after { content: none; }
 .phase-dim { border-left: 1px solid var(--phase); border-right: 1px solid var(--phase); padding: 0 0; height: 9px; }
 .phase-dim span { padding: 0 2px; }
-.phase-group:last-child .phase-dim { overflow: visible; }
+.phase-group:last-child .phase-dim { overflow: visible; justify-content: flex-end; }
 .phase-group:last-child .phase-dim::before, .phase-group:last-child .phase-dim::after { min-width: 2px; }
+
+.strip { container-type: inline-size; }
+@container (max-width: 920px) {
+  .sheet { height: 44px; }
+  .sheet-num { font-size: var(--text-15); left: 4px; bottom: 8px; }
+  .sheet-mark { width: 12px; height: 12px; top: 3px; right: 3px; }
+  .strip-groups { gap: 8px; }
+  .phase-sheets { gap: 3px; }
+}
 
 /* The one orchestrated motion: the stamp */
 @keyframes stamp-in {
@@ -436,6 +445,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   100% { transform: rotate(-14deg) scale(1); opacity: 1; }
 }
 .stamp.is-landing { animation: stamp-in var(--dur-stamp) var(--ease-stamp) both; animation-delay: 300ms; }
+@media (prefers-reduced-motion: reduce) { .stamp.is-landing { animation: none; } }
 
 /* Miniature strip (Today, wizard) */
 .mini-strip { justify-self: start; display: inline-flex; gap: 2px; padding: 4px; background: var(--strip-bg); vertical-align: middle; }
@@ -582,7 +592,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .switch[aria-checked="true"]::after { transform: translateX(12px); background: var(--sheet); }
 
 /* Segmented control (tri-state conditions, theme) */
-.seg { display: inline-flex; border: 1px solid var(--control-edge); border-radius: var(--radius-control); overflow: hidden; }
+.seg { justify-self: start; display: inline-flex; border: 1px solid var(--control-edge); border-radius: var(--radius-control); overflow: hidden; }
 .seg button { border: 0; background: transparent; padding: 3px 11px; font-size: var(--text-12); color: var(--ink); border-left: 1px solid var(--control-edge); }
 .seg button:first-child { border-left: 0; }
 .seg button[aria-checked="true"], .seg button[aria-selected="true"] { background: var(--accent-ink); color: var(--sheet); font-weight: var(--weight-medium); }
@@ -732,7 +742,7 @@ details.argv pre { margin: 6px 0 0; padding: var(--space-3) var(--space-4); back
 .scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 20; }
 .dialog {
   position: fixed; z-index: 21; left: 50%; top: 64px; transform: translateX(-50%);
-  width: 620px; max-height: calc(100vh - 96px); overflow: auto;
+  width: 680px; max-height: calc(100vh - 96px); overflow: auto;
   background: var(--sheet-raised); color: var(--ink); border-radius: var(--radius-overlay); box-shadow: var(--shadow-overlay);
 }
 .dialog-head { padding: var(--space-5) var(--space-6) var(--space-3); }
@@ -887,7 +897,7 @@ details.argv pre { margin: 6px 0 0; padding: var(--space-3) var(--space-4); back
     </main>
   </div>
 </div>
-<aside class="mock-legend" aria-label="Mockup legend (not part of the app)"><span class="p2key">Mockup: <span class="p2tag">P2</span> marks phase 2; the rest is P1</span><button type="button" id="theme-toggle">Theme: System</button></aside>
+<aside class="mock-legend" aria-label="Mockup legend (not part of the app)"><span class="p2key">Mockup: <span class="p2tag">P2</span> = phase 2</span><button type="button" id="theme-toggle">Theme: System</button></aside>
 
 <script>
 (function () {

@@ -1,0 +1,81 @@
+<!-- title: Foreman mockup: Doctor -->
+<style>
+.checks li { display: grid; grid-template-columns: 22px 220px minmax(0, 1fr) auto; gap: var(--space-4); align-items: start; padding: 10px var(--space-2); border-bottom: var(--hairline) solid var(--rule); }
+.checks li.is-fail { background: var(--fail-wash); box-shadow: inset 3px 0 0 var(--fail); }
+.checks .name { font-weight: var(--weight-medium); }
+.checks .detail { font-size: var(--text-12); color: var(--ink-muted); }
+.checks .detail b { color: var(--ink); font-weight: var(--weight-medium); }
+.checks .found { font-size: var(--text-12); }
+.checks .icon.glyph { width: 14px; height: 14px; margin-top: 2px; }
+.cap td:nth-child(2), .cap td:nth-child(3) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cap tr.blocks td { background: var(--fail-wash); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-7); }
+</style>
+<div class="app">
+  {{sidebar:doctor}}
+  <div class="window no-strip">
+    {{titlebar:Doctor|Last run 14:31, at launch|}}
+    <main class="main" id="main" aria-labelledby="doc-title">
+      <div class="page" style="max-width:1120px">
+        <div style="display:flex;align-items:end;gap:var(--space-4)">
+          <div><h1 class="page-title" id="doc-title">Doctor</h1>
+          <p class="page-sub">What Foreman needs on this Mac to launch steps exactly as the blueprint says. 1 problem blocks some steps.</p></div>
+          <button class="btn" style="margin-left:auto">{{i:restore}}Check again</button>
+        </div>
+
+        <section class="section" aria-labelledby="env-h">
+          <div class="section-head"><h2 class="section-title" id="env-h">Claude Code</h2></div>
+          <ul class="checks">
+            <li class="is-fail">{{g:cross:fail}}<span class="name">Version</span>
+              <span class="detail"><b>Claude Code 2.1.288 found. Haiku 5.5 in the Stage 5 test-runner agent needs 2.1.293 or later.</b> Run <code>claude update</code>, then check again.</span>
+              <span class="found mono">2.1.288</span></li>
+            <li>{{g:check:pass}}<span class="name">Found at an allowed path</span><span class="detail">Foreman only launches this exact file.</span><span class="found mono">/opt/homebrew/bin/claude</span></li>
+            <li>{{g:check:pass}}<span class="name">Signed in with your plan</span><span class="detail"><code>claude auth status</code> in ~/Code/tradelog/spec reports <b>claude.ai</b>. No API key or helper in any config Foreman checked.</span><span class="found">claude.ai</span></li>
+            <li>{{g:warn:attention}}<span class="name">Transcripts kept</span><span class="detail">cleanupPeriodDays is 30. Chains idle longer than that break. Raise it in ~/.claude/settings.json if your stages run long; Foreman doesn't edit that file.</span><span class="found mono">30 days</span></li>
+            <li>{{g:check:pass}}<span class="name">Hooks enabled</span><span class="detail">disableAllHooks isn't set, so the session sensor can run.</span><span class="found">on</span></li>
+            <li>{{g:warn:attention}}<span class="name">Broad allow rules</span><span class="detail"><code>Bash(*)</code> in user settings. No effect in v1; it matters for headless gates in v1.1.</span><span class="found">1 rule</span></li>
+          </ul>
+        </section>
+
+        <div class="cols">
+          <section class="section" aria-labelledby="cap-h">
+            <div class="section-head"><h2 class="section-title" id="cap-h">Capability table</h2><span class="muted">What your version supports</span></div>
+            <table class="table cap">
+              <thead><tr><th scope="col">Feature</th><th scope="col">Minimum</th><th scope="col">Found</th><th scope="col">Blocks</th></tr></thead>
+              <tbody>
+                <tr><td>Fable 5.1</td><td>2.1.257</td><td><span class="status pass">{{g:check:pass}}yes</span></td><td class="muted">—</td></tr>
+                <tr><td><code>--permission-prompts</code></td><td>2.1.259</td><td><span class="status pass">{{g:check:pass}}yes</span></td><td class="muted">—</td></tr>
+                <tr><td>Opus 5.5</td><td>2.1.280</td><td><span class="status pass">{{g:check:pass}}yes</span></td><td class="muted">—</td></tr>
+                <tr><td><code>--agents</code> file form</td><td>2.1.281</td><td><span class="status pass">{{g:check:pass}}yes</span></td><td class="muted">—</td></tr>
+                <tr><td>Sonnet 5.5</td><td>2.1.284</td><td><span class="status pass">{{g:check:pass}}yes</span></td><td class="muted">—</td></tr>
+                <tr><td><code>--desktop</code></td><td>2.1.285</td><td><span class="status pass">{{g:check:pass}}yes</span></td><td class="muted">—</td></tr>
+                <tr class="blocks"><td>Haiku 5.5</td><td>2.1.293</td><td><span class="status fail">{{g:cross:fail}}no</span></td><td>Stage 5 Gate A (test-runner)</td></tr>
+              </tbody>
+            </table>
+          </section>
+          <section class="section" aria-labelledby="probe-h">
+            <div class="section-head"><h2 class="section-title" id="probe-h">Contract probes</h2><span class="right">{{p2}}</span></div>
+            <p class="page-sub" style="font-size:var(--text-12)">Run in the trusted probe folder when the version changes. They cost no tokens.</p>
+            <table class="table" style="margin-top:var(--space-3)">
+              <thead><tr><th scope="col">Probe</th><th scope="col">Result</th></tr></thead>
+              <tbody>
+                <tr><td>Flags parse and per-launch hooks fire (<code>--init-only</code>)</td><td><span class="status pass">{{g:check:pass}}Pass on 2.1.288</span></td></tr>
+                <tr><td><code>--resume</code> parses</td><td><span class="status attention">{{g:clock:attention}}Inconclusive</span><div class="muted">Timed out after 20 s. Keeping the last verified state, 2.1.284.</div></td></tr>
+              </tbody>
+            </table>
+            <p class="remap" style="margin-top:var(--space-3)">Contract verified on 2.1.284. Probe folder trusted 12 Oct.</p>
+          </section>
+        </div>
+
+        <section class="section" aria-labelledby="tool-h">
+          <div class="section-head"><h2 class="section-title" id="tool-h">Toolchain and PATH</h2><span class="right">{{p2}}</span></div>
+          <ul class="checks">
+            <li>{{g:check:pass}}<span class="name">git, node, pnpm, cargo</span><span class="detail">Found at fixed paths with <code>--version</code> only.</span><span class="found mono">2.51.0 · 22.17.1 · 12.14.0 · 1.90.0</span></li>
+            <li>{{g:info:muted}}<span class="name">Login shell PATH</span><span class="detail">Not captured. Capturing runs your login shell once to read PATH, shows you the result, and stores it. It's the only shell Foreman ever starts.</span><button class="btn">Capture my login shell PATH</button></li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+{{legend:}}

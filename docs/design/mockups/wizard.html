@@ -354,7 +354,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .side-item .icon { color: var(--ink-muted); }
 .side-item[aria-current] .icon { color: var(--accent-ink); }
 .side-stages { margin: 2px 0 var(--space-3) 0; }
-.side-stage { display: grid; grid-template-columns: 14px 30px minmax(0, 1fr); align-items: center; gap: 6px; padding: 2px var(--space-3) 2px 22px; font-size: var(--text-12); color: var(--ink-muted); border-radius: var(--radius-control); }
+.side-stage { display: grid; grid-template-columns: 14px 30px minmax(0, 1fr); align-items: center; gap: 6px; min-height: 24px; padding: 2px var(--space-3) 2px 22px; font-size: var(--text-12); color: var(--ink-muted); border-radius: var(--radius-control); }
 .side-stage .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .side-stage > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-stage[aria-current] { color: var(--ink); background: color-mix(in srgb, var(--selected) 60%, transparent); }
@@ -426,8 +426,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .phase-dim > span::before, .phase-dim > span::after { content: none; }
 .phase-dim { border-left: 1px solid var(--phase); border-right: 1px solid var(--phase); padding: 0 0; height: 9px; }
 .phase-dim span { padding: 0 2px; }
-.phase-group:last-child .phase-dim { overflow: visible; }
+.phase-group:last-child .phase-dim { overflow: visible; justify-content: flex-end; }
 .phase-group:last-child .phase-dim::before, .phase-group:last-child .phase-dim::after { min-width: 2px; }
+
+.strip { container-type: inline-size; }
+@container (max-width: 920px) {
+  .sheet { height: 44px; }
+  .sheet-num { font-size: var(--text-15); left: 4px; bottom: 8px; }
+  .sheet-mark { width: 12px; height: 12px; top: 3px; right: 3px; }
+  .strip-groups { gap: 8px; }
+  .phase-sheets { gap: 3px; }
+}
 
 /* The one orchestrated motion: the stamp */
 @keyframes stamp-in {
@@ -436,6 +445,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   100% { transform: rotate(-14deg) scale(1); opacity: 1; }
 }
 .stamp.is-landing { animation: stamp-in var(--dur-stamp) var(--ease-stamp) both; animation-delay: 300ms; }
+@media (prefers-reduced-motion: reduce) { .stamp.is-landing { animation: none; } }
 
 /* Miniature strip (Today, wizard) */
 .mini-strip { justify-self: start; display: inline-flex; gap: 2px; padding: 4px; background: var(--strip-bg); vertical-align: middle; }
@@ -582,7 +592,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .switch[aria-checked="true"]::after { transform: translateX(12px); background: var(--sheet); }
 
 /* Segmented control (tri-state conditions, theme) */
-.seg { display: inline-flex; border: 1px solid var(--control-edge); border-radius: var(--radius-control); overflow: hidden; }
+.seg { justify-self: start; display: inline-flex; border: 1px solid var(--control-edge); border-radius: var(--radius-control); overflow: hidden; }
 .seg button { border: 0; background: transparent; padding: 3px 11px; font-size: var(--text-12); color: var(--ink); border-left: 1px solid var(--control-edge); }
 .seg button:first-child { border-left: 0; }
 .seg button[aria-checked="true"], .seg button[aria-selected="true"] { background: var(--accent-ink); color: var(--sheet); font-weight: var(--weight-medium); }
@@ -732,7 +742,7 @@ details.argv pre { margin: 6px 0 0; padding: var(--space-3) var(--space-4); back
 .scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 20; }
 .dialog {
   position: fixed; z-index: 21; left: 50%; top: 64px; transform: translateX(-50%);
-  width: 620px; max-height: calc(100vh - 96px); overflow: auto;
+  width: 680px; max-height: calc(100vh - 96px); overflow: auto;
   background: var(--sheet-raised); color: var(--ink); border-radius: var(--radius-overlay); box-shadow: var(--shadow-overlay);
 }
 .dialog-head { padding: var(--space-5) var(--space-6) var(--space-3); }
@@ -801,14 +811,14 @@ details.argv pre { margin: 6px 0 0; padding: var(--space-3) var(--space-4); back
 .wiz-steps li[aria-current] .n { border-color: var(--accent-ink); color: var(--accent-ink); }
 .path-strip { margin-top: var(--space-5); }
 .path { margin-top: var(--space-5); }
-.path li { display: grid; grid-template-columns: 30px 22px 230px minmax(0, 1fr); gap: var(--space-3); align-items: baseline; padding: 6px 0; border-bottom: var(--hairline) solid var(--rule); font-size: var(--text-13); }
+.path li { display: grid; grid-template-columns: 40px 22px 230px minmax(0, 1fr); gap: var(--space-3); align-items: baseline; padding: 6px 0; border-bottom: var(--hairline) solid var(--rule); font-size: var(--text-13); }
 .path li .why { color: var(--ink-muted); font-size: var(--text-12); }
 .path li.is-na { background-image: repeating-linear-gradient(135deg, var(--hatch) 0 1px, transparent 1px 7px); }
-.path li .num { text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.path li .num { white-space: nowrap; text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 .wiz-foot { display: flex; gap: var(--space-3); margin-top: var(--space-6); align-items: center; }
 .wiz-foot .spacer { flex: 1; }
 .writes-inline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); margin-top: var(--space-4); font-size: var(--text-12); }
-.writes-inline h3 { font-size: var(--text-12); font-weight: var(--weight-semibold); color: var(--ink-muted); margin-bottom: 4px; }
+.writes-inline .wi-h { font-size: var(--text-12); font-weight: var(--weight-semibold); color: var(--ink-muted); margin-bottom: 4px; }
 .writes-inline code { font-size: var(--text-12); }
 .writes-inline li { padding: 2px 0; }
 
@@ -862,9 +872,9 @@ details.argv pre { margin: 6px 0 0; padding: var(--space-3) var(--space-4); back
             <li><span class="num">6–18</span><svg class="icon glyph glyph-muted" aria-hidden="true" focusable="false"><use href="#i-dashsq"/></svg><span>Foundation to Maintenance</span><span class="why">Shown but not runnable until a later blueprint annotates them</span></li>
           </ol>
           <div class="writes-inline" aria-label="File writes">
-            <div><h3>Create</h3><ul><li><code>.foreman/</code> (3 files)</li><li><code>docs/handoff/</code></li><li><code>docs/templates/</code> (3 files)</li><li><code>spec/</code></li></ul></div>
-            <div><h3>Leave alone</h3><ul><li><code>docs/lessons.md</code>, exists</li><li><code>README.md</code>, exists</li></ul></div>
-            <div><h3>Refuse to overwrite</h3><ul><li>None</li></ul></div>
+            <div><h2 class="wi-h">Create</h2><ul><li><code>.foreman/</code> (3 files)</li><li><code>docs/handoff/</code></li><li><code>docs/templates/</code> (3 files)</li><li><code>spec/</code></li></ul></div>
+            <div><h2 class="wi-h">Leave alone</h2><ul><li><code>docs/lessons.md</code>, exists</li><li><code>README.md</code>, exists</li></ul></div>
+            <div><h2 class="wi-h">Refuse to overwrite</h2><ul><li>None</li></ul></div>
           </div>
           <div class="wiz-foot">
             <button class="btn">Back</button><span class="spacer"></span>
@@ -876,7 +886,7 @@ details.argv pre { margin: 6px 0 0; padding: var(--space-3) var(--space-4); back
     </main>
   </div>
 </div>
-<aside class="mock-legend" aria-label="Mockup legend (not part of the app)"><span class="p2key">Mockup: Whole screen is <span class="p2tag">P2</span></span><button type="button" id="theme-toggle">Theme: System</button></aside>
+<aside class="mock-legend" aria-label="Mockup legend (not part of the app)"><span class="p2key">Mockup: All <span class="p2tag">P2</span></span><button type="button" id="theme-toggle">Theme: System</button></aside>
 
 <script>
 (function () {

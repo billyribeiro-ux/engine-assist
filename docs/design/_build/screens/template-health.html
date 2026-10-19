@@ -1,0 +1,66 @@
+<!-- title: Foreman mockup: Template health -->
+<style>
+.counts { display: flex; gap: var(--space-7); margin-top: var(--space-5); padding: var(--space-4) 0; border-top: var(--hairline) solid var(--rule); border-bottom: var(--hairline) solid var(--rule); }
+.counts div { display: grid; }
+.counts b { font-size: var(--text-18); font-weight: var(--weight-semibold); }
+.counts span { font-size: var(--text-12); color: var(--ink-muted); }
+.health td:first-child { width: 44px; white-space: nowrap; text-align: right; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.health tr.annot td { color: var(--ink-muted); }
+.diag { display: grid; gap: 0; }
+.diag li { display: grid; grid-template-columns: 22px 64px minmax(0, 1fr); gap: var(--space-3); padding: 8px 0; border-bottom: var(--hairline) solid var(--rule); font-size: var(--text-12); }
+.diag .loc { font-family: var(--font-mono); color: var(--ink-muted); }
+.cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--space-7); }
+</style>
+<div class="app">
+  {{sidebar:template-health}}
+  <div class="window no-strip">
+    {{titlebar:Template health|~/claude-blueprint/claude-build-blueprint.md|}}
+    <main class="main" id="main" aria-labelledby="th-title">
+      <div class="page" style="max-width:1180px">
+        <h1 class="page-title" id="th-title">Template health</h1>
+        <p class="page-sub">What Foreman can run from blueprint 2.2. Only <code>fm:</code> annotations decide behavior; the prose is checked against them and only warns.</p>
+        <div class="counts">
+          <div><b>2.2</b><span>Blueprint, a3f9c1, grammar v1</span></div>
+          <div><b>19</b><span>Stages</span></div>
+          <div><b>31</b><span>Runnable steps</span></div>
+          <div><b>27</b><span>Inspection items</span></div>
+          <div><b style="color:var(--fail)">1</b><span>Error</span></div>
+          <div><b style="color:var(--attention)">2</b><span>Warnings</span></div>
+        </div>
+        <div class="cols">
+          <section class="section" aria-labelledby="st-h">
+            <div class="section-head"><h2 class="section-title" id="st-h">Stages</h2></div>
+            <table class="table health">
+              <thead><tr><th scope="col"><span class="vh">Number</span></th><th scope="col">Stage</th><th scope="col">Status</th><th scope="col">Steps</th></tr></thead>
+              <tbody>
+                <tr><td>0</td><td>Land Survey</td><td><span class="status pass">{{g:check:pass}}Runnable</span></td><td>2</td></tr>
+                <tr><td>1</td><td>Meet the Architect</td><td><span class="status pass">{{g:check:pass}}Runnable</span></td><td>5 + F.2</td></tr>
+                <tr><td>2</td><td>Architect's Design Studio</td><td><span class="status pass">{{g:check:pass}}Runnable</span></td><td>8 + F.2</td></tr>
+                <tr><td>3</td><td>Permits &amp; Zoning</td><td><span class="status pass">{{g:check:pass}}Runnable</span></td><td>2 + F.2</td></tr>
+                <tr><td>4</td><td>Construction Drawings</td><td><span class="status attention">{{g:warn:attention}}Runnable, 1 warning</span></td><td>9 + F.2</td></tr>
+                <tr><td>5</td><td>Site Prep &amp; Excavation</td><td><span class="status fail">{{g:cross:fail}}Partly: 5.4 has an error</span></td><td>5 + gate</td></tr>
+                <tr class="annot"><td>6–18</td><td>Foundation to Homeowner Maintenance</td><td><span class="status muted">{{g:dashsq}}Needs annotation</span></td><td>—</td></tr>
+              </tbody>
+            </table>
+          </section>
+          <section class="section" aria-labelledby="dg-h">
+            <div class="section-head"><h2 class="section-title" id="dg-h">Errors and warnings</h2></div>
+            <h3 class="field-label" style="margin-top:var(--space-4)">Stage 5</h3>
+            <ul class="diag">
+              <li>{{g:cross:fail}}<span class="loc">1121:6</span><span>5.4: unknown key <code>agent=</code> in <code>fm:step</code>. Did you mean <code>agents=</code>? 5.4 can't run until the blueprint is fixed.</span></li>
+              <li>{{g:warn:attention}}<span class="loc">1105:1</span><span>5.3: RUN WITH says "same session"; the annotation says <code>session=new</code>. The annotation wins; check which one you meant.</span></li>
+            </ul>
+            <h3 class="field-label" style="margin-top:var(--space-4)">Stage 4</h3>
+            <ul class="diag">
+              <li>{{g:warn:attention}}<span class="loc">946:1</span><span>4.5: RUN WITH says effort "high"; the annotation says <code>opus@xhigh</code>. The annotation wins.</span></li>
+            </ul>
+            <h3 class="field-label" style="margin-top:var(--space-4)">Stages 0 to 3</h3>
+            <p class="empty" style="padding-top:var(--space-2)">No errors or warnings.</p>
+            <p class="remap">Foreman proposes fixes; you edit the blueprint and re-pin.</p>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+{{legend:<span class="p2tag">P2</span> screen}}

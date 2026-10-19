@@ -1,0 +1,49 @@
+<!-- title: Foreman mockup: Run log -->
+<style>
+.filters { display: flex; gap: var(--space-3); align-items: center; margin-top: var(--space-5); flex-wrap: wrap; }
+.filters .input { width: 320px; }
+.metrics { display: flex; gap: var(--space-7); margin-top: var(--space-5); padding: var(--space-4) 0; border-top: var(--hairline) solid var(--rule); border-bottom: var(--hairline) solid var(--rule); }
+.metric { display: grid; gap: 2px; }
+.metric b { font-size: var(--text-18); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.metric span { font-size: var(--text-12); color: var(--ink-muted); }
+.runs { margin-top: var(--space-4); }
+.runs td.mono, .runs code { font-size: var(--text-12); white-space: nowrap; }
+.argv-row td { padding-top: 0; }
+.argv-row pre { margin: 0; padding: var(--space-3) var(--space-4); background: var(--well); border: var(--hairline) solid var(--rule); font-family: var(--font-mono); font-size: var(--text-12); white-space: pre-wrap; }
+</style>
+<div class="app">
+  {{sidebar:run-log}}
+  <div class="window no-strip">
+    {{titlebar:Run log|All projects|}}
+    <main class="main" id="main" aria-labelledby="rl-title">
+      <div class="page" style="max-width:1180px">
+        <h1 class="page-title" id="rl-title">Run log</h1>
+        <p class="page-sub">Every launch, with the exact command and what happened. Resume works while Claude Code still has the conversation.</p>
+        <div class="metrics" aria-label="Time to start a step, last 30 days">
+          <div class="metric"><b>6.2 s</b><span>Median time to start, CLI</span></div>
+          <div class="metric"><b>8.9 s</b><span>Median time to start, chat</span></div>
+          <div class="metric"><b>9.4 s</b><span>p95, all steps (target 10 s)</span></div>
+          <div class="metric"><b>0</b><span>Manual prompt edits</span></div>
+          <button class="btn" style="align-self:center;margin-left:auto">Export metrics</button>
+        </div>
+        <div class="filters" role="search">
+          <label class="vh" for="rl-q">Search runs</label><input class="input" id="rl-q" placeholder="Search step, session, or command" value="council">
+          <div class="seg" role="radiogroup" aria-label="Outcome"><button role="radio" aria-checked="true">All</button><button role="radio" aria-checked="false">Running</button><button role="radio" aria-checked="false">Failed</button><button role="radio" aria-checked="false">Interrupted</button></div>
+          <span class="muted" style="font-size:var(--text-12)">5 of 212 runs</span>
+        </div>
+        <table class="table runs">
+          <thead><tr><th scope="col">Started</th><th scope="col">Project</th><th scope="col">Step</th><th scope="col">Session</th><th scope="col">Ran with</th><th scope="col">Outcome</th><th scope="col">To start</th><th scope="col"><span class="vh">Actions</span></th></tr></thead>
+          <tbody>
+            <tr><td>Today 14:06</td><td>TradeLog</td><td>2.3 Feature specifications</td><td><code>fm-tradelog-s02-2.3</code></td><td>Fable 5.1, high, Accept edits</td><td><span class="status" style="color:var(--accent-ink)">{{g:dot:accent}}Running</span></td><td>4.1 s</td><td><button class="btn ghost">Show terminal</button></td></tr>
+            <tr class="is-selected"><td>Today 11:20</td><td>TradeLog</td><td>2.2 Convene the council</td><td><code>fm-tradelog-s02-2.2</code></td><td>Fable 5.1, high, Plan</td><td><span class="status pass">{{g:check:pass}}Exited 0</span></td><td>7.8 s</td><td><button class="btn ghost" aria-expanded="true">Hide command</button></td></tr>
+            <tr class="argv-row is-selected"><td></td><td colspan="7"><pre>/opt/homebrew/bin/claude --session-id 7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871 --model fable --effort high --permission-mode plan --name fm-tradelog-s02-2.2 --settings …/runs/r_0188/settings.json "You are the chair of the product design council for TradeLog. …"</pre></td></tr>
+            <tr><td>16 Oct 09:12</td><td>Foreman</td><td>2.2 Convene the council</td><td><code>fm-foreman-s02-2.2</code></td><td>Opus 5.5, xhigh, Plan <span class="muted">(substituted for Fable)</span></td><td><span class="status pass">{{g:check:pass}}Exited 0</span></td><td>5.3 s</td><td><button class="btn ghost">Resume</button></td></tr>
+            <tr><td>2 Sep 15:40</td><td>Swings</td><td>7.1 Skeleton plan</td><td><code>fm-swings-s07-7.1</code></td><td>Opus 5.5, high, Plan</td><td><span class="status muted">{{g:broken}}Interrupted</span></td><td>6.0 s</td><td><span class="reason">Transcript removed after 30 days</span></td></tr>
+            <tr><td>1 Sep 10:02</td><td>Swings</td><td>Gate A</td><td><code>fm-swings-s06-gate.A</code></td><td>Opus 5.5, high, Plan</td><td><span class="status fail">{{g:cross:fail}}Errored</span><div class="muted" style="font-size:var(--text-11)">Child exited during spawn: unknown option --agents</div></td><td>3.2 s</td><td><button class="btn ghost">Copy command</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+{{legend:<span class="p2tag">P2</span> screen}}

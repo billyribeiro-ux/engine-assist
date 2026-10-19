@@ -222,6 +222,20 @@ def sidebar(active: str) -> str:
             )
         stages = f'<ol class="side-stages" aria-label="TradeLog stages">{"".join(rows)}</ol>'
     tl_cur = ' aria-current="page"' if proj_open else ""
+    if active == "none":
+        return f"""
+<nav class="sidebar" aria-label="Foreman">
+  <div class="traffic" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="side-scroll">
+    <a class="side-item" href="today.html">{icon("tray")}Today</a>
+    <div class="side-head">Projects</div>
+    <p class="side-stage" style="padding-left:var(--space-3);display:block">No projects yet</p>
+  </div>
+  <div class="side-foot">
+    <a class="side-item" href="doctor.html">{icon("pulse")}Doctor</a>
+    <a class="side-item" href="settings.html">{icon("sliders")}Settings<span class="meta">⌘,</span></a>
+  </div>
+</nav>"""
     return f"""
 <nav class="sidebar" aria-label="Foreman">
   <div class="traffic" aria-hidden="true"><span></span><span></span><span></span></div>

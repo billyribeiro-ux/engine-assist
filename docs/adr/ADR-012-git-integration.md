@@ -1,4 +1,4 @@
-# ADR-012: Git through the git CLI with fixed safe overrides; signing by pathspec commit or plumbing, with read-back
+# ADR-012: Git through one `git::run` entry point over the git CLI; all commits by plumbing, with read-back
 
 ## Status
 Proposed
@@ -11,86 +11,88 @@ Proposed
 Foreman uses git for:
 
 - `git init` at setup;
-- blueprint lock restore (`<commit>:<path>`, F-002);
-- dirty-tree checks at pin;
-- pathspec commits of decision changes before Stage 5;
-- signing (P2, F-014): current-branch pathspec commit, or another branch through plumbing, then read-back;
-- tamper detection.
+- blueprint lock restore (F-002);
+- the dirty-tree check at pin;
+- `git config user.name` for the DRI default;
+- P1 pathspec commits of decision changes before Stage 5;
+- signing (P2, F-014): current branch or another branch, then read-back;
+- tamper detection;
+- locating `info/exclude` (SR-32).
 
-MASTER-SPEC §8, SR-42 to SR-45 fix:
+A repo's `.git/config` is untrusted input: it can define filter drivers that `git add` executes, and a `gpg.program` that `git commit` executes, even with hooks disabled.
 
-- every git call passes `-c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.pager=cat -c diff.external= -c core.editor=true` and `GIT_TERMINAL_PROMPT=0`, with a 60 s timeout;
-- current branch: `git add -- <paths>` then `git commit --only -m … -- <paths>`;
-- another branch: `hash-object`, a temporary index, `commit-tree`, `update-ref`.
+The revised `docs/requirements.md` (after the security review) fixes:
 
-A repo's `.git/config` is untrusted input (SR-45).
+- **SR-44:** one `git::run` entry point, **built in Stage 6**, for every git use; no repo hook ever runs.
+- **SR-45:**
+  - environment `env_clear()` plus `HOME`, a fixed `PATH`, `LANG`, `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0` (`GIT_INDEX_FILE` only for Foreman's temporary index);
+  - always `-c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.pager=cat -c core.editor=true -c sequence.editor=true -c commit.gpgSign=false -c tag.gpgSign=false -c core.sshCommand=false -c credential.helper= -c protocol.allow=never`;
+  - diffs `--no-ext-diff --no-textconv`; status `--ignore-submodules=all`;
+  - blobs only via `hash-object -w --no-filters`;
+  - signing settings honored only from global/system scope;
+  - a 60 s timeout.
+- **SR-42:** current-branch signing by **plumbing**: temporary index from HEAD; `hash-object -w --no-filters` per path; `update-index --cacheinfo`; `write-tree`; `commit-tree --no-gpg-sign`; `update-ref HEAD <new> <old>`; then `update-index --cacheinfo` on the real index for those paths only. P1 decision-file commits follow the same rules.
+- **SR-43:** another branch, by the same plumbing against that branch's tip, never touching HEAD, the index or the working tree.
 
-Checked 2026-10-19:
+Library check, 2026-10-19:
 
-- `git2` 0.21.0: default features are `[]`; `https` pulls `openssl-sys`, and `ssh` pulls libssh2.
-- `gix` 0.89.0: MSRV 1.88; default features don't include network, while `blocking-network-client` adds `gix-transport`.
+- `git2` 0.21.0: default features `[]`; `https` pulls `openssl-sys`; `ssh` pulls libssh2.
+- `gix` 0.89.0: MSRV 1.88; network only behind `blocking-network-client`.
 
 ## Decision
 
-1. **The git CLI** at an allowlisted absolute path (ADR-007), wrapped by `foreman-app::git::GitCli`. Argument lists are built by pure functions in `foreman-core::git`. Every invocation is:
+1. **`foreman-sys::git::run(repo: &Root, args: GitArgs, opts: GitOpts) -> Result<GitOutput, GitError>`** is the only function that spawns git (clippy `disallowed-methods` plus `git::single_entry_point`). `GitArgs` is built by pure functions in `foreman-core::git` from a closed enum of operations:
+   - `Init`, `ConfigGet{key, show_origin}`, `RevParseGitPath`, `Status`, `CatFileBlob{rev, path}`, `HashObjectNoFilters`, `ReadTree`, `UpdateIndexCacheInfo`, `WriteTree`, `CommitTree{tree, parent, msg, sign: SignMode}`, `UpdateRef{ref, new, old}`, `DiffNoExt`, `LsFiles`.
+
+   No free-form argv.
+2. **Invocation**, exactly SR-45:
    ```text
-   git -C <root> -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.pager=cat
-       -c diff.external= -c core.editor=true -c protocol.allow=never <subcommand> …
+   <abs git> -C <root> -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.pager=cat
+     -c core.editor=true -c sequence.editor=true -c commit.gpgSign=false -c tag.gpgSign=false
+     -c core.sshCommand=false -c credential.helper= -c protocol.allow=never <op args>
    ```
-   - `protocol.allow=never` is an extra, additive guarantee that no git call Foreman makes can reach a remote (SR-60).
-   - Environment: `env_clear()`, then `HOME`, `PATH` (built), `LANG=C`, `GIT_TERMINAL_PROMPT=0`; `GIT_OPTIONAL_LOCKS=0` on read-only commands, so `status` doesn't take `index.lock` while Claude works.
-   - stdin is null, the timeout is 60 s, and output is capped. A `commit.gpgsign` GUI prompt ends at the timeout with a clear message.
-2. **Git config preflight**, before any command that writes objects or commits (`add`, `commit`, `hash-object -w`, `commit-tree`):
-   - run `git config --show-origin --show-scope --get-regexp '^(filter\..*|gpg\..*program|core\.sshcommand|commit\.gpgsign)$'`;
-   - a `filter.<driver>.*` defined at **local or worktree scope** (or included from a file under the repo) whose driver applies to any signed path (`git check-attr filter -- <paths>`) **blocks** signing, because `git add` would execute it;
-   - `gpg.program` or `gpg.<format>.program` at local scope blocks signing too;
-   - global and system scope are Billy's own and trusted.
-
-   This tightens SR-45's intent ("a repo's `.git/config` is untrusted"). The spec's flag list doesn't cover filter drivers or `gpg.program`, which run on `add`/`commit` even with hooks disabled.
-3. **Read-back** (SR-42) reads every committed path with `git cat-file blob <commit>:<path>`, not `git show`, so no textconv or filter can alter what's compared. The SHA-256 is compared with what Foreman wrote. On a mismatch: "Your repo's commit hooks changed the packet" with the diff. The same plumbing reads the blueprint at a locked commit (F-002) and the committed packet for tamper checks.
-4. **Signing, current branch:** `git add -- <paths>`, then `git commit --only -m "handoff: stage NN" -- <paths>`. Never `-a` or `add -A`. `--only` with pathspecs excludes Billy's unrelated staged changes.
-5. **Signing, another branch** (SR-43):
-   1. `hash-object -w --no-filters --stdin` per file (bytes from memory; nothing is written to the working tree);
-   2. `GIT_INDEX_FILE=<app-data tmp>`, `read-tree <branch tip>`, `update-index --add --cacheinfo 100644,<oid>,<path>`, `write-tree`;
-   3. `commit-tree <tree> -p <tip> -m …`;
-   4. `update-ref refs/heads/<branch> <new> <tip>` (old value given, so a concurrent move fails).
-
-   HEAD, the real index and the working tree are untouched.
-6. Everything is recorded in the stage record (hooks disabled, overrides used, commit OID).
+   - environment: `env_clear()`, then `HOME`, a fixed `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin` plus the git binary's own directory), `LANG=C`, `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0`, and `GIT_INDEX_FILE` only for Foreman's temporary index (created in app data, `0600`);
+   - stdin: a pipe used only for `hash-object --stdin`, otherwise null;
+   - 60 s timeout; output capped at 8 MB;
+   - `-z` porcelain or plumbing formats only.
+3. **Every commit is plumbing** (current branch, another branch, and P1 decision-file commits):
+   1. Re-read each path through `store` and compare with the reviewed hash (SR-42).
+   2. `hash-object -w --no-filters --stdin` per file, with bytes from memory. No repo filter driver can run.
+   3. `GIT_INDEX_FILE=<tmp> read-tree <tip>`, then `update-index --add --cacheinfo 100644,<oid>,<path>` per path, then `write-tree`.
+   4. `commit-tree <tree> -p <tip> -m "handoff: stage NN"` with `SignMode`: `--no-gpg-sign` unless `git config --show-origin --show-scope commit.gpgSign` reports `true` from **global or system** scope **and** every `gpg.*` key that would apply also comes from global/system scope. Then `-S` is used, and the run has the 60 s timeout for a GUI pinentry. Local-scope signing settings are ignored, with a notice.
+   5. `update-ref <HEAD or refs/heads/branch> <new> <old>` (old value given, so a concurrent move fails cleanly).
+   6. Current branch only: `update-index --cacheinfo` on the **real** index for exactly those paths, so `git status` shows them clean. Billy's other staged changes are untouched.
+4. **Read-back:** `cat-file blob <commit>:<path>` for every path, with SHA-256 compared against what Foreman wrote. `cat-file` applies no textconv or filters. A mismatch shows the diff and keeps the stage in `signed (commit pending)`.
+5. **Reads:** lock restore (`cat-file blob <commit>:<path>`), dirty check (`status --porcelain=v2 -z --ignore-submodules=all -- <path>`), `rev-parse --git-path info/exclude` (SR-32), `config --get user.name`. All go through `git::run`.
+6. Every commit's stage record notes the overrides, the sign mode and the commit OID.
 
 ## Alternatives considered
 
-- **`git2` 0.21.0 (libgit2).** In-process, no CLI parsing. Lost because:
-  - it's C code linked into Foreman, with OpenSSL and libssh2 if its network features are enabled (and cargo-deny would have to police that);
-  - its behavior on attributes, filters, `commit.gpgsign` and hooks differs from the git Billy uses in the same repos;
-  - the spec's guarantees are phrased as git CLI flags that are auditable in argv logs.
-- **`gix` 0.89.0** (gitoxide, pure Rust). Safe Rust and no subprocess, with `hash-object`/`commit-tree` equivalents. Lost because it's pre-1.0 with fast-moving APIs; its index/`add` with attributes, filters and signing is not at git parity; and mixing gix-written commits with CLI git in the same repo invites subtle differences (for example signing config ignored). A good candidate for read-only paths later (Exit path).
-- **Running `git` through a shell.** Forbidden (SR-02).
+- **`git add -- <paths>` then `git commit --only -- <paths>`** (MASTER-SPEC §8 and r6 F-014 as frozen). Simple porcelain, but `git add` runs repo-configured clean filters, and `git commit` honors repo-local `gpg.program`. Hooks off doesn't stop either. The security review replaced it with plumbing (SR-42), and this ADR follows the requirement. **The frozen spec text must be aligned (Change Request).**
+- **`git2` 0.21.0 (libgit2).** In-process, but C code linked into Foreman (plus OpenSSL/libssh2 if network features creep in, and banned by ADR-016). Its attribute, filter and signing behavior differs from the git CLI used in the same repos, and the spec's guarantees are phrased as CLI flags auditable in argv.
+- **`gix` 0.89.0** (pure Rust). Safe and promising, with plumbing equivalents. But it's pre-1.0 with fast-moving APIs, and mixing gix-written objects and refs with CLI git in one repo risks subtle divergence. A candidate for read-only operations later.
 
 ## Consequences
 
-- Each git call is a process spawn (~ms). Signing makes about 6–10 calls, which is fine for a click-driven action.
-- Output parsing uses porcelain/plumbing formats only (`--porcelain=v2 -z`, `cat-file`, `rev-parse`), which are stable.
-- If Billy's own global hooks or signing config are needed for signing commits, they still apply (global scope), except hooks, which never run (SR-44).
+- Signing is about 8–12 short git processes, which is fine for a click-driven action.
+- Because commits bypass `git add`, `.gitattributes` text conversion (for example `eol=crlf`) is **not** applied. Foreman writes LF and commits the exact bytes it wrote, which is what read-back verifies.
+- If Billy signs commits globally, Foreman's commits are signed too. Repo-local signing config is ignored by design.
 
 ## Verification
 
-Fixture repos:
+Fixture repos and tests:
 
-- lint-staged + Prettier on Markdown: `git::no_hooks_on_any_command`, `sign::readback_detects_hook_rewrite` (with the hooks path forced through a local `core.hooksPath` to prove the override wins);
-- a new untracked packet and stage record;
-- a dirty tree with unrelated staged files: `sign::pathspec_only`;
-- `sign::other_branch_leaves_worktree_head_and_index`;
-- `sign::refuses_changed_file`;
-- `git::invocation_snapshot`, `git::timeout`;
-- `git::local_filter_blocks_signing`, `git::local_gpg_program_blocks_signing`, `git::protocol_never`;
+- `git::single_entry_point` (clippy `disallowed-methods`), `git::invocation_snapshot`, `git::env_cleared`, `git::timeout`, `git::no_hooks_on_any_command` (repo with local `core.hooksPath` and lint-staged);
+- `git::filter_driver_never_runs` (a local `filter.x.clean` that would touch a marker file);
+- `git::repo_gpg_program_never_runs` (local `gpg.program` + `commit.gpgSign=true`);
+- `sign::refuses_changed_file`, `sign::pathspec_only` (unrelated staged changes survive and aren't committed), `sign::untracked_new_packet`, `sign::readback_detects_mismatch`, `sign::other_branch_leaves_worktree_head_and_index`, `sign::concurrent_ref_move_fails`;
 - `lock::restore_from_git`.
 
 ## Revisit when
 
-- gix reaches 1.0 with index/add/commit parity, including attributes and signing.
-- git changes the semantics of `commit --only` or the `-c` keys used (git release notes are checked when Doctor sees a new major).
+- gix reaches 1.0 with plumbing parity.
+- git changes plumbing semantics for `commit-tree`/`update-ref` (checked when Doctor sees a new git major).
 
 ## Exit path
 
-`GitCli` sits behind a `GitPort` trait (`read_blob`, `status`, `commit_paths`, `commit_on_branch`, `init`). A gix implementation can replace read-only operations first (`read_blob`, `status`), then the rest, test by test against the same fixtures.
+`git::run` takes a closed operation enum, so a gix-backed implementation can replace operations one at a time behind the same enum, verified against the same fixtures.

@@ -44,15 +44,18 @@ Checked 2026-10-19:
      { crate = "axum", reason = "SR-60: only under the e2e feature" },
      { crate = "openssl", reason = "SR-60: no TLS stack needed" }, { crate = "rustls", reason = "SR-60" },
      { crate = "native-tls", reason = "SR-60" }, { crate = "git2", reason = "ADR-012" },
-     { crate = "keyring", reason = "SR-51" },
+     { crate = "keyring", reason = "SR-51" }, { crate = "security-framework", reason = "SR-51: no keychain access" },
    ]
    ```
+
+   **Verified on 2026-10-19:** a scratch workspace with the planned dependencies (tauri 2.12.4, tauri-build 2.7.3, portable-pty 0.9.0, notify 8.2.0, notify-debouncer-full 0.7.0, comrak 0.56.0, tokio 1.54.0, rustix 1.1.5, the five plugins, tracing-subscriber, jiff, sha2, uuid) was resolved with `cargo generate-lockfile`. `cargo tree --target aarch64-apple-darwin -e normal,build -i <crate>` reported nothing for **every** banned crate above, including `reqwest`, `hyper`, `hyper-util`, `rustls`, `openssl`, `security-framework` and `keyring`, across 383 crates. With `--target all`, `reqwest` appears (the mobile-only path), which is why the target filter is required.
 2. CI job `deny`: `cargo deny --workspace check` with the default config. A second job, `deny-e2e`, runs with `--features e2e` and an `e2e` exception file that allows `axum`/`hyper` only as dependencies of `tauri-plugin-wdio-webdriver` (`wrappers`), proving the server enters only through that plugin.
 3. **Webview:** CSP `connect-src ipc: http://ipc.localhost` and `default-src 'self'` (ADR-014); no remote fonts or images.
 4. **Git:** `-c protocol.allow=never` on every call (ADR-012).
-5. **JS:** `pnpm audit --prod` in CI. No runtime package may call `fetch`/`XMLHttpRequest`/`WebSocket` to a non-IPC origin (the CSP blocks it; a Playwright test asserts zero requests outside `ipc:` during the P1 flow).
-6. **Behavioral test:** `network::blocked_network_run`. The WDIO smoke runs with the macOS application firewall or a `pf` anchor denying Foreman's outbound traffic (on Billy's Mac before the M5 security gate), with no errors and full function.
-7. A new dependency needs a line in the ADR log saying why (SR-61). `cargo deny` licenses are reviewed at each stage gate.
+5. **JS:** `pnpm audit` in CI (policy details in ADR-024). No runtime package may call `fetch`/`XMLHttpRequest`/`WebSocket` to a non-IPC origin (the CSP blocks it; a Playwright test asserts zero requests outside `ipc:` during the P1 flow).
+6. **Behavioral test** (SR-60): `network::blocked_network_run`, a full harness run plus the WDIO smoke under a `sandbox-exec` profile with `(deny network*)` (allowing only local Unix sockets the WebKit helpers need), on Billy's Mac before the M5 security gate, with no errors and full function. `sandbox-exec` is deprecated but still shipped. **UNVERIFIED** on macOS 27 (not testable from this Linux session). The fallback is a `pf` anchor denying the Foreman process's outbound traffic.
+7. **JS supply chain:** ADR-024.
+8. A new dependency needs a line in the ADR log saying why (SR-61). `cargo deny` licenses are reviewed at each stage gate.
 
 ## Alternatives considered
 

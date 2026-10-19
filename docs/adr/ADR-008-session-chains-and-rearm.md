@@ -46,7 +46,7 @@ Spikes S-3 (effort on resume) and S-8 (graceful end, fork IDs, latency) decide b
 
 ## Verification
 
-- Fake-claude tests: `argv::session_id_only_on_chain_start`, `rearm::ctrl_c_then_exit_order`, `rearm::no_kill_without_idle_or_confirm`, `rearm::only_from_user_action` (no internal caller of `rearm_start`), `chain::superseded_on_rerun`, `chain::broken_when_transcript_missing`, `chain::fork_argv`.
+- Fake-claude tests: `argv::session_id_only_on_chain_start_or_fork` (SR-14), `rearm::ctrl_c_then_exit_order`, `rearm::no_kill_without_idle_or_confirm`, `rearm::only_from_user_action` (no internal caller of `rearm_start`), `chain::superseded_on_rerun`, `chain::broken_when_transcript_missing`, `chain::fork_argv`.
 - Proptest over random sequences of step runs: no argv has both `--session-id` and `--resume` except the fork form.
 - S-3, S-8 and S-23 on Billy's Mac (Stage 5.3).
 

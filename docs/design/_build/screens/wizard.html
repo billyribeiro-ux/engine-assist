@@ -16,7 +16,7 @@
 .wiz-foot { display: flex; gap: var(--space-3); margin-top: var(--space-6); align-items: center; }
 .wiz-foot .spacer { flex: 1; }
 .writes-inline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); margin-top: var(--space-4); font-size: var(--text-12); }
-.writes-inline h3 { font-size: var(--text-12); font-weight: var(--weight-semibold); color: var(--ink-muted); margin-bottom: 4px; }
+.writes-inline .wi-h { font-size: var(--text-12); font-weight: var(--weight-semibold); color: var(--ink-muted); margin-bottom: 4px; }
 .writes-inline code { font-size: var(--text-12); }
 .writes-inline li { padding: 2px 0; }
 </style>
@@ -47,9 +47,9 @@
             <li><span class="num">6–18</span>{{g:dashsq}}<span>Foundation to Maintenance</span><span class="why">Shown but not runnable until a later blueprint annotates them</span></li>
           </ol>
           <div class="writes-inline" aria-label="File writes">
-            <div><h3>Create</h3><ul><li><code>.foreman/</code> (3 files)</li><li><code>docs/handoff/</code></li><li><code>docs/templates/</code> (3 files)</li><li><code>spec/</code></li></ul></div>
-            <div><h3>Leave alone</h3><ul><li><code>docs/lessons.md</code>, exists</li><li><code>README.md</code>, exists</li></ul></div>
-            <div><h3>Refuse to overwrite</h3><ul><li>None</li></ul></div>
+            <div><h2 class="wi-h">Create</h2><ul><li><code>.foreman/</code> (3 files)</li><li><code>docs/handoff/</code></li><li><code>docs/templates/</code> (3 files)</li><li><code>spec/</code></li></ul></div>
+            <div><h2 class="wi-h">Leave alone</h2><ul><li><code>docs/lessons.md</code>, exists</li><li><code>README.md</code>, exists</li></ul></div>
+            <div><h2 class="wi-h">Refuse to overwrite</h2><ul><li>None</li></ul></div>
           </div>
           <div class="wiz-foot">
             <button class="btn">Back</button><span class="spacer"></span>
@@ -61,4 +61,4 @@
     </main>
   </div>
 </div>
-{{legend:Whole screen is <span class="p2tag">P2</span>}}
+{{legend:All <span class="p2tag">P2</span>}}

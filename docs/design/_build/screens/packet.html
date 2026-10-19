@@ -1,0 +1,94 @@
+<!-- title: Foreman mockup: Packet -->
+<style>
+.packet-head { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.packet-header-line { font-family: var(--font-mono); font-size: var(--text-mono); padding: 6px 10px; background: var(--well); border: var(--hairline) solid var(--rule); }
+.pfields { margin-top: var(--space-5); border-top: var(--hairline) solid var(--rule); }
+.pf { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: var(--space-5); padding: 10px var(--space-4); border-bottom: var(--hairline) solid var(--rule); }
+.pf dt { font-size: var(--text-12); color: var(--ink-muted); font-weight: var(--weight-medium); padding-top: 1px; }
+.pf dd { min-width: 0; }
+.pf dd ul { display: grid; gap: 2px; }
+.pf.has-problem { background: var(--fail-wash); box-shadow: inset 3px 0 0 var(--fail); }
+.pf.has-note { box-shadow: inset 3px 0 0 var(--accent-ink); }
+.problem { margin-top: 8px; display: grid; gap: 8px; font-size: var(--text-12); }
+.problem p { color: var(--ink); display: flex; gap: 6px; align-items: flex-start; }
+.problem p .icon { color: var(--fail); margin-top: 1px; }
+.problem .actions { gap: var(--space-2); }
+.summary-bar { display: flex; gap: var(--space-5); align-items: center; padding: var(--space-3) var(--space-4); margin-top: var(--space-5); border: var(--hairline) solid var(--fail); background: var(--fail-wash); }
+.summary-bar .status { font-weight: var(--weight-semibold); }
+.raw { margin: 0; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6; white-space: pre; overflow-x: auto; }
+.raw .ln { color: var(--ink-muted); display: inline-block; width: 22px; text-align: right; margin-right: 8px; user-select: none; }
+.raw .bad { background: var(--fail-wash); color: var(--ink); display: block; box-shadow: inset 2px 0 0 var(--fail); }
+.condition-box { border: 1px solid var(--attention); background: var(--attention-wash); padding: var(--space-4); display: grid; gap: var(--space-3); }
+.condition-box .row { display: flex; align-items: center; gap: var(--space-4); justify-content: space-between; }
+</style>
+<div class="app">
+  {{sidebar:tradelog-s2}}
+  <div class="window">
+    {{titlebar:TradeLog|docs/handoff/stage-02.md|insp}}
+    {{strip:s2}}
+    <div class="body">
+      <main class="main" id="main" aria-labelledby="pk-title">
+        <div class="page" style="max-width:920px">
+          <div class="packet-head">
+            <h1 class="page-title" id="pk-title">Stage 2 packet</h1>
+            <span class="packet-header-line" aria-label="Packet header">=== HANDOFF PACKET · Stage 2 → Stage 3 ===</span>
+          </div>
+          <p class="page-sub">Written by 2.6 at 15:41. Foreman checks it every time the file changes; nothing here edits it.</p>
+          <div class="summary-bar" role="status" aria-live="polite">
+            <span class="status fail">{{g:cross:fail}}2 problems</span>
+            <span class="muted" style="font-size:var(--text-12)">Fix both, then attest the Stage 2 items and run F.2. Sign stays locked until then.</span>
+          </div>
+
+          <dl class="pfields" aria-label="Packet fields">
+            <div class="pf"><dt>Project</dt><dd>TradeLog</dd></div>
+            <div class="pf has-note"><dt>Approved by</dt><dd>Unsigned <span class="muted">(the file says <code>&lt;sign here&gt;</code>; Foreman treats it as unsigned and writes your name at signing)</span></dd></div>
+            <div class="pf"><dt>Positioning</dt><dd>TradeLog turns broker fills into a journal you actually keep: every trade imported, tagged by setup, and scored by expectancy, so a trader sees which setups pay within a week.</dd></div>
+            <div class="pf"><dt>V1 features</dt><dd><ul><li>F-001 Broker CSV import with fill matching</li><li>F-002 Setup tags and playbooks</li><li>F-003 Expectancy by setup, time of day, and size</li><li><span class="muted">and 11 more</span></li></ul></dd></div>
+            <div class="pf"><dt>Stack (final)</dt><dd>SvelteKit 3 · Rust/Axum · Postgres 18 · Fly.io <span class="muted">(r7-stack.md, your choice recorded)</span></dd></div>
+            <div class="pf has-problem" id="prob-data">
+              <dt>Data we handle</dt>
+              <dd><span class="muted">Missing</span>
+                <div class="problem">
+                  <p>{{i:cross}}<span>The field DATA WE HANDLE is required for Stage 2 and isn't in the file. Stage 3's security and privacy requirements read it.</span></p>
+                  <div class="actions"><button class="btn">{{i:wrench}}Repair {{p2}}</button><button class="btn ghost">{{i:file}}Open in editor</button></div>
+                </div></dd></div>
+            <div class="pf has-problem" id="prob-open">
+              <dt>Open items</dt>
+              <dd><code>Confirm the tier names with the trading room before Stage 3</code>
+                <div class="problem">
+                  <p>{{i:cross}}<span>OPEN ITEMS must be exactly "none". Resolve this item, or move it to KNOWN LIMITS with a ticket ID.</span></p>
+                  <div class="actions"><button class="btn">{{i:wrench}}Repair {{p2}}</button><button class="btn ghost">{{i:file}}Open in editor</button></div>
+                </div></dd></div>
+            <div class="pf"><dt>Next</dt><dd>Stage 3 · Permits &amp; Zoning · Claude chat · Opus 5.5 <span class="muted">(matches the next applicable stage)</span></dd></div>
+            <div class="pf"><dt>Files</dt><dd><code>spec/MASTER-SPEC.md</code>, <code>spec/council/r1…r8</code></dd></div>
+          </dl>
+          <p class="remap" style="margin-top:var(--space-4)">Repair re-arms the council session with: "Fix only these problems in docs/handoff/stage-02.md: … Do not change anything else."</p>
+        </div>
+      </main>
+      <aside class="inspector" aria-label="Inspector: raw packet and conditions">
+        <div class="insp-tabs" role="tablist" aria-label="Inspector views"><button role="tab" aria-selected="true">Packet</button><button role="tab" aria-selected="false">Gate</button><button role="tab" aria-selected="false">Lessons</button><span style="margin-left:auto">{{p2}}</span></div>
+        <div class="insp-body" role="tabpanel">
+          <div class="condition-box" role="group" aria-labelledby="cc-h">
+            <h2 class="insp-title" id="cc-h">{{g:question:attention}} Confirm conditions</h2>
+            <p class="insp-sub" style="color:var(--ink)">payments is undecided. Signing Stage 2 freezes the conditions, so decide it first.</p>
+            <div class="row"><code>payments</code><div class="seg" role="radiogroup" aria-label="payments"><button role="radio" aria-checked="false">Yes</button><button role="radio" aria-checked="false">No</button><button role="radio" aria-checked="true">Undecided</button></div></div>
+          </div>
+          <div>
+            <h2 class="insp-title">Raw file</h2>
+            <p class="insp-sub">docs/handoff/stage-02.md, lines with problems marked</p>
+          </div>
+<pre class="raw" aria-label="Raw packet text"><span class="ln">1</span>=== HANDOFF PACKET · Stage 2 → Stage 3 ===
+<span class="ln">2</span>PROJECT: TradeLog
+<span class="ln">3</span>APPROVED BY: &lt;sign here&gt;
+<span class="ln">4</span>POSITIONING: TradeLog turns broker fills…
+<span class="ln">18</span>STACK (FINAL): SvelteKit 3 · Rust/Axum …
+<span class="ln">23</span>NFRs: p95 import &lt; 3 s for 10k fills …
+<span class="ln">26</span>PRICING SIGNALS: none (commercial = no)
+<span class="bad"><span class="ln">27</span>OPEN ITEMS: Confirm the tier names with …</span><span class="ln">28</span>NEXT: Stage 3 · Permits &amp; Zoning · …
+<span class="ln">29</span>FILES: MASTER-SPEC.md, council/r1…r8</pre>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+{{legend:}}

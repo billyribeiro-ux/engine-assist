@@ -70,7 +70,6 @@ def main() -> None:
                         ctx.close()
         browser.close()
     if axe_src:
-        out = DESIGN.parent.parent / ".axe-results.json"
         print(json.dumps({k: [(v["id"], v["impact"], len(v["nodes"])) for v in vs] for k, vs in results.items()}, indent=1))
         Path(args.axe).parent.joinpath("axe-results.json").write_text(json.dumps(results, indent=1))
 

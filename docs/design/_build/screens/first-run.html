@@ -1,0 +1,58 @@
+<!-- title: Foreman mockup: First run -->
+<style>
+.fr { display: grid; grid-template-columns: minmax(0, 720px); padding: var(--space-8) var(--space-8) var(--space-8) 96px; }
+.fr-hero { display: grid; gap: var(--space-3); margin-bottom: var(--space-7); }
+.fr-hero h1 { font-size: var(--text-28); font-weight: var(--weight-semibold); letter-spacing: -0.015em; line-height: 1.15; }
+.fr-hero p { color: var(--ink-muted); max-width: 60ch; }
+.fr-steps > li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--space-4); padding: var(--space-4) 0; border-top: var(--hairline) solid var(--rule); }
+.fr-steps > li:last-child { border-bottom: var(--hairline) solid var(--rule); }
+.fr-n { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--control-edge); display: grid; place-items: center; font-size: var(--text-12); font-weight: var(--weight-semibold); }
+li.done .fr-n { border-color: var(--pass); color: var(--pass); }
+li.now .fr-n { border-color: var(--accent-ink); color: var(--accent-ink); border-width: 1.5px; }
+li.later { color: var(--ink-muted); }
+.fr-t { font-weight: var(--weight-semibold); font-size: var(--text-15); }
+.fr-d { font-size: var(--text-12); color: var(--ink-muted); margin-top: 2px; }
+.fr-body { margin-top: var(--space-4); display: grid; gap: var(--space-4); }
+.trust { border: var(--hairline) solid var(--rule); background: var(--ground); padding: var(--space-4); display: grid; gap: var(--space-3); font-size: var(--text-12); }
+.fr .writes li { grid-template-columns: 120px minmax(0, 1fr); }
+.empty-start { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
+</style>
+<div class="app">
+  {{sidebar:none}}
+  <div class="window no-strip">
+    {{titlebar:Welcome to Foreman||}}
+    <main class="main" id="main" aria-labelledby="fr-title">
+      <div class="fr">
+        <div class="fr-hero">
+          <h1 id="fr-title">Set up the site office</h1>
+          <p>Foreman reads your blueprint, checks this Mac, and then you start your first project. It never edits the blueprint or your Claude settings.</p>
+        </div>
+        <ol class="fr-steps">
+          <li class="done"><span class="fr-n" aria-hidden="true">{{g:check:pass}}</span><div><div class="fr-t">Blueprint repo</div><div class="fr-d">Found ~/claude-blueprint. Blueprint 2.2 at a3f9c1, grammar v1.</div></div></li>
+          <li class="done"><span class="fr-n" aria-hidden="true">{{g:check:pass}}</span><div><div class="fr-t">Template health</div><div class="fr-d">Stages 0 to 5 runnable. Stages 6 to 18 need annotation. 0 errors, 2 warnings.</div></div></li>
+          <li class="done"><span class="fr-n" aria-hidden="true">{{g:check:pass}}</span><div><div class="fr-t">Your name for signatures</div><div class="fr-d">Billy Ribeiro, from git config user.name</div></div></li>
+          <li class="now" aria-current="step"><span class="fr-n" aria-hidden="true">4</span><div>
+            <div class="fr-t">Doctor</div><div class="fr-d">Checks Claude Code, your sign-in, and git.</div>
+            <div class="fr-body">
+              <ul class="writes">
+                <li><span class="what">{{g:check:pass}} Claude Code</span><span>2.1.293 at /opt/homebrew/bin/claude</span></li>
+                <li><span class="what">{{g:check:pass}} Sign-in</span><span>claude.ai (your Max plan)</span></li>
+                <li><span class="what">{{g:check:pass}} git</span><span>2.51.0 at /usr/bin/git</span></li>
+              </ul>
+              <div class="trust" role="group" aria-labelledby="trust-h">
+                <strong id="trust-h" style="font-size:var(--text-13)">Trust the probe folder once</strong>
+                <span>Foreman checks that Claude Code still accepts its flags by running it in its own empty folder. Claude Code asks whether to trust that folder the first time. Foreman opens it in a terminal tab so you can answer.</span>
+                <code>~/Library/Application Support/dev.foreman/probe</code>
+                <div class="actions"><button class="btn primary is-focus">{{i:terminal}}Open in terminal and trust</button><button class="btn ghost">Skip for now</button></div>
+                <span class="muted">Skipping keeps contract probes off; Doctor reminds you.</span>
+              </div>
+            </div></div></li>
+          <li class="later"><span class="fr-n" aria-hidden="true">5</span><div><div class="fr-t">Start your first project</div>
+            <div class="empty-start"><span class="fr-d">No projects yet. A project is one product in its own folder; Foreman tailors the blueprint to it.</span>
+              <div class="actions"><button class="btn" disabled>Start your first project<kbd>⌘N</kbd></button><span class="reason">Available after Doctor</span></div></div></div></li>
+        </ol>
+      </div>
+    </main>
+  </div>
+</div>
+{{legend:All P1}}
