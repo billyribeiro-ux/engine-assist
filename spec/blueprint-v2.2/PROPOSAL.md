@@ -6,7 +6,7 @@ Source: Stage 2 council for Foreman (`spec/council/r2-proposals.md` §5, decided
 
 Foreman never edits the blueprint. Billy applies these changes in the claude-blueprint repo, renders the PDF, and bumps `CHANGELOG.md`. Foreman's golden fixture then pins the v2.2 file.
 
-Every change below makes the blueprint more precise. None changes the order of stages, a gate, or a model or effort choice. The rendered PDF looks the same except for the wording edits in B-2 to B-6 and B-8, because `fm:` annotations are HTML comments.
+Every change below makes the blueprint more precise. None changes the order of stages, a gate, or a model or effort choice. `fm:` annotations are HTML comments, so they don't render. The rendered PDF changes in two ways: the wording edits in B-2 to B-6 and B-8, and the prompts that get an `fm:if` part (3.2's legal part, 2.2's commercial-only council roles), which become two or three consecutive code boxes, because a block-level comment can't sit inside a fenced code block (Foreman domain rule DR-032). The prompt text itself is unchanged.
 
 | ID | Change | Needed for |
 |---|---|---|
@@ -24,6 +24,8 @@ Every change below makes the blueprint more precise. None changes the order of s
 
 ## B-1 · `fm:` annotations
 
+**Normative source.** The grammar and the reference annotations are specified exactly in Foreman's `docs/domain-rules.md`: **DR-020 to DR-038** (lexical form, version, keys and values, expressions, sessions and chains, `fm:verify`, item kinds, `fm:if`, optional parts, item IDs, unknown keys, actions, diagnostics, and DR-038's table of the reference annotation for every step of Stages 0–5, the Gate, F.2 and Council setup), with DR-005 to DR-008 for placement and step IDs. This section summarizes them for review; where the two differ, the domain rules win, and Foreman's golden test (`template::golden_v2_2`) pins the annotated file against DR-038.
+
 ### Grammar
 
 Revised after the council's red team (`spec/council/r5-resolution.md`, R-05, R-06, R-26): **annotations are the only source** of every field Foreman acts on. Foreman still reads the prose, but only to warn when the prose and the annotation disagree. Every step Foreman runs must carry a full `fm:step`, and inspection items have explicit IDs.
@@ -36,12 +38,12 @@ The first line after the title is the grammar version:
 
 Two more directives, each a block-level HTML comment on its own lines.
 
-`fm:step` goes directly under a RUN WITH blockquote, with no blank line between them:
+`fm:step` goes directly under a RUN WITH blockquote, with no blank line between them (DR-006). A step that has no RUN WITH (Council setup, the 7-day wait after 1.3, the manual "record your final choice" after 2.4, 5.1's second prompt, the 1.4 handoff copy) gets a standalone `fm:step` on its own lines directly after the paragraph or HANDOFF blockquote that describes it, with a letter-suffixed ID of the step it follows: `1.3b`, `1.4b`, `2.4b`, `5.1b` (DR-005, DR-007):
 
 ```text
 <!-- fm:step id=<id> [kind=prompt|followup|action|manual|wait|repeatable]
      [tag=core|conditional|optional] [when=<expr>]
-     [surface=chat|cli|desktop] [cwd=project|spec|blueprint|worktree]
+     [surface=chat|cli|desktop] [cwd=project|spec]
      [session=new|continue] [chain=<stepId>|@stage]
      [start=<model>@<effort>/<mode>] [switch=<trigger>:<model>@<effort>/<mode>]*
      [alt=<rule>:<model>@<effort>]* [in=<name>:<type>[:remember]]*
@@ -58,13 +60,16 @@ Rules:
 
 - Values contain no spaces. Lists are comma-separated. **Every path is repo-relative** (never relative to the step's `cwd`), with no `..`; Foreman renders paths relative to the cwd when it puts them into a prompt.
 - `when` is an expression over condition IDs, using `!`, `&`, `|`, and parentheses (for example `when=payments&!public`). Condition IDs: `idea_known`, `commercial`, `payments`, `multi_user`, `public`, `has_ui`, `others_data`, `server`, `has_database`, `has_uploads`, `has_email`, `has_integrations`; any other ID is an error.
-- `<mode>` is one of `plan`, `default`, `acceptEdits`, `auto`, `dontAsk`. Chat steps omit the mode.
+- `<model>` is one of `fable`, `opus`, `sonnet`, `haiku`, `opusplan`. `<effort>` is one of `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` for CLI and Desktop steps, and `adaptive` only for chat steps (the chat "effort adaptive" in the RUN WITH lines) (DR-023).
+- `cwd` is `project` or `spec`; `blueprint` and `worktree` are reserved for v1.1 and are errors in v1.
 - A `session=continue` step inherits its chain's `cwd`; declaring a different one is an error. `chain=@stage` (used by F.2) means the chain of the stage's packet-producing step.
-- `<mode>` is one of `plan`, `default`, `manual` (alias of `default`), `acceptEdits`, `auto`, `dontAsk`. `bypassPermissions` is always an error.
+- `<mode>` is one of `plan`, `default`, `manual` (alias of `default`), `acceptEdits`, `auto`, `dontAsk`. CLI and Desktop steps must have one; chat steps omit it. `bypassPermissions` is always an error.
 - `tag=optional` with `when`: not applicable when false, skippable with a reason when true.
-- `fm:verify` kinds: `attest` (Billy confirms with a note, or records "not applicable" with a reason), `time:<n>d` (a waiting period, then `>attest`). Reserved for Foreman v1.1: `auto:cmd=<verify-id>` (Foreman runs that approved command itself). The number of entries must equal the number of bullets.
-- Item IDs are stable: Foreman stores a normalized hash of each bullet's text in the lock. If a bullet's text changes, Foreman asks to re-confirm its kind. A retro that reorders bullets keeps each ID with its bullet.
-- An unknown directive or key is an error within a grammar version and a warning across versions.
+- `fm:verify` kinds: `attest` (Billy confirms with a note, or records "not applicable" with a reason), `time:<n>d` (a waiting period, then `>attest`). Reserved for Foreman v1.1: `auto:cmd=<verify-id>` (Foreman runs that approved command itself); Foreman v1 warns and treats it as `attest`. The number of entries must equal the number of bullets.
+- Item IDs are stable and **unique across the whole template**, not just within a stage, because the lock keys items by ID alone (DR-034): a later stage's staging check is `staging-load`, not a second `staging`. Foreman stores a normalized hash of each bullet's text in the lock. If a bullet's text changes, Foreman asks to re-confirm its kind. A retro that reorders bullets keeps each ID with its bullet.
+- Unknown directives and keys: within the declared grammar version, an error. When the file declares a newer grammar version than the Foreman reading it, a step whose `fm:step` has an unknown key becomes "needs a newer Foreman" (shown, not runnable, because Foreman can't know what the key changes); an unknown directive or key anywhere else is a warning, and Template health says "Update Foreman" (DR-021, DR-035).
+- `kind=wait` steps have no duration key: Billy enters the date the wait ends when he starts the step, and Foreman notifies him on that date (DR-067).
+- `kind=followup` is a prompt sent into the chain's **live** session: Foreman copies it and focuses the chain's terminal tab (or, if the session has ended, resumes it with `--resume` and the step's start). A followup can't change model, effort or mode; a step that does must be `kind=prompt`, which re-arms the session (DR-042, DR-068).
 - `<!-- fm:if <expr> -->` … `<!-- fm:end -->` wraps a conditional part of a prompt (block-level, not nested). Foreman removes the part when the expression is false and records it under SKIPPED. An optional part is written inline as `[optional: …]`; Foreman shows it with an Include toggle.
 
 ### What to annotate
@@ -76,12 +81,12 @@ Required for v1 (about 40 comment lines):
 | Location | What the annotations add |
 |---|---|
 | Stage 0 (0.1, 0.2) | Full `fm:step` on each; tag `optional` with `when=!idea_known` (an idea can arrive already chosen) |
-| Stage 1 (1.1 to 1.4) | `in=X:text` on 1.1, `in=changes:text` on 1.2, `in=paste_numbers:text` on 1.4; the 7-day wait as `kind=wait` after 1.3; tags (B-5) |
-| Stage 2 (2.1 to 2.6, Council setup) | `out=` for 2.1 and every council round; Council setup as `kind=action`; the manual "record your final choice" in 2.4 as `kind=manual`; 2.6 `out=spec/MASTER-SPEC.md,docs/handoff/stage-02.md` (B-2) |
+| Stage 1 (1.1 to 1.4) | `in=X:text` and `in=changes:text` on 1.2 (where `[X]` and `[changes]` appear), `in=paste_numbers:multiline` on 1.4; the 7-day wait as `1.3b kind=wait` after 1.3; the handoff copy as `1.4b kind=action` (B-8); tags (B-5) |
+| Stage 2 (2.1 to 2.6, Council setup) | `out=` for 2.1 and every council round; Council setup as `kind=action`; the manual "record your final choice" after 2.4 as `2.4b kind=manual`; 2.6 `out=spec/MASTER-SPEC.md,docs/handoff/stage-02.md` (B-2) |
 | Stage 3 (3.1, 3.2) | `in=jurisdictions:text:remember`; tags (3.1 `conditional`, `when=commercial\|payments`); `fm:if commercial\|others_data\|multi_user` around 3.2's legal part |
 | Stage 4 (4.1 to 4.8) | `session=new` on each; `out=` per document; tags (4.5 `conditional`, `when=has_ui`); late conditions asked at the 4.8 sign |
-| Stage 5 (5.1 to 5.5, gate) | `start`/`switch` for the opusplan → Opus → Sonnet sequence; `fm:verify` on the gate |
-| Stage Gate (A, B, C) | `kind=prompt`, `chain` for B and C; A's headless eligibility comes from `fm:verify` on each stage's inspection list |
+| Stage 5 (5.1 to 5.5, gate) | `start`/`switch` for the opusplan → Opus → Sonnet sequence; 5.1's second prompt as `5.1b kind=followup`; `fm:verify` on the gate |
+| Stage Gate (A, B, C) | A and B `kind=prompt` (B continues A's chain with a new start, so it re-arms); C `kind=followup` in A's chain (same start as B, so it's sent into the live session), `appends=docs/lessons.md`; A's headless eligibility (v1.1) comes from `fm:verify` on each stage's inspection list |
 | F.2 | `kind=followup`, `session=continue`, `chain=@stage`, `appends=docs/lessons.md` (in chat stages Foreman appends the pasted entries; in Stage 2 Claude writes them) |
 
 The remaining stages (6–18) show as "needs annotation" in Foreman's Template health screen until a later v2.x change annotates them.
@@ -97,7 +102,7 @@ Stage 2.2, the council (annotation under the existing RUN WITH):
      out=spec/council/r1-market.md,spec/council/r1-users.md,spec/council/r2-features.md,spec/council/r2-growth.md,spec/council/r2-feasibility.md,spec/council/r3-synthesis.md,spec/council/r4-redteam.md,spec/council/r5-resolution.md -->
 ```
 
-Stage 2.3, a continuing step:
+Stage 2.3, a continuing step. It's `kind=followup` because its start (Fable, high, Accept edits) equals 2.2's live start after its plan-approved switch, so Foreman sends it into the running session instead of re-arming it (DR-042, DR-068); 2.6, which switches to Manual mode, is `kind=prompt`:
 
 ```markdown
 > **RUN WITH** · same session · same chair model · effort unchanged · **Accept edits**
@@ -117,9 +122,11 @@ The Stage 5 gate:
 <!-- fm:verify fresh-clone=attest ci-gates=attest staging=attest adr-check=attest -->
 ```
 
-All four stay `attest` in the shared blueprint. A fresh clone, CI failures and a staging rollback can't be checked by a command run in place, and "no CONTRADICTED left open" is judged by reading. A project can add its own `auto:cmd=` checks through its overlay.
+All four stay `attest` in the shared blueprint. A fresh clone, CI failures and a staging rollback can't be checked by a command run in place, and "no CONTRADICTED left open" is judged by reading. (Items a project adds through its overlay are `attest` too in v1; `auto` checks are v1.1.)
 
-The full annotated text for Stages 0–5 is produced by a Foreman Stage 6 ticket, because only Foreman's parser can prove each annotation loads cleanly. This proposal fixes the grammar and the coverage list.
+The full annotated text for Stages 0–5 is produced by Foreman Stage 6 and 11 tickets (M1-01, M4-04) from DR-038's reference annotations, because only Foreman's parser can prove each annotation loads cleanly. This proposal fixes the grammar and the coverage list.
+
+**Harness fixture values.** The blueprint's Project Variables example for `[BUDGET_TIME]` is itself a placeholder (`[your numbers]`), which Foreman treats as unresolved (DR-083). The TradeLog acceptance fixture therefore uses a real value (for example `BUDGET_TIME = "$0 cash; 10 hours a week for 12 weeks"`); the blueprint text doesn't change.
 
 ---
 
@@ -189,6 +196,8 @@ You read it, add your name and date under APPROVED BY, and commit. **Then** the 
 You read it, fill in APPROVED BY with your name and the date, and commit only that file:
 `git add -- docs/handoff/stage-NN.md docs/lessons.md` then `git commit --only -m "handoff: stage NN" -- docs/handoff/stage-NN.md docs/lessons.md` (plain `git commit -- <paths>` fails for a new, untracked packet). **Then** the next stage starts.
 ```
+
+This by-hand commit is how every stage is signed until Foreman's Sign ships in its phase 2 (P2). From then on, for projects run through Foreman, Foreman's Sign makes the signing commit by git plumbing instead (it never runs `git add` or `git commit`); the blueprint text stays as above for anyone running it by hand.
 
 ---
 
@@ -351,7 +360,7 @@ diff before writing.
 
 ```markdown
 ## 2.2 · <date>
-- Foreman support: `fm:` annotations on Stages 0–5, the Stage Gate, F.2, and Council setup (HTML comments; the PDF is unchanged).
+- Foreman support: `fm:` annotations on Stages 0–5, the Stage Gate, F.2, and Council setup (HTML comments; the PDF shows prompts with a conditional part as consecutive code boxes, text unchanged).
 - Every packet is a file in `docs/handoff/`, including Stage 2's. Gate B no longer commits; the signing commit is the only one.
 - 4.6 tickets use one heading per ticket with labeled fields.
 - 1.4 is core; its press release and FAQ are optional.
