@@ -133,7 +133,7 @@ claude --session-id <uuid>                       # chain start only
        --model <alias> --effort <level> --permission-mode <mode>
        --name fm-<project>-s<NN>-<step>
        --settings <app-data>/runs/<runId>/settings.json
-       [--ax-screen-reader]                      # when VoiceOver is on
+       [--ax-screen-reader]                      # when Settings → Screen reader mode is on
        "<resolved prompt>"
 ```
 
@@ -194,7 +194,7 @@ A packet is valid when:
 
 F.2 is one template step instantiated per stage with `chain=@stage` (the chain of the stage's packet-producing step). A stage's lessons requirement is met by an entry headed `## L-NNN · Stage N` or a "clean stage" entry for that stage.
 
-**Signing** is hash-bound and verified (`docs/requirements.md` SR-42 to SR-45): re-read and compare; write APPROVED BY and Foreman's fields atomically; commit only the named paths through git plumbing (temporary index from HEAD, `hash-object -w --no-filters`, `write-tree`, `commit-tree --no-gpg-sign`, `update-ref HEAD <new> <old>`, then refresh those paths in the real index) on the current branch (the default; Billy works on a branch per stage). Every git call goes through one entry point with a cleared environment and overrides that stop repo hooks, filter drivers, gpg programs, fsmonitor, pagers and editors. Every path is read back from the commit. "Sign on another branch" uses the same plumbing against that branch's tip and leaves HEAD, the index and the working tree untouched. Stage records hold intended and observed models.
+**Signing** is hash-bound and verified: re-read and compare; write APPROVED BY and Foreman's fields atomically; commit **by git plumbing only** on the current branch (the default; Billy works on a branch per stage): `hash-object -w --no-filters` per path, a temporary index from HEAD, `update-index --cacheinfo`, `write-tree`, `commit-tree --no-gpg-sign -m "handoff: stage NN"`, `update-ref HEAD <new> <old>`, then `update-index --cacheinfo` on the real index for those paths only. Foreman never runs `git add`, `git commit`, `git status` or `git diff` (repo filter drivers and `gpg.program` would run), and v1 never GPG-signs commits. Every git call passes the fixed `-c` overrides (hooks, fsmonitor, pager, editors, gpg signing, ssh, credential helper and protocols off) and `GIT_TERMINAL_PROMPT=0` (`docs/requirements.md` SR-42, SR-45). Read every path back from the commit. A repo with no commits yet gets a parentless first commit; a detached HEAD is refused ("Check out a branch first"). "Sign on another branch" uses the same plumbing against that branch's tip and leaves HEAD, the index and the working tree untouched. Stage records hold intended and observed models; the commit's ID lives in app data, because the record is inside the commit.
 
 ## 9. Delivery plan
 
@@ -205,15 +205,15 @@ F.2 is one template step instantiated per stage with `chain=@stage` (the chain o
 | 2 · Complete v1 | F-001 (Stages 0–5, Gate), F-003 (screen), F-006 (Stages 3–5), F-009 (Now/Next, round tracker, focus), F-011, F-012 (ADR split), F-013 (repair, capture), F-014, F-015, F-016, F-017 (inbox), F-018 (wizard), F-019 (Doctor, probes), F-023, F-024, F-025, F-026 (panel, run log screen), F-027, F-028 (palette), F-029 (rest), F-030 (sheet strip, title block) | **TradeLog Stages 3–5 through Foreman; success metrics read** |
 | v1.1 | F-101 … F-108 | v1.1 metric |
 
-**Estimate** (from the r6 sizes; S ≤ 2 days, M ≤ 1 week, L ≤ 3 weeks): phase 0 about 1 week; phase 1 **7–13 weeks** (typical to upper bound), so the **kill check lands at about 8–14 weeks**, after roughly half of the v1 work; phase 2 about 7–12 weeks. Total v1 about 15–26 working weeks; calendar time is longer.
+**Estimate** (restated from the Stage 4.6 tickets, each sized for one Claude Code session of 1–4 hours of Billy's time): **110 tickets come before the kill check** (M0–M3), about **110–440 hours**; v1 is 160 tickets, about 160–640 hours. At Billy's pace that is roughly 3–11 weeks to the kill check at 40 hours a week, longer at part time; calendar time is longer still. The earlier week estimate from the r6 sizes (kill check at 8–14 weeks) is superseded by this count.
 
 **Success metrics (App Brief):** TradeLog Stages 1–5 run entirely through Foreman; zero manual prompt edits; zero gates skipped by accident; starting any step takes under 10 seconds (measured as **p95 ≤ 10 s**, excluding time spent typing run inputs).
 
 **Kill criterion (App Brief), made measurable.** Two measures, defined the same way for Foreman and for the by-hand baseline (`docs/metrics-baseline.md`), compared per surface (chat, CLI):
-- **Time to start a step:** from the moment Billy begins looking for the next step (opening the blueprint or prompts file by hand; focusing Foreman or pressing Do next) to the prompt being sent.
-- **Active time per stage:** from the first step started to the packet signed, excluding waits (Claude working, the 7-day test), so Foreman's own overhead (dialogs, confirmations, re-arm) counts.
+- **Time to start a step:** from the moment Billy begins looking for the next step (opening the blueprint or prompts file by hand; focusing Foreman or pressing Do next) to the step being ready to run, with the same end point on both sides: for CLI, the spawn (by hand, Enter on the typed command); for chat, the filled prompt on the clipboard and the target chat open.
+- **Active time per step:** from that start point to the step done (packet saved, output pasted back, session exited), excluding waits (Claude working, the 7-day test), so Foreman's own overhead (dialogs, confirmations, re-arm, paste-back) counts. Compared as the median per surface.
 
-After TradeLog Stages 1–2: if Foreman's median on either measure isn't lower than the by-hand median for the same surface, or any step needed a manual prompt edit, stop and simplify. The by-hand baseline starts with Foreman's own Stage 5 on Billy's Mac (CLI); the first chat steps Billy runs by hand in any project are logged for the chat baseline.
+After TradeLog Stages 1–2: if Foreman's median on either measure isn't lower than the by-hand median for the same surface, or any step needed a manual prompt edit, stop and simplify. The by-hand baseline starts with Foreman's own Stage 5 on Billy's Mac (CLI); for chat, at least 10 chat steps Billy runs by hand, in any project, between Stage 5 and the kill check are logged (a surface with fewer can't pass).
 
 **v1.1 metric:** one TradeLog milestone through the CLI Crew Loop with zero manual routing and zero lost ticket state. **v1.1 kill criterion:** if routing a ticket through Foreman's loop is slower than the Desktop loop by hand over that milestone, reduce the loop to a launcher.
 
@@ -249,7 +249,7 @@ Evidence and alternatives: `spec/council/r7-stack.md`. Frontend: **Billy's decis
 | State | Svelte 5 runes in `.svelte.ts`, mirroring Rust over commands, Channels and events | Rust is the source of truth. |
 | Tests | cargo test + proptest 1.12.0 + insta 1.49.0 + criterion 0.8.2 (benchmarks) · Vitest 5.0.5 (browser mode) · Playwright 1.64.1 + axe 4.14.0 with mocked IPC · @wdio/tauri-service 1.5.0 smoke (webdriverio 9.32.0) behind an `e2e` feature | `tauri-driver` has no macOS support. |
 | Lint and format | eslint 10.13.0 + eslint-plugin-svelte 3.23.1 + typescript-eslint 8.72.0 · svelte-check 4.7.7 · prettier 3.9.10 · rustfmt + clippy `-D warnings` | Zero-warning gates. |
-| Tauri plugins | opener 2.7.2, clipboard-manager 2.5.0, dialog 2.8.3, window-state 2.5.0; notifications plugin in P2 (version verified in Stage 4.2) | No shell, fs or pty plugins. |
+| Tauri plugins | opener 2.7.2, clipboard-manager 2.5.0, dialog 2.8.3, window-state 2.5.0; notification 2.7.0 in **P1** with the `wait` steps (a wait whose date passed while Foreman was closed notifies at the next launch); P2 adds inbox notifications | No shell, fs or pty plugins. |
 | Hardening | `freezePrototype: true`; `AppManifest::commands`; capabilities per window; explicit `csp` (`script-src 'self'`, `connect-src` Tauri IPC only) and separate `devCsp` | SR-06, SR-08. |
 
 Full pinned list (Rust crates and JS packages): `r7-stack.md` PART 3.
@@ -331,7 +331,7 @@ After v1.0, every change requires a Change Request (`docs/change-requests/CR-NNN
 | Dashboard: progress, time per stage, runs per ticket, CO checklist | Today + Next step in v1; metric panel in P2; dashboard v1.1 (F-108) | Today answers "what next"; the dashboard isn't on the metric path |
 | Stage map with live status | Sheet strip in P2; P1 has a minimal stage workspace | Phase 1 is cut to reach the kill check sooner |
 | Starting any step takes under 10 seconds | p95 ≤ 10 s, excluding typing run inputs | Makes the metric measurable |
-| Kill criterion after two TradeLog stages | Unchanged, measured per surface on two defined measures (§9); reached after about 8–14 weeks | The freeze review's re-estimate (r5b B1) |
+| Kill criterion after two TradeLog stages | Unchanged, measured per surface on two defined measures (§9); reached after 110 tickets, about 110–440 hours (§9, restated at Stage 4.7) | The freeze review's re-estimate (r5b B1), restated from the Stage 4.6 tickets |
 | Lets me sign packets | In P1, Billy signs by hand as today; Foreman's signing ships in P2 | Same as above |
 | Blueprint v2.1 as the template | Foreman v1 targets blueprint v2.2 (`spec/blueprint-v2.2/PROPOSAL.md`); signing the Stage 2 packet approves applying it | Annotations, packet files and strict tickets are needed to run the blueprint without guesses |
 
@@ -412,7 +412,7 @@ Scale (pt): 11 · 12 · 13 (body) · 15 · 18 · 22 · 28. Body line height 1.45
 │            │  6.2  Authentication   n/a · single-user app         │               │
 │            │  +                                                   │               │
 ├────────────┴──────────────────────────────────────────────────────┴───────────────┤
-│  Terminal drawer: tabs per run (fm-tradelog-s06-6.1 …)                           ⌃` │
+│  Terminal drawer: tabs per run (fm-tradelog-s06-6-1 …)                           ⌃` │
 └────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
