@@ -25,7 +25,7 @@ Repo files are shared across machines and possibly across Foreman versions; app 
    - `migrate::<T>()` applies the chain, then deserializes with `deny_unknown_fields`.
 3. **Reading** a file:
    - `schemaVersion` < CURRENT → migrate in memory. The migrated form is written back only on Foreman's next legitimate write to that file (never just because it was read), so opening a project doesn't create repo diffs.
-   - `schemaVersion` > CURRENT → **read-only** with "Created by a newer Foreman (schema N). Update Foreman to edit this project." Nothing is written.
+   - `schemaVersion` > CURRENT → **read-only** with "Created by a newer Foreman (schema N). Update Foreman to edit this project." Nothing is written. The full typed parse (`deny_unknown_fields`) would fail on a newer file, so the older build does a **tolerant header read** first: a separate small struct without `deny_unknown_fields` that takes only `schemaVersion` and the identity fields (`projectId`, `name`) and ignores everything else. That is enough for the banner, the sidebar entry and Open in editor; the rest of the project isn't interpreted.
    - Missing or invalid → the F-020 invalid-file path.
 4. **Golden fixtures:** for every historical version of every file kind, a fixture in `crates/foreman-core/tests/schema/<kind>/v<N>.json` must migrate to an insta snapshot of the current form. Removing a migration is forbidden; the chain only grows.
 5. Template caches (`templates/<sha256>.md`) are content-addressed and need no versioning. The parsed `Template` cache includes Foreman's parser version in its key, so a parser upgrade re-parses.
@@ -40,7 +40,7 @@ Repo files are shared across machines and possibly across Foreman versions; app 
 ## Consequences
 
 - Every schema change carries a migration and a fixture in the same change. That's the cost of never losing data.
-- Older Foreman builds can still read newer projects (read-only), so Billy can always see his state.
+- Older Foreman builds still open newer projects: the tolerant header read gives the read-only banner and the project's identity, and Open in editor shows the files. They don't render the newer state itself (they can't know its meaning). Test: `schema::older_build_header_read_banner`.
 
 ## Verification
 

@@ -8,7 +8,7 @@ Proposed
 
 ## Context
 
-F-026 must produce the kill-check numbers at the end of P1 (M3): time to start a step and active time per stage, per surface, compared with `docs/metrics-baseline.md`. Requirements:
+F-026 must produce the kill-check numbers at the end of P1 (M3): time to start a step and active time per step, median per surface, compared with `docs/metrics-baseline.md`. Requirements:
 
 - **NFR-21:** 100,000 run entries without degrading.
 - **SR-52:** argv stored with the prompt replaced by `<prompt sha256:…>`; env names only.
@@ -30,10 +30,10 @@ F-026 must produce the kill-check numbers at the end of P1 (M3): time to start a
      "status": "running|exited|errored|interrupted", "exitCode": null, "claudeVersion": "2.1.303" }
    ```
    - Times are monotonic-derived milliseconds plus a wall-clock RFC 3339 start (`jiff` 0.2.38).
-   - `lookStart` is when Foreman was focused or Do next was pressed (MASTER-SPEC §9 definition). For chat steps, the "sent" moment is Copy and open.
-2. **Index** `runs/index-YYYY-MM.jsonl`: one summary line per run, appended at exit with `O_APPEND` and `sync_data` (ADR-010). Readers skip a torn last line. The metric panel and Export read only indexes (NFR-21: about 200 bytes × 100 k ≈ 20 MB across files; a month file is scanned linearly).
-3. **Active time per stage:** derived from the index (first step started → packet signed), minus waits recorded as intervals (`waiting-until`, Claude-working periods from run spans).
-4. **Export metrics** (P1): `core::runlog::export_metrics(index, baseline) -> String` produces Markdown tables per surface and per stage in `docs/metrics-baseline.md`'s layout (median, p95, n; manual-edit count; Copy-prompt usage), saved through a Rust-side save dialog.
+   - `lookStart` is when Foreman was focused or Do next was pressed (MASTER-SPEC §9 definition). The end point is the same as the by-hand baseline's (AC-KC-01): for CLI the spawn; for chat, the moment the filled prompt is on the clipboard and the target chat is open (when Copy and open returns).
+2. **Index** `runs/index-YYYY-MM.jsonl`: one summary line per run, appended at exit with `O_APPEND` and `sync_data` (ADR-010). Readers skip a torn last line. The metrics strip on the Run log screen (`metrics_view`) and Export read only indexes (NFR-21: about 200 bytes × 100 k ≈ 20 MB across files; a month file is scanned linearly).
+3. **Active time per step:** derived from the index (the step's `lookStart` → the step done: exit, packet saved or Mark done), minus waits recorded as intervals (`waiting-until`, Claude-working periods from run spans); compared as the median per surface (AC-KC-02).
+4. **Export metrics** (P1): `core::runlog::export_metrics(index, baseline) -> String` produces Markdown tables per surface and per stage in `docs/metrics-baseline.md`'s layout (median, p95, n; manual-edit count; Copy-prompt usage), saved through a Rust-side save dialog (`WritePurpose::UserExport`, `.md` only).
 5. **Output tails:** `runs/<runId>/output.log`, the last 2,000 lines (ADR-006), pruned after 90 days by a startup pruner, which also prunes templates unused for 90 days and events past retention.
 6. **Diagnostics:**
    - `tracing` 0.1.44 + `tracing-subscriber` 0.3.23 to `logs/foreman.log`, through Foreman's own size-rotating writer (10 MB × 5, about 60 lines; `tracing-appender` rotates by time, not size). Files are `0600`.

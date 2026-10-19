@@ -48,7 +48,7 @@ Source checks of `portable-pty` 0.9.0 (22 M downloads, 662 reverse deps; source 
   - `pty_write(runId, bytes ≤ 64 KB)` covers keystrokes only and is refused unless the run is live (SR-24).
   - `pty_paste(runId)` reads the clipboard **in Rust** (SR-56: text only, ≤ 1 MB, on this explicit action, never logged), applies `core::sanitize::for_paste`, and returns the sanitized text plus a "removed N control characters" notice. That function removes every ESC, C0 except TAB/LF/CR, DEL and C1. The webview then calls `term.paste(text)`, so xterm adds the bracketed-paste markers around text that can no longer contain `ESC[201~`. xterm's own paste-event handling is disabled (the custom key handler intercepts ⌘V, and a capture-phase `paste` listener on the terminal element calls `preventDefault`).
   - `pty_resize` calls `MasterPty::resize`; `pty_interrupt` writes `\x03`.
-- **Signals:** Terminate sends `SIGTERM` to the child's process group (`rustix::process::kill_process_group`), waits 5 s, then `SIGKILL`, with a confirmation when not idle (F-009, SR-13). On quit after the quit guard, `ChildKiller::kill` (SIGHUP, SR-57).
+- **Signals:** Terminate sends `SIGTERM` to the child's process group (`rustix::process::kill_process_group`), waits 5 s, then `SIGKILL`, after a native confirmation raised by Rust (always in P1; in P2 only when the session isn't idle; F-009, SR-13, SR-24a). On quit after the quit guard, `ChildKiller::kill` (SIGHUP, SR-57).
 - `output.log` is flushed from the ring every 5 s and at exit, best effort and not fsync'd (a diagnostic tail, SR-53). `run.json` is the durable state (ADR-010).
 
 **Webview side (`#lib/terminal`):**

@@ -22,14 +22,14 @@ r1 §A1 probed comrak and pulldown-cmark on the real blueprint: both produce ide
    - stages (`## Stage N:`);
    - steps (`### Prompt N.M:`, Gate prompts, Council setup, F.2);
    - RUN WITH blockquotes;
-   - fenced `text` prompt blocks;
+   - fenced `text` prompt blocks (a prompt may be several `text` fences separated only by `fm:if`/`fm:end` blocks, DR-008, DR-032);
    - INSPECTION blockquotes and their bullets;
    - HANDOFF blockquotes;
-   - packet formats (fences starting `=== HANDOFF PACKET`);
+   - packet formats: the `=== HANDOFF PACKET · Stage <a> → Stage <b> ===` line **inside a step's `text` prompt fence**, to the first blank line or the fence's end (DR-017). The blueprint has no separate packet-format fences;
    - `HtmlBlock` nodes starting `<!-- fm:`.
 2. **Grammar:** an owned, hand-written recursive-descent parser in `foreman-core::template::grammar`. There's no parser-generator dependency: the grammar is about 15 keys and the `when` expression language is `! & | ( )` over 12 IDs. Rules (each an error with line and column):
    - `fm:` inside a list item or inline: "annotations must be block-level";
-   - an unknown key: an error within `v=1`, a warning for `v>1`;
+   - an unknown key or directive: an error within `v=1`. When the declared grammar is newer than Foreman's (`v>1`), a step whose `fm:step` has an unknown key is `needsNewerForeman` (shown, never runnable), every other unknown is a warning, and Template health says "Update Foreman" (DR-021, DR-035);
    - values without spaces; repo-relative paths only, checked by `pathpolicy::check_write`;
    - `start` model, effort and mode vocabularies, with `bypassPermissions` **always** an error (SR-03);
    - unknown condition IDs;

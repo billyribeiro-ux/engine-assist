@@ -58,7 +58,8 @@ Doc checks (code.claude.com, 2026-10-19):
    12. confirmation reason (SR-19).
 
    The result is a `LaunchPlan` stored under a one-time `planId`, valid for 60 s and for the exact project revision and fingerprint.
-2. **Fingerprint sources** (`core::fingerprint::sources(cwd, repo_root, home, config_dir)` returns the list; `store::outside` reads it with no-symlink, 256 KB caps (larger → block)):
+2. **Fingerprint sources** (`core::fingerprint::sources(cwd, repo_root, home, config_dir)` returns the list; `store::outside` reads it read-only with size caps: 256 KB per file, except `~/.claude.json`, whose own cap is **64 MB** because Claude Code keeps per-project history in it. `~/.claude.json` is parsed as a **stream** (serde_json's streaming deserializer with `IgnoredAny` for every other key), keeping only the `mcpServers` paths below; nothing else is buffered. Larger than the cap → block, naming the file.
+   **Symlinks.** Repo content (`.claude/**`, `.mcp.json`, `CLAUDE.md` inside the repo) is read with no symlink at any component, as SR-31 says. For the read-only sources **outside** the repo (`~/.claude/**`, `~/.claude.json`, managed settings, ancestor `CLAUDE.md` files above the repo), a symlink is followed only when its target is a regular file outside every registered project; Foreman hashes the target and records both the link path and the resolved target, so a retarget changes the fingerprint. A symlink into a registered project, to a directory loop, or to a non-regular file blocks the launch with the path. (Dotfile managers commonly symlink `~/.claude/settings.json` and `CLAUDE.md`; S-7′ measures Billy's real `~/.claude` for sizes and symlinks.)
    - `$CLAUDE_CONFIG_DIR` or `~/.claude`: `settings.json`, `CLAUDE.md`, `{agents,skills,commands,rules,output-styles}/**`, enabled plugin folders (from `enabledPlugins` in the settings, resolved under `plugins/`);
    - `~/.claude.json`: **only** the `mcpServers` object at user scope and under `projects[<repo path>]`, parsed and re-serialized canonically. Other keys (sign-in session, trust state) are never retained, logged or diffed;
    - managed: `/Library/Application Support/ClaudeCode/managed-settings.json` and `managed-settings.d/*.json`;
@@ -68,7 +69,7 @@ Doc checks (code.claude.com, 2026-10-19):
 
    A cache keyed by `(path, dev, ino, size, mtime)` avoids re-hashing unchanged files (NFR-04).
 3. **Blocking** (SR-07): `auth_key_hits` scans every parsed settings source (user, managed, project, local, and any `env` maps in `~/.claude.json` project entries) for the keys and env patterns above. The block names the file and key. The allowlist exception stores `sha256(key=value)` for user settings only.
-4. **Acknowledgement** (SR-06, SR-55): a changed fingerprint shows a **redacted** diff. Values under `env` or `headers`, any `apiKey*` key, any key containing `token`/`secret`/`password` at any depth, and any string matching the secret-scanner patterns become `‹redacted sha256:8›`. One click acknowledges, and the new snapshot is stored redacted (`0600`) in `cache/fingerprints/<cwdHash>.json`.
+4. **Acknowledgement** (SR-06, SR-55): a changed fingerprint shows a **redacted** diff. Values under `env` or `headers`, any `apiKey*` key, any key containing `token`/`secret`/`password` at any depth, and any string matching the secret-scanner patterns become `‹redacted sha256:8›`. Acknowledging is a native dialog raised by Rust naming the changed sources (SR-24a); the webview banner only shows the diff. Then the new snapshot is stored redacted (`0600`) in `cache/fingerprints/<cwdHash>.json`.
 5. **Auth** (SR-08): `claude auth status` runs with the exact launch env in the step cwd, only after steps 3–4 pass. Foreman parses only the JSON `authMethod` and the exit code. Anything unexpected blocks. Results are cached on `(fingerprint, claude version, env names+hash)`.
 6. **Run settings file** (SR-09), written fresh via `store` to `runs/<runId>/settings.json` (`0600`):
    ```json
@@ -102,9 +103,10 @@ Doc checks (code.claude.com, 2026-10-19):
 - `preflight::hook_script_change_detected`, `preflight::ancestor_claude_md_detected`, `preflight::user_mcp_server_detected`, and one test per source.
 - `preflight::blocks_<key>` (one per key and pattern), `preflight::allowlisted_user_key_passes`.
 - `preflight::auth_checked_in_step_cwd`, `preflight::blocks_api_key_auth`, `preflight::auth_unknown_output_blocks`, `preflight::auth_after_fingerprint`.
-- `run_settings::contents_snapshot`, `run_settings::deny_paths_absolute` (cwd = project and cwd = spec), `run_settings::fresh_per_run`.
+- `run_settings::contents_snapshot`, `run_settings::deny_paths_absolute` (cwd = project and cwd = spec, and a project path containing a space, e.g. `~/Developer/Trade Log`), `run_settings::fresh_per_run`.
+- `fingerprint::claude_json_streamed_64mb` (a 60 MB `~/.claude.json` fixture: only `mcpServers` kept, memory bounded; 65 MB blocks), `fingerprint::outside_symlink_followed_to_regular_file` (link and target recorded; retarget changes the fingerprint), `fingerprint::outside_symlink_into_project_blocks`, `fs_policy::read_refuses_symlink_at_any_component` (repo content unchanged).
 - `preflight::config_snapshot_redacts_secrets`, `preflight::diff_shows_redacted_change`, `preflight::confirm_required_for_*`.
-- The S-1′ probe confirms the run settings parse. S-7′ decides whether a project `env` block needs approval.
+- The S-1′ probe confirms the run settings parse, including deny rules for a repo path with a space in it. S-7′ decides whether a project `env` block needs approval and measures Billy's real `~/.claude` and `~/.claude.json` (sizes, symlinks) against the caps above.
 - `criterion` `bench_prepare_launch` (NFR-04, warm cache).
 
 ## Revisit when

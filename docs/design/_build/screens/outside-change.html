@@ -22,7 +22,7 @@
           <h1 class="page-title" id="oc-title">Review a change to TradeLog's decision files</h1>
           <p class="page-sub">Something other than Foreman edited two files that decide how this project runs. Foreman keeps using the approved versions until you accept.</p>
           <dl class="oc-meta">
-            <dt>Changed</dt><dd>Today at 14:02, while <code>fm-tradelog-s02-2.3</code> was running in <code>spec/</code></dd>
+            <dt>Changed</dt><dd>Today at 14:02, while <code>fm-tradelog-s02-2-3</code> was running in <code>spec/</code></dd>
             <dt>Git</dt><dd>Uncommitted; no commit touches these files since your last approval</dd>
             <dt>Approved version</dt><dd>sha256 9c41…e07a, approved 12 Oct</dd>
           </dl>
@@ -39,7 +39,7 @@
           </ul>
         </div>
         <div class="decide">
-          <span class="reason">Reject restores the approved versions with an atomic write. Accept makes them the new approved versions.</span>
+          <span class="reason">Reject restores the approved versions with an atomic write. Accept asks you once more in a macOS dialog, then makes them the new approved versions.</span>
           <span class="spacer"></span>
           <button class="btn">{{i:restore}}Reject and restore</button>
           <button class="btn primary">{{i:check}}Accept changes</button>

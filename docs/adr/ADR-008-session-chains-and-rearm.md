@@ -22,10 +22,11 @@ Spikes S-3 (effort on resume) and S-8 (graceful end, fork IDs, latency) decide b
 - **Chain model** (in `progress.json`): `Chain { id: SessionId (UUID v4 from uuid 1.28.0), projectId, cwd, steps[], status: open | closed | superseded | handed-off | broken, forkedFrom? }`. `core::chain::plan_session(step, chains, new_id)` is pure.
   - `session=new` → `New { id }`, launched with `--session-id <id>`.
   - `session=continue` → `Continue { chain }`, launched with `--resume <id>` and no `--session-id`, unless fork (below).
-  - Transcript missing (checked by the app in `<CLAUDE_CONFIG_DIR or ~/.claude>/projects/<project dir>/<id>.jsonl`) → `Broken` → "Start a fresh chain with context": a new session whose prompt is the step's prompt preceded by the last signed packet and the declared input paths.
+  - Transcript missing (checked by the app in `<CLAUDE_CONFIG_DIR or ~/.claude>/projects/<project dir>/<id>.jsonl`) → `Broken` → "Start a fresh chain with context" (`launch_prepare { mode: "freshWithContext" }`, `docs/contracts/ipc.md` §4.6): a new session whose prompt is the step's prompt preceded by the last signed packet and the declared input paths.
+  - Resume from a tab, from Interrupted sessions or from the Run log goes through `chain_resume_prepare { chain }`, then the normal `launch_start` (same preflight and native confirmation).
   - Re-running a chain-start step → a new chain; the old one becomes `superseded`.
-- **Re-arm** (`foreman-app::rearm`), a state machine with one entry point, the `rearm_start` command (user invoke only):
-  1. *Idle.* P1: Billy clicks "Claude is idle and nothing is running in the background" (the button text is the assertion). P2: the sensor reports idle (last event `Stop`, no outstanding `SubagentStart`/`TaskCreated`, no running background Bash); otherwise "N background tasks still running: Wait / End anyway".
+- **Re-arm** (`foreman-app::rearm`), a state machine with one entry point, the `rearm_start { planId }` command (user invoke only; the plan comes from `launch_prepare`, so a re-arm always goes through the same preview):
+  1. *Idle.* P1: Rust shows a **native dialog**, "Claude is idle and nothing is running in the background", with Continue and Cancel; Continue is the assertion, Cancel returns `Cancelled` and changes nothing. No request field carries the assertion (SR-24a, `docs/contracts/ipc.md` IPC-R11). P2: the sensor reports idle (last event `Stop`, no outstanding `SubagentStart`/`TaskCreated`, no running background Bash); otherwise the native dialog says "N background tasks still running" with Wait and End anyway.
   2. *End.* Write `\x03`, wait 150 ms, write `/exit\r`. Wait ≤ 10 s for process exit (P1) or `SessionEnd` with reason `prompt_input_exit` (P2). On timeout: "Claude didn't exit. End it yourself, then press Continue." No signal is sent unless Billy then chooses Terminate (ADR-006) with its confirmation.
   3. *Relaunch* in the same tab through the normal launch pipeline (ADR-021): archive the buffer, write the divider `── <step> · <model> · <effort> · <mode> · permission grants reset ──`, and spawn with `--resume <id>` plus the full flags and `--settings`. A "Resuming 2.3…" state shows until the first output.
 - **Effort on resume** (S-3): pass → `--effort`; fail → `--settings` with `effortLevel`; else show the `/effort <level>` line for Billy to type, warning that it saves as his default. Foreman never types it.
@@ -41,7 +42,7 @@ Spikes S-3 (effort on resume) and S-8 (graceful end, fork IDs, latency) decide b
 ## Consequences
 
 - Each re-arm resets Claude Code's per-session permission grants; this is written into the divider every time (r5b minor 20).
-- The P1 idle check relies on Billy's assertion, so the button text must be precise and is covered by a copy test.
+- The P1 idle check relies on Billy's assertion, so the native dialog's text must be precise and is covered by a copy test; a scripted Cancel leaves the chain unchanged (`ipc::security_confirmations_are_native`).
 - Chains depend on Claude Code's transcript retention (`cleanupPeriodDays`); Doctor shows the effective value.
 
 ## Verification

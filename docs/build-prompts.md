@@ -190,7 +190,7 @@ Same session. Shift+Tab to **Accept edits**, or to **Manual** for HARD tickets.
 ```text
 Approved. Write the tests first and show me they fail. Then implement
 until they pass. Then use the test-runner agent for `pnpm verify`. For UI
-work, run `pnpm dev:web` and check the screen against its mockup in
+work, run `pnpm dev:mock` and check the screen against its mockup in
 docs/design/mockups/ in both themes, including empty, error, locked and
 not-applicable states.
 ```
@@ -263,14 +263,14 @@ Not applicable: `payments = no`. Record it in the Stage 11 packet's SKIPPED line
 
 ## Stages 11–12: HVAC and Drywall (M4)
 
-Branches `stage/11-hvac`, then `stage/12-drywall`. Tickets **M4-01 to M4-35**.
-- M4-28 is NEEDS-DESIGN: run Loop step 1 with Opus 5.5 · medium, and produce the missing mockup and domain rules first.
-- From EX-M4-06 on, Foreman's own gates run inside Foreman (dogfood).
+Branches `stage/11-hvac`, then `stage/12-drywall`. Tickets **M4-01 to M4-35**, plus **M3-18** (probe-folder trust, moved from M3 in the Stage 4.7 fix pass).
+- M4-28 (the build-package assembler) has its component entry, mockup (`docs/design/mockups/assembler.html`) and evidence rules since the Stage 4.7 fix pass; run it as a normal ticket.
+- Foreman's own Stages 11–17 close out by hand in v1, as Stages 5–10 did (running Foreman's own build inside Foreman needs adoption, which is v1.1).
 
 Then apply the remaining blueprint v2.2 annotations (Stages 0, 3, 4, 5) in `claude-blueprint`, using the same prompt as "Before Stage 6", and run **TradeLog Stages 3–5 through Foreman**.
 
 > **INSPECTION: pass before Stage 13**
-> - EX-M4-01 to EX-M4-06
+> - EX-M4-01 to EX-M4-05
 
 ## Stage 13: Siding & Exterior (M5, part 1)
 

@@ -1,0 +1,84 @@
+<!-- title: Foreman mockup: Build-package assembler -->
+<style>
+.asm-summary { display: flex; gap: var(--space-5); align-items: center; padding: var(--space-3) var(--space-4); margin-top: var(--space-5); border: var(--hairline) solid var(--attention); background: var(--attention-wash); }
+.asm-summary .status { font-weight: var(--weight-semibold); }
+.asm-rows { margin-top: var(--space-4); border-top: var(--hairline) solid var(--rule); }
+.asm-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; gap: var(--space-4); align-items: center; padding: 9px var(--space-4); border-bottom: var(--hairline) solid var(--rule); }
+.asm-row code { font-family: var(--font-mono); font-size: var(--text-mono); overflow-wrap: anywhere; }
+.asm-row .note { grid-column: 2 / 4; font-size: var(--text-12); color: var(--ink-muted); margin-top: -4px; }
+.asm-row.is-refused { background: var(--fail-wash); box-shadow: inset 3px 0 0 var(--fail); }
+.asm-row.is-empty { box-shadow: inset 3px 0 0 var(--attention); }
+.asm-row .actions { display: flex; gap: var(--space-2); }
+.late { margin-top: var(--space-4); display: grid; gap: 0; border-top: var(--hairline) solid var(--rule); }
+.late-row { display: grid; grid-template-columns: 170px auto minmax(0, 1fr) auto; gap: var(--space-4); align-items: center; padding: 10px var(--space-4); border-bottom: var(--hairline) solid var(--rule); }
+.late-row code { font-family: var(--font-mono); font-size: var(--text-mono); }
+.late-row .evidence { font-size: var(--text-12); color: var(--ink-muted); }
+.late-row.is-proposed { box-shadow: inset 3px 0 0 var(--accent-ink); }
+.complete-box { margin-top: var(--space-4); border: 1px dashed var(--control-edge); padding: var(--space-4); display: grid; gap: var(--space-2); }
+</style>
+<div class="app">
+  {{sidebar:tradelog-s4}}
+  <div class="window">
+    {{titlebar:TradeLog|Stage 4 · Build package}}
+    {{strip:s4}}
+    <div class="body">
+      <main class="main" id="main" aria-labelledby="asm-title">
+        <div class="page" style="max-width:960px">
+          <h1 class="page-title" id="asm-title">Build package {{p2}}</h1>
+          <p class="page-sub">From the REPO FILES list in <code>docs/handoff/stage-04.md</code>. Paste each file from your Stage 4 chats; Foreman writes only what the path policy allows and shows every overwrite first.</p>
+
+          <div class="asm-summary" role="status" aria-live="polite">
+            <span class="status">{{g:warn:attention}}8 of 12 files ready</span>
+            <span class="muted" style="font-size:var(--text-12)">2 missing, 1 empty, 1 refused. "The package is complete" is offered when every row Foreman may write exists and isn't empty.</span>
+          </div>
+
+          <section class="section" aria-labelledby="rf-title">
+            <div class="section-head"><h2 class="section-title" id="rf-title">Repo files</h2><span class="muted">in packet order</span></div>
+            <ul class="asm-rows" aria-label="Repo files from the Stage 4 packet">
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>docs/MASTER-SPEC.md</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span></li>
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>docs/requirements.md</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span></li>
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>docs/design-doc.md</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span></li>
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>docs/migrations/0001_init.sql</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span></li>
+              <li class="asm-row is-empty"><span class="status">{{g:warn:attention}}Empty</span><code>docs/tickets.md</code><span class="actions"><button class="btn">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span><span class="note">The file exists but has no content. Paste the tickets from 4.6.</span></li>
+              <li class="asm-row"><span class="status">{{g:ring:muted}}Missing</span><code>docs/threat-model.md</code><span class="actions"><button class="btn">{{i:paste}}Paste into</button></span></li>
+              <li class="asm-row"><span class="status">{{g:ring:muted}}Missing</span><code>docs/design/tokens.css</code><span class="actions"><button class="btn">{{i:paste}}Paste into</button></span></li>
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>CLAUDE.md</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span><span class="note">{{i:lock}} Claude Code loads this file in every session. Writing it asks you again in a macOS dialog.</span></li>
+              <li class="asm-row is-refused"><span class="status fail">{{g:cross:fail}}Refused</span><code>.github/workflows/ci.yml</code><span class="actions"></span><span class="note">Foreman doesn't write under <code>.github/</code> (path policy). Create this file yourself or in a Stage 5 session.</span></li>
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>docs/adr/README.md</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span></li>
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>docs/contracts/ipc.md</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span></li>
+              <li class="asm-row"><span class="status">{{g:check:pass}}Exists</span><code>docs/lessons.md</code><span class="actions"><button class="btn ghost">{{i:paste}}Paste into</button><button class="btn ghost">{{i:folder}}Reveal</button></span></li>
+            </ul>
+          </section>
+
+          <section class="section" aria-labelledby="late-title">
+            <div class="section-head"><h2 class="section-title" id="late-title">Late conditions</h2><span class="muted">decide before Stage 4 is signed; proposals come from file paths only</span></div>
+            <div class="late">
+              <div class="late-row is-proposed"><code>has_database</code>
+                <div class="seg" role="radiogroup" aria-label="has_database"><button role="radio" aria-checked="true">Yes</button><button role="radio" aria-checked="false">No</button><button role="radio" aria-checked="false">Undecided</button></div>
+                <span class="evidence">Proposed from: <code>docs/migrations/0001_init.sql</code>. Not recorded until you confirm.</span>
+                <button class="btn">Confirm</button></div>
+              <div class="late-row"><code>has_uploads</code>
+                <div class="seg" role="radiogroup" aria-label="has_uploads"><button role="radio" aria-checked="false">Yes</button><button role="radio" aria-checked="false">No</button><button role="radio" aria-checked="true">Undecided</button></div>
+                <span class="evidence">No evidence in REPO FILES or the repo. Decide it yourself.</span><span></span></div>
+              <div class="late-row"><code>has_email</code>
+                <div class="seg" role="radiogroup" aria-label="has_email"><button role="radio" aria-checked="false">Yes</button><button role="radio" aria-checked="false">No</button><button role="radio" aria-checked="true">Undecided</button></div>
+                <span class="evidence">No evidence in REPO FILES or the repo. Decide it yourself.</span><span></span></div>
+              <div class="late-row"><code>has_integrations</code>
+                <div class="seg" role="radiogroup" aria-label="has_integrations"><button role="radio" aria-checked="false">Yes</button><button role="radio" aria-checked="true">No</button><button role="radio" aria-checked="false">Undecided</button></div>
+                <span class="evidence">Decided by you on 2026-10-18 ("broker CSV import only, no API").</span><span></span></div>
+            </div>
+          </section>
+
+          <section class="section" aria-labelledby="done-title">
+            <div class="section-head"><h2 class="section-title" id="done-title">Package complete</h2></div>
+            <div class="complete-box">
+              <p>{{i:lock}} <strong>The package is complete</strong> isn't offered yet.</p>
+              <p class="muted" style="font-size:var(--text-12)">Waiting for: <code>docs/tickets.md</code> (empty), <code>docs/threat-model.md</code> and <code>docs/design/tokens.css</code> (missing). The refused row doesn't block it: Foreman can never write it, so you create it yourself.</p>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+{{legend:}}

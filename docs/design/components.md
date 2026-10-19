@@ -135,7 +135,7 @@ Header line in mono, then the packet's fields as a readable two-column list. A s
 
 **Close-out sequence:** Gate A → Results → Gate B packet → Gate C lessons → Sign, as a one-line ordered list with the current step marked. **Sign packet** stays disabled with the reason ("Sign is locked: 1 item failed and 2 wait for your note. Then Gate B and Gate C.").
 
-**Sign dialog (F-014):** name and date (prefilled), branch (current branch, default; or another branch), "Fields Foreman will add" as a diff (APPROVED BY, SKIPPED, SUBSTITUTIONS, ATTESTED), the content hash, the exact paths committed with hooks off, the commit message, and Cancel / **Sign packet**. Stage 2 adds Confirm conditions. Toast after read-back: "Packet signed. Committed 4e1b2c7 on stage/05-site-prep and read back 3 files." Then the stamp.
+**Sign dialog (F-014):** name and date (prefilled), branch (current branch, default; or another branch), "Fields Foreman will add" as a diff (APPROVED BY, SKIPPED, SUBSTITUTIONS, ATTESTED), the content hash, the exact paths committed with hooks off, the commit message, and Cancel / **Sign packet**. Stage 2 adds Confirm conditions. This sheet is the **review**; **Sign packet** only requests signing, and Rust then raises the native macOS confirmation (name, date, "Signing stage-05.md @ a3f9c1", conditions, chain state; SR-24a). Cancel in the native dialog leaves everything as it was. Toast after read-back: "Packet signed. Committed 4e1b2c7 on stage/05-site-prep and read back 3 files." Then the stamp.
 
 **Accessibility.** Items are a list; stamps are `role="img"` with "Failed", "Passed", "Waiting for you". The attest choice is a `radiogroup`; note errors use `aria-invalid` and `aria-describedby`. The dialog is `role="dialog" aria-modal="true"`, labelled by its title and described by the hash line; focus starts on Name, is trapped inside, Esc cancels and returns focus to Sign packet.
 
@@ -143,11 +143,11 @@ Header line in mono, then the packet's fields as a readable two-column list. A s
 
 **Drawer:** bottom panel with a grip (`role="separator"`, ↑ ↓ resize by 16 px), a tab bar, the Now/Next strip, and xterm. Collapsed state is a single bar ("Terminal: no sessions in TradeLog. Chat steps run in claude.ai."). Slides 160 ms when motion is allowed.
 
-**Tab:** named after the session in mono (`fm-tradelog-s02-2.3`), with a state glyph and word: running (dot, accent), idle (P2, ring), blocked (P2, warn in attention: "waiting for permission"), exited 0 (check), exited non-zero / errored (cross, fail), interrupted (broken link). Tab menu: Interrupt (Ctrl-C), Terminate (asks first when not idle), Copy session ID, Resume. Closing a running tab asks first and says the session ends. After a re-arm the previous buffer is an archived, collapsed, read-only section at the top ("Earlier in this session: 2.2 Convene the council, 1,842 lines").
+**Tab:** named after the session in mono (`fm-tradelog-s02-2-3`), with a state glyph and word: running (dot, accent), idle (P2, ring), blocked (P2, warn in attention: "waiting for permission"), exited 0 (check), exited non-zero / errored (cross, fail), interrupted (broken link). Tab menu: Interrupt (Ctrl-C), Terminate (asks first when not idle), Copy session ID, Resume. Closing a running tab asks first and says the session ends. After a re-arm the previous buffer is an archived, collapsed, read-only section at the top ("Earlier in this session: 2.2 Convene the council, 1,842 lines").
 
 **Keyboard.** ⌃` toggles the drawer; with the terminal focused every key goes to Claude Code except ⌘-chords, ⌃`, ⌘C/⌘V/⌘A/⌘F; ⌘⇧E returns focus to the workspace (never a trap); ⌘⇧T focus mode (P2); ⌘K opens the palette from the terminal.
 
-**Accessibility.** Tabs are a `tablist`; the panel is a focusable `tabpanel` named after the session. With VoiceOver on, launches add `--ax-screen-reader` and xterm's screen-reader mode is on. The terminal keeps the theme (`--term-*`), which passes 4.5:1 for ink, muted text and status colors.
+**Accessibility.** Tabs are a `tablist`; the panel is a focusable `tabpanel` named after the session. With Settings → Screen reader mode on, launches add `--ax-screen-reader` and xterm's screen-reader mode is on (Foreman doesn't detect VoiceOver itself). The terminal keeps the theme (`--term-*`), which passes 4.5:1 for ink, muted text and status colors.
 
 ## Now/Next strip (F-009, P2)
 
@@ -155,11 +155,21 @@ A one-line band above the terminal: **Now** live mode, model and effort from the
 
 ## Config-changed banner (F-008)
 
-Full-width band under the stage header, attention bar and wash: "Claude Code configuration in spec/ changed. principal-engineer.md was edited at 13:52. Review it before 2.4 launches." Actions: Review diff, Acknowledge (one click). A blocking variant (fail bar and wash) names the file and key for auth-changing settings: "apiKeyHelper in spec/.claude/settings.json would move billing off your plan. Remove it, then check again." **Accessibility:** `role="status"`; the blocking variant is `role="alert"`. Acknowledge moves focus back to the step.
+Full-width band under the stage header, attention bar and wash: "Claude Code configuration in spec/ changed. principal-engineer.md was edited at 13:52. Review it before 2.4 launches." Actions: Review diff, Acknowledge (requests the native acknowledgement dialog Rust raises, naming the changed sources; SR-24a). A blocking variant (fail bar and wash) names the file and key for auth-changing settings: "apiKeyHelper in spec/.claude/settings.json would move billing off your plan. Remove it, then check again." **Accessibility:** `role="status"`; the blocking variant is `role="alert"`. Acknowledge moves focus back to the step.
 
 ## Outside-change review (F-022)
 
-A full review screen per pending change: what changed and when (and which session was running), whether git has a commit for it, the approved hash; then one diff per decision file with a pill for its effect ("Changes the path", "Has no effect") and one line per consequence ("2.5 is core; Foreman ignores this skip"). Variables reload on their own with a toast. Sticky footer: **Reject and restore** (atomic write of the approved content) and **Accept changes**. **Keyboard:** Tab reaches each diff (scroll regions are focusable), then the footer; ⌘↵ accepts, Esc leaves without deciding (the change stays pending in Today). **Accessibility:** diffs mark lines with + and − characters as well as color.
+A full review screen per pending change: what changed and when (and which session was running), whether git has a commit for it, the approved hash; then one diff per decision file with a pill for its effect ("Changes the path", "Has no effect") and one line per consequence ("2.5 is core; Foreman ignores this skip"). Variables reload on their own with a toast. Sticky footer: **Reject and restore** (atomic write of the approved content) and **Accept changes** (requests the native dialog "Accept this change to <file>? It changes: <decision keys>"; nothing is accepted until Billy answers it, SR-24a). **Keyboard:** Tab reaches each diff (scroll regions are focusable), then the footer; ⌘↵ accepts, Esc leaves without deciding (the change stays pending in Today). **Accessibility:** diffs mark lines with + and − characters as well as color.
+
+## Build-package assembler (F-023, P2)
+
+A panel on Stage 4's workspace after the 4.8 packet is valid (`assembler_view`; mockup `assembler.html`). Three parts, top to bottom:
+
+1. **REPO FILES** from the Stage 4 packet, one row per path in packet order: a state glyph and word (**exists** check/pass, **missing** ring/muted, **empty** warn/attention, **refused** cross/fail with the path-policy rule, e.g. "Refused: `.github/` isn't writable by Foreman"), the path in mono, and actions **Paste into** (clipboard → `assembler_paste_preview`, then a diff sheet with Create or Overwrite and **Write file**) and **Reveal**. Root `CLAUDE.md` has a lock-style note "Claude Code loads this file in every session"; its Write requests the native confirmation Rust raises (SR-24a, AC-F021-06). A summary line counts rows ("8 of 12 files ready; 2 missing, 1 empty, 1 refused").
+2. **Late conditions** (shown while any is `undecided` and Stage 4 isn't signed): one tri-state row each for `has_database`, `has_uploads`, `has_email`, `has_integrations`. A proposal from path evidence (DR-063) shows as a pre-selected but **unconfirmed** choice with "from: `docs/migrations/0001_init.sql`" and a **Confirm** button; a condition with no evidence stays Undecided with "No evidence in REPO FILES or the repo; decide it yourself". Confirming records the condition with the note "from evidence: <path>".
+3. **Package complete** attest item: offered only when every row that Foreman may write exists and isn't empty (AC-F023-05); otherwise it says which rows block it. A refused row doesn't block it (Foreman can never write it; Billy creates it himself).
+
+**States:** no Stage 4 packet yet (empty state pointing to 4.8), loading, all ready, rows missing, a refused row, read-only project. **Keyboard:** rows are a list; Tab reaches each row's actions; the late-conditions controls are `radiogroup`s (← →). **Accessibility:** each row's state is text, not color only; the summary is `role="status"`; the diff sheet is `role="dialog" aria-modal="true"` and returns focus to the row's Paste into.
 
 ## Toast
 
@@ -188,7 +198,7 @@ Check rows: glyph, name, detail (what was found and the fix in plain words), fou
 ## Focus, motion and theming notes
 
 - Focus ring: 2 px `--focus` with 2 px offset everywhere (`--linework` in Night, `--cyanotype` in Vellum, `--focus-on-strip` on the strip). Never removed; `:focus-visible` only hides it for pointer clicks.
-- Reduce Motion: all durations become 0 and the stamp doesn't animate. Reduce Transparency: the sidebar uses solid `--sidebar`. Increase Contrast: `--rule` becomes `--control-edge`, muted text becomes `--ink`.
+- Reduce Motion (`prefers-reduced-motion`): all durations become 0 and the stamp doesn't animate. Reduce Transparency (`prefers-reduced-transparency: reduce`): the sidebar uses solid `--sidebar`, and the webview reports it to Rust, which turns the window's vibrancy off. Increase Contrast (`prefers-contrast: more`): the high-contrast token set applies, with every text/background pair ≥ 7:1 (AC-XC-23; today's block only steps up `--rule` and muted text, and M5 completes it).
 - Themes follow the system unless Settings picks Night or Vellum (`data-theme` on the root).
 - Fonts are local only. The drafting face (IBM Plex Sans Condensed SemiBold, OFL) ships in the bundle; mockups fall back to a local condensed face.
 

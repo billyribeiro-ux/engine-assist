@@ -18,7 +18,7 @@ Every file Foreman owns is listed here with its schema, data class, mode, writer
 | FILE-R5 | **Modes.** App data: directories `0700`, files `0600`, from the first write (SR-53). Repo files: the existing file's mode, or `0644` for a new file (ADR-010). | `fs::app_data_permissions` |
 | FILE-R6 | **Reads** of repo files go through `store::Root::read` (no symlink at any component, regular file, `nlink == 1`, size caps: decision files, packets and lessons 1 MB; Claude config 256 KB). | `fs_policy::read_*` |
 | FILE-R7 | **Data classes** (PR-02): (a) project decisions and signed records, repo, versioned; (b) in-flight state, run records, prompt hashes; (c) terminal output tails, sensitive; (d) sensor events, sensitive, short retention; (e) redacted config snapshots; (f) settings incl. the captured login PATH; (g) claude.ai Project and chat URLs, repo `project.json`. | `files::class_table_matches` (this table is parsed by the test) |
-| FILE-R9 | **Write allowlist** (SR-30). Inside a project, Foreman writes only the repo files in §2 rows 1–8: under `docs/` and `spec/`, `.foreman/` through the decision-file writers, the `council-setup` destinations under `spec/.claude/agents/`, `<git-path info/exclude>` through its own writer, and root `CLAUDE.md` through the assembler. Paths are ≤ 1,024 bytes, components ≤ 255 bytes. Parsers of these files (JSON, Markdown) stop at nesting depth 64 (SR-31). | `fs_policy::allowlist_only`, `fs_policy::rejects_overlong_path`, `files::json_depth_limit` |
+| FILE-R9 | **Write allowlist** (SR-30). Inside a project, Foreman writes only the repo files in §2 rows 1–8: under `docs/` and `spec/`, `.foreman/` through the decision-file writers, the `council-setup` destinations under `spec/.claude/agents/`, `<git-path info/exclude>` through its own writer, and root `CLAUDE.md` through the assembler. Outside projects and app data, the only write is `WritePurpose::UserExport` (§2 row 28): a path Billy picks in the Rust save dialog, `.md` only, never inside a registered project's `.foreman/`, `.git` or `.claude`, written with the same atomic rules. Paths are ≤ 1,024 bytes, components ≤ 255 bytes. Parsers of these files (JSON, Markdown) stop at nesting depth 64 (SR-31). | `fs_policy::allowlist_only`, `fs_policy::rejects_overlong_path`, `files::json_depth_limit` |
 | FILE-R8 | **No secrets, no content.** No file stores environment values, prompt text (only SHA-256), clipboard contents, transcript contents, or `~/.claude.json` keys other than `mcpServers`. Run inputs are stored only in `progress.json` (Billy's own typed values). | `runlog::no_env_values`, `runlog::argv_prompt_redacted`, `privacy::no_prompt_text_on_disk` |
 
 ## 2. Inventory
@@ -51,6 +51,8 @@ Every file Foreman owns is listed here with its schema, data class, mode, writer
 | 24 | `bin/foreman-sensor-<sha256-12>` | app | — | 0700 | startup copy from the bundle (P2) | replaced on hash change | binary |
 | 25 | `logs/foreman.log[.1-.4]` | app | b | 0600 | `app::logging` | 10 MB × 5, rotated by size | redacted text |
 | 26 | `projects/<projectId>/progress.json.corrupt-<timestamp>` | app | b | 0600 | `progress_rebuild_apply` · keeps the corrupt original (AC-F020-12) | until project removed | as found |
+| 27 | `recovered/<timestamp>-<projectId>-<name>` | app | b | 0600 | `store` · a leftover `.foreman-tmp` that differs from its target (ADR-010) | until Billy deletes it (shown in a notice with Open and Reveal) | as found |
+| 28 | Export files (metrics summary, run sheet) | Billy's chosen folder | b | 0644 | `metrics_export`, `run_sheet_export` · `WritePurpose::UserExport`, path from the Rust save dialog, `.md` only | Billy's | Markdown |
 
 `<cwdHash>` is the first 32 hex characters of SHA-256 over the canonical absolute cwd path. `<seq>` is a 20-digit zero-padded nanosecond timestamp, `-`, and the zero-padded pid (ADR-009).
 
@@ -328,7 +330,7 @@ Written in signing phase 1, committed in the same plumbing commit, never rewritt
       "type": "object", "additionalProperties": false, "required": ["overrides", "signMode", "env"],
       "properties": {
         "overrides": { "type": "array", "items": { "type": "string" } },
-        "signMode": { "enum": ["noGpgSign", "globalSigning"] },
+        "signMode": { "const": "noGpgSign" },                       // v1 always commits with --no-gpg-sign (DR-144)
         "env": { "type": "array", "items": { "type": "string", "pattern": "^[A-Z_]+$" } }
       }
     }
@@ -337,7 +339,7 @@ Written in signing phase 1, committed in the same plumbing commit, never rewritt
 ```
 
 - `observed` is `null` without the sensor (P1 behavior, or S-1′ fail).
-- **The commit OID is not in this file**: the record is part of the commit it would describe, so it can't contain that commit's OID. ADR-012 §6 says "every commit's stage record notes … the commit OID"; this contract instead stores the OID in app data (`progress.json` `signing[NN].commit`, §4.3) and the record is found by `git log -- .foreman/stages/stage-NN.json` (finding for the Stage 4.7 review).
+- **The commit OID is not in this file**: the record is part of the commit it would describe, so it can't contain that commit's OID. The OID is stored in app data (`progress.json` `signing[NN].commit`, §4.3), and the record at that commit is read with `cat-file blob <commit>:.foreman/stages/stage-NN.json` (ADR-012 decision 7; Foreman never runs `git log`).
 - `skipped`, `substitutions` and `gate` carry exactly the lines Foreman writes into the packet's `SKIPPED:`, `SUBSTITUTIONS:` and `ATTESTED:` fields (§5.4).
 
 ## 4. App-data files
@@ -443,7 +445,7 @@ App data is `~/Library/Application Support/<bundle id>/` (`app_data_dir()`).
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:foreman:progress.v1",
   "type": "object", "additionalProperties": false,
-  "required": ["schemaVersion", "projectId", "rev", "steps", "chains", "runInputs", "remembered", "optionalParts", "overrides", "gateRuns", "pendingOutside", "pendingOwn", "readStamps", "firstLaunchDone", "signing", "waits"],
+  "required": ["schemaVersion", "projectId", "rev", "steps", "chains", "runInputs", "remembered", "optionalParts", "overrides", "gateRuns", "pendingOutside", "pendingOwn", "readStamps", "firstLaunchDone", "signing", "waits", "indexRefreshPending"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "projectId": { "$ref": "urn:foreman:common#/$defs/uuid" },
@@ -520,13 +522,19 @@ App data is `~/Library/Application Support/<bundle id>/` (`app_data_dir()`).
                                    "branch": { "type": "string" }, "packetSha256": { "$ref": "urn:foreman:common#/$defs/sha256" },
                                    "at": { "$ref": "urn:foreman:common#/$defs/timestamp" } } } },
     "waits": { "type": "object", "propertyNames": { "$ref": "urn:foreman:common#/$defs/stepKey" },
-               "additionalProperties": { "$ref": "urn:foreman:common#/$defs/isoDate" } }
+               "additionalProperties": { "$ref": "urn:foreman:common#/$defs/isoDate" } },
+    "indexRefreshPending": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false, "required": ["commit", "paths", "since"],
+                               "properties": { "commit": { "$ref": "urn:foreman:common#/$defs/gitOid" },
+                                               "paths": { "type": "array", "items": { "$ref": "urn:foreman:common#/$defs/repoPath" } },
+                                               "since": { "$ref": "urn:foreman:common#/$defs/timestamp" } } }] }
   }
 }
 ```
 
-- Derived states (`skipped`, `notApplicable`, `undecided`, `needsAnnotation`, `waitingUntil`) are **not stored**: they're computed from the template, conditions, overlay and `waits` on every read (DR-050), so they can't go stale. Stored `state` is only what Billy's actions produced.
+- Derived states (`skipped`, `notApplicable`, `undecided`, `needsAnnotation`, `needsNewerForeman`, `waitingUntil`) are **not stored**: they're computed from the template, conditions, overlay and `waits` on every read (DR-050), so they can't go stale. Stored `state` is only what Billy's actions produced.
 - `readStamps` holds the stamp of every repo file Foreman may write next (ADR-010). `dev`, `ino`, `mtimeNs` are 64-bit; this file is never sent to the webview whole (IPC-R4 doesn't apply).
+- `signing[NN].commit` is where the signing commit's OID lives (the stage record can't hold it, because it is inside that commit; ADR-012 decision 7, DR-143).
+- `indexRefreshPending` is set when a commit moved the ref but the real-index refresh failed after 5 retries on `index.lock` (ADR-012). Foreman retries on project open and window focus and shows "Index not refreshed; don't commit until this clears" until it succeeds; then it goes back to `null`.
 - `handSigned` marks a P1 packet whose `APPROVED BY` was filled in outside Foreman **and** confirmed by Billy in the native dialog (AC-F013-09, SR-47); it's derived from `approvals/<id>.json` `outsideSignatures` and `commit` is `null` for it. A packet with a name in it but no confirmation is "signature not confirmed", not signed.
 - Rebuild (NFR-17, AC-F020-11): from `docs/handoff/` packets and `.foreman/stages/` records; chains, run inputs and overrides are lost.
 
@@ -607,14 +615,16 @@ This file is **Claude Code's** settings format (passed as `--settings`), so it h
                         "signedOn": { "$ref": "urn:foreman:common#/$defs/isoDate" }, "at": { "$ref": "urn:foreman:common#/$defs/timestamp" } } } }
   },
   "$defs": {
-    "approval": { "type": "object", "additionalProperties": false, "required": ["approvedSha256", "committedSha256"],
+    "approval": { "type": "object", "additionalProperties": false, "required": ["approvedSha256", "committedSha256", "committedOnOtherBranches"],
       "properties": { "approvedSha256": { "oneOf": [{ "$ref": "urn:foreman:common#/$defs/sha256" }, { "type": "null" }] },
-                      "committedSha256": { "oneOf": [{ "$ref": "urn:foreman:common#/$defs/sha256" }, { "type": "null" }] } } }
+                      "committedSha256": { "oneOf": [{ "$ref": "urn:foreman:common#/$defs/sha256" }, { "type": "null" }] },
+                      "committedOnOtherBranches": { "type": "object", "propertyNames": { "pattern": "^refs/heads/[^\\s]{1,200}$" },
+                                                    "additionalProperties": { "$ref": "urn:foreman:common#/$defs/sha256" } } } }
   }
 }
 ```
 
-- `approvedSha256` is the hash of the effective (approved) copy in `approvals/<projectId>/<file>.json`; `committedSha256` is the last version committed to the repo. Before Stage 5 is signed they're equal after every Foreman change; afterwards Foreman's own changes make `approved` run ahead of `committed` until the signing commit, and the drift check compares the repo file against `committedSha256` (ADR-022 §5).
+- `approvedSha256` is the hash of the effective (approved) copy in `approvals/<projectId>/<file>.json`; `committedSha256` is the last version committed to the repo. Before Stage 5 is signed they're equal after every Foreman change; afterwards Foreman's own changes make `approved` run ahead of `committed` until the signing commit, and the drift check compares the repo file against `committedSha256` (ADR-022 §5). `committedOnOtherBranches` keeps, per branch ref, what a signing on another branch (SR-43) committed; while HEAD names one of those branches (`symbolic-ref -q HEAD`), the drift check compares against that branch's entry instead, so checking out the signed branch doesn't raise a false pending change (ADR-022 §5).
 - `envApprovals` is used only on the S-7′ fail branch (AC-F008-07).
 - `outsideSignatures` records Billy's native confirmation (`packet_signature_confirm`, SR-24a, SR-47) that a packet signed outside Foreman's signing flow is his. It binds the packet's SHA-256: if the file changes, the stage no longer counts as signed until he confirms again (DR-135).
 - Lost app data: rebuilt by treating HEAD's committed decision files as approved after a one-time review prompt (ADR-022 Consequences).

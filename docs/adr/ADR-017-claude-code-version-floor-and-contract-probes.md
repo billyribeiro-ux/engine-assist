@@ -8,7 +8,7 @@ Proposed
 
 ## Context
 
-Foreman's correctness depends on Claude Code's CLI contract: flags, aliases, hook events and fields, `auth status` JSON, and session and transcript behavior. Claude Code ships often. npm `@anthropic-ai/claude-code` dist-tags on 2026-10-19: `stable` 2.1.292, `latest` 2.1.303, `next` 2.1.304. The CLI reference says "`claude --help` does not list every flag".
+Foreman's correctness depends on Claude Code's CLI contract: flags, aliases, hook events and fields, `auth status` JSON, and session and transcript behavior. Claude Code ships often. npm `@anthropic-ai/claude-code` dist-tags on 2026-10-19 when this ADR was written: `stable` 2.1.292, `latest` 2.1.303, `next` 2.1.303 (the Stage 4.7 review corrected `next`). Re-checked in the 4.7 fix pass the same day (registry, after 2.1.304 was published at 19:47 UTC): `stable`, `latest` and `next` all 2.1.304. The tags move daily; Doctor shows the installed version, not a tag. The CLI reference says "`claude --help` does not list every flag".
 
 MASTER-SPEC §6 gives the floors:
 
@@ -22,7 +22,7 @@ MASTER-SPEC §6 gives the floors:
 | `--desktop` | 2.1.285 |
 | Haiku 5.5 | 2.1.293 |
 
-The effective floor is the maximum over the steps' models, flags and the pinned kit's agent models (**2.1.293** today, above `stable`, per R-19). Other requirements:
+The effective floor is the maximum over the steps' models, flags and the pinned kit's agent models (**2.1.293** today; above `stable` when this ADR was written, per R-19, and below it after `stable` moved to 2.1.304). Other requirements:
 
 - **SR-17:** probes on version change, only in `<app-data>/probe/` (trusted once, recreated `0700` with only Foreman's files before each run), 20 s timeout, outcomes pass / flag failure / inconclusive.
 - **SR-19:** a confirmation on the first launch after a version change.
@@ -33,14 +33,14 @@ The effective floor is the maximum over the steps' models, flags and the pinned 
 1. **Floor:** `core::compat::floor(template, kit_agents, policy) -> (Version, Vec<Requirement>)` computes the floor from a data table of `{feature, minVersion, source}` (the table above plus `--ax-screen-reader` 2.1.181). `semver` 1.0.28 parses the leading semver of `claude -v` output (`2.1.211 (Claude Code)`).
    - Checked **on every launch** (no cache).
    - Below the floor: Run is disabled, with the capability table (feature → minimum → found → steps blocked) and **Run `claude update`**. If the floor is above npm `stable`, Doctor says so and recommends the `latest` channel.
-2. **Contract probes (P2, F-019):** run when the observed version differs from `lastVerifiedVersion`, before the next launch, with no tokens.
+2. **Contract probes (P2, F-019):** run when the observed version differs from `settings.json` `contract.version` (the last verified version; `docs/contracts/files.md` §4.1), before the next launch, with no tokens. `settings.json` `lastSeenClaudeVersion` (the last version any launch saw) drives the SR-19 "Claude Code updated X → Y" confirmation; `probeFolderTrusted` records the first-run trust step.
    - **Probe A:** `claude --init-only --settings <probe settings> --session-id <fresh uuid> --model <m> --effort <e> --permission-mode <mode> --name fm-probe` with a `SessionStart` hook (exec form, the sensor binary) that writes a marker. Pass = the marker exists **and** exit 0. That proves the hooks fire and every interactive flag Foreman passes still parses.
    - **Probe B:** `claude --init-only --resume <random uuid>`. Pass = exit ≠ 0 with a "no conversation found"-class message (the flag parsed).
    - **Classification:**
      - stderr matching `unknown option|unrecognized|invalid value` → **flag failure**, mapped to the named flag and disabling only the dependent feature;
      - timeout, trust prompt or anything else → **inconclusive**, which keeps the last verified state and warns.
    - **Folder:** `<app-data>/probe/` is recreated before each run (`0700`, only Foreman's files: probe settings, no `.claude/`, no `CLAUDE.md`). Billy trusts it once during first run (Foreman opens `claude` there in a terminal tab).
-   - The result is stored as `contract { version, verifiedAt, outcomes }` in `settings.json`.
+   - The result is stored as `contract { version, verifiedAt, outcomes { probeA, probeB } }` in `settings.json` (field names exactly as `docs/contracts/files.md` §4.1).
    - The probe records one real hook payload per event type (redacted) as a fixture for the sensor's derived-state tests (ADR-009). That settles the SessionEnd reason field name (UNVERIFIED in ADR-009).
 3. **Version-change confirmation** (SR-19): the first launch after a change shows "Claude Code updated X → Y" in the confirmation.
 4. **Fake-claude contract tests** pin argv, environment and run settings for every harness step (ADR-015), so Foreman-side regressions are caught in CI. Probes catch Claude-side changes on Billy's Mac.

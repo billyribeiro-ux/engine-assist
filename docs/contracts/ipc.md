@@ -1,9 +1,9 @@
 # Foreman · IPC contract
 
 **Status:** DRAFT for the Stage 4.7 review · 2026-10-19 · Blueprint stage 4.4
-**Inputs:** `docs/design-doc.md` §3.4–§3.5, ADR-004 (typed IPC), ADR-006 (PTY), ADR-008 (chains), ADR-014 (capabilities), ADR-021 (launch), ADR-022 (decisions), `docs/requirements.md`, `docs/scope.md`, `spec/council/r6-feature-specs.md`.
+**Inputs:** `docs/design-doc.md` §3.5 (the design doc points here for the command list), ADR-004 (typed IPC), ADR-006 (PTY), ADR-008 (chains), ADR-014 (capabilities), ADR-021 (launch), ADR-022 (decisions), `docs/requirements.md`, `docs/scope.md`, `spec/council/r6-feature-specs.md`.
 
-This file is the single list of everything that crosses the webview ↔ Rust boundary: **87 commands**, **3 Channel types** and **9 events**. A command, field, Channel or event that isn't in this file doesn't exist. Adding one is a change to this file, to `ipc::COMMANDS`, to `src/lib/ipc/contract.ts` and to `MockIpcClient`, in one commit (§7).
+This file is the single list of everything that crosses the webview ↔ Rust boundary: **91 commands**, **3 Channel types** and **9 events**. A command, field, Channel or event that isn't in this file doesn't exist. Adding one is a change to this file, to `ipc::COMMANDS`, to `src/lib/ipc/contract.ts` and to `MockIpcClient`, in one commit (§7).
 
 Library facts this contract relies on were checked on 2026-10-19 in the published crate sources:
 
@@ -67,7 +67,8 @@ enum Model { Fable, Opus, Sonnet, Haiku, Opusplan }
 enum Effort { Low, Medium, High, Xhigh, Max, Ultracode, Adaptive }   // "adaptive" only for chat
 enum Mode { Plan, Default, AcceptEdits, Auto, DontAsk }    // "manual" in the template maps to Default
 enum EntryPoint { DoNext, Palette, StageView }             // "doNext" | "palette" | "stageView"
-enum StepState { NotStarted, Copied, Running, Done, Skipped, NotApplicable, WaitingUntil, Undecided, NeedsAnnotation }
+enum StepState { NotStarted, Copied, Running, Done, Skipped, NotApplicable, WaitingUntil, Undecided, NeedsAnnotation,
+                 NeedsNewerForeman }                       // DR-035: blueprint grammar newer than this Foreman
 enum RunStatus { Starting, Running, Idle, Blocked, Exited, Errored, Interrupted }   // Idle/Blocked: P2 sensor
 enum ReadOnlyReason { LockMismatch, BlueprintMissing, DecisionFileInvalid, NewerSchema, GitMissing, FolderMissing }
 enum DoctorLevel { Ok, Warning, Failing, Unknown }
@@ -87,7 +88,7 @@ type Effort = "low" | "medium" | "high" | "xhigh" | "max" | "ultracode" | "adapt
 type Mode = "plan" | "default" | "acceptEdits" | "auto" | "dontAsk";
 type EntryPoint = "doNext" | "palette" | "stageView";
 type StepState = "notStarted" | "copied" | "running" | "done" | "skipped" | "notApplicable"
-  | "waitingUntil" | "undecided" | "needsAnnotation";
+  | "waitingUntil" | "undecided" | "needsAnnotation" | "needsNewerForeman";
 type RunStatus = "starting" | "running" | "idle" | "blocked" | "exited" | "errored" | "interrupted";
 ```
 
@@ -216,7 +217,9 @@ Rust  SettingsUpdateReq { expect_rev: Rev, patch: SettingsPatch }
       SettingsPatch { dri_name: Option<ShortText>, editor: Option<EditorSetting>, theme: Option<Theme>,
                       terminal: Option<TerminalPrefs>, env_passthrough: Option<Vec<EnvName>>,
                       global_variables: Option<BTreeMap<String, ShortText>>, reset_tool: Option<ToolKind>,
-                      clear_login_path: Option<bool>, remove_allowlist_entry: Option<Sha256> }
+                      clear_login_path: Option<bool>, remove_allowlist_entry: Option<Sha256>,
+                      screen_reader_mode: Option<bool>, os_display: Option<OsDisplay> }
+      OsDisplay { reduce_transparency: bool, increase_contrast: bool }       // reported by the webview, not stored
       EditorSetting = Set { bundle_id: BundleId } | Clear                    // #[serde(tag = "kind")]
       Theme = System | Vellum | Night;  TerminalPrefs { font_size: u8, scrollback: u32, mac_option_is_meta: bool }
 TS    { expectRev: number; patch: { driName: string | null;
@@ -224,11 +227,12 @@ TS    { expectRev: number; patch: { driName: string | null;
         theme: "system" | "vellum" | "night" | null;
         terminal: { fontSize: number; scrollback: number; macOptionIsMeta: boolean } | null;
         envPassthrough: string[] | null; globalVariables: Record<string, string> | null;
-        resetTool: "claude" | "git" | null; clearLoginPath: boolean | null; removeAllowlistEntry: string | null } }
+        resetTool: "claude" | "git" | null; clearLoginPath: boolean | null; removeAllowlistEntry: string | null;
+        screenReaderMode: boolean | null; osDisplay: { reduceTransparency: boolean; increaseContrast: boolean } | null } }
 Res   SettingsView
 Err   Stale · Cancelled · Conflict · Io
 ```
-F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". A patch that sets `env_passthrough`, `reset_tool` or `remove_allowlist_entry` is applied only after a native confirmation listing the change (SR-24a); declining returns `Cancelled` and nothing in the patch is saved. `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32.
+F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". A patch that sets `env_passthrough`, `reset_tool` or `remove_allowlist_entry` is applied only after a native confirmation listing the change (SR-24a); declining returns `Cancelled` and nothing in the patch is saved. `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32. `screen_reader_mode` is the Settings "Screen reader mode" toggle (stored, default off): when on, CLI launches add `--ax-screen-reader` and xterm gets `screenReaderMode: true` (AC-XC-22). `os_display` is what the webview's `prefers-reduced-transparency: reduce` and `prefers-contrast: more` media queries currently report; it isn't stored, and Rust turns the window's vibrancy off when either is true (ADR-014, AC-XC-23).
 
 **`settings_pick_tool`** · P1 · M2 · **app**
 ```text
@@ -312,14 +316,14 @@ Err   Expired · Cancelled (native dialog listing the entries) · Conflict
 ```
 F-019 · AC-F019-12 · SR-02, SR-05, SR-24a (entries sanitized again when PATH is built).
 
-**`probe_folder_open`** · P1 · M3 · **spawn** (interactive `claude` in a PTY tab, cwd `<app-data>/probe/`, no prompt)
+**`probe_folder_open`** · P2 · M4 · **spawn** (interactive `claude` in a PTY tab, cwd `<app-data>/probe/`, no prompt)
 ```text
 Rust  ProbeFolderOpenReq {}
 TS    Record<symbol, never>
 Res   RunStarted
 Err   ToolMissing · Io
 ```
-`output: Channel<tauri::ipc::Response>` · F-019 · AC-F019-08 · SR-17. (The design doc marks it P2; `docs/scope.md` puts AC-F019-08 in M3. This contract follows scope.)
+`output: Channel<tauri::ipc::Response>` · F-019 · AC-F019-08 · SR-17. P2, M4 (moved from M3 in the Stage 4.7 fix pass, with AC-F019-08 and ticket M3-18).
 
 **`probe_run`** · P2 · M4 · **spawn** (`claude --init-only` probes A and B), **app** (`settings.json` `contract`)
 ```text
@@ -434,6 +438,15 @@ Err   Cancelled · NotAllowed ("runs-live") · Io
 ```
 F-029, F-020 · AC-F029-06 · PR-05, SR-55. Never touches the repo.
 
+**`project_pin_set`** · P2 · M4 · **app** (`projects.json` `pinned`)
+```text
+Rust  ProjectPinSetReq { project_id: ProjectId, slot: Option<u8> }   // 1..=9; None unpins
+TS    { projectId: string; slot: number | null }
+Res   Vec<ProjectSummary>
+Err   NotFound · Invalid (slot outside 1–9)
+```
+F-017 · AC-F017-10. A slot already held by another project moves to this one (the other is unpinned). ⌘1–⌘9 open the project in that slot. Mock fixtures: `requests/project_pin_set.json` (`{ "projectId": <TradeLog>, "slot": 1 }`), `responses/project_pin_set.json`.
+
 ### 4.4 Steps
 
 **`step_view`** · P1 · M2 · **no**
@@ -473,7 +486,7 @@ TS    { projectId: string; step: string; over: { model: Model | null; effort: Ef
 Res   StepView
 Err   NotFound · NotAllowed (a value outside the step's surface vocabulary, e.g. a mode on a chat step)
 ```
-F-005 · AC-F005-01, -05 · SR-03, SR-19 (an override that changes mode or model triggers `ModeOrModelChanged`). Not in the design doc's command table; F-005's per-run chip needs it.
+F-005 · AC-F005-01, -05 · SR-03, SR-19 (an override that changes mode or model triggers `ModeOrModelChanged`). F-005's per-run chip needs it.
 
 **`step_mark_done`** · P1 · M2 · **app**
 ```text
@@ -500,7 +513,7 @@ TS    { projectId: string; step: string }
 Res   ActionPreview { preview_id: PreviewId, action: ActionKind, writes: Vec<Diff> }   // "writeBlocks" | "copyFile" | "mkdir"
 Err   NotFound · NotAllowed (step isn't an action) · PolicyViolation · ReadOnly
 ```
-F-007 · AC-F007-02, -03 · SR-34. Not in the design doc's command table; `action` steps (Council setup, the Stage 1 brief copy) need it.
+F-007 · AC-F007-02, -03 · SR-34. `action` steps (Council setup, the Stage 1 brief copy) need it.
 
 **`action_apply`** · P1 · M2 · **repo**
 ```text
@@ -529,7 +542,7 @@ TS    { projectId: string; target: "prompt" | "command" | "sessionId" | "fileCon
 Res   CopyResult { removed_controls: u32, focus_run: Option<RunId> }   // focus_run: followup → focus its chain's tab
 Err   NotFound · Invalid (the target needs a field that is null) · NotAllowed ("unresolved-tokens", "prompt-control-char")
 ```
-F-005, F-007, F-009, F-023, F-026 · AC-F007-07, AC-F009-05, -16, AC-F026-01, AC-F023-01, AC-F013-12 · SR-22, SR-28 (text sanitized before it reaches the clipboard), SR-56. Covers Copy prompt (⌘⇧C), Copy command (⌘⌥C), Copy session ID, `followup` Copy-and-focus, manifest Copy contents and the fix request. Not in the design doc's table (which has only `fix_request_copy`); this contract merges them into one typed command, so `fix_request_copy` is `clipboard_copy { target: "fixRequest" }`.
+F-005, F-007, F-009, F-023, F-026 · AC-F007-07, AC-F009-05, -16, AC-F026-01, AC-F023-01, AC-F013-12 · SR-22, SR-28 (text sanitized before it reaches the clipboard), SR-56. Covers Copy prompt (⌘⇧C), Copy command (⌘⌥C), Copy session ID, `followup` Copy-and-focus, manifest Copy contents and the fix request. One typed command covers them all; the fix request is `clipboard_copy { target: "fixRequest" }`.
 
 ### 4.5 Chat
 
@@ -555,13 +568,14 @@ F-012 · AC-F012-02 · SR-25, SR-56, PR-02 (g).
 
 **`paste_back_preview`** · P1 (packet, output) + P2 (ADR set, lessons) · M3/M4 · reads the clipboard, **mem**
 ```text
-Rust  PasteBackPreviewReq { project_id: ProjectId, step: StepKey, kind: PasteKind }
-TS    { projectId: string; step: string; kind: "auto" | "packet" | "output" | "adrSet" | "lessons" }
+Rust  PasteBackPreviewReq { project_id: ProjectId, step: StepKey, kind: PasteKind, source: PasteSource }
+      PasteSource = Clipboard | Sensor            // Sensor: P2, the run's `last_assistant_message` (Capture from session)
+TS    { projectId: string; step: string; kind: "auto" | "packet" | "output" | "adrSet" | "lessons"; source: "clipboard" | "sensor" }
 Res   PastePreview { preview_id: PreviewId, kind: PasteKind, targets: Vec<Diff>, problems: Vec<Problem>,
                      notes: Vec<String>, packet_fields: Option<PacketFields> }
-Err   Clipboard · NotAllowed ("wrong-stage-packet", "two-packets", "appends-in-p1") · PolicyViolation · ReadOnly
+Err   Clipboard · Unsupported (`sensor` with no sensor, or no `last_assistant_message` for the step's run) · NotAllowed ("wrong-stage-packet", "two-packets", "appends-in-p1") · PolicyViolation · ReadOnly
 ```
-F-012, F-013, F-016 · AC-F012-05…-11, -13, -14, -15, AC-F016-02 · SR-26, SR-35, SR-56. Diffs show bidi, zero-width and control characters as visible escapes.
+F-012, F-013, F-016 · AC-F012-05…-11, -13, -14, -15, AC-F013-14, AC-F016-02 · SR-18, SR-26, SR-35, SR-56. Diffs show bidi, zero-width and control characters as visible escapes. `source: "sensor"` (P2, M4) reads the text the sensor recorded for the step's last run; it goes through the same normalize, split, `check_write` and preview as a clipboard paste, and only Billy's Apply writes it (SR-18). Mock fixtures: one request per source (`requests/paste_back_preview.json`, `requests/paste_back_preview.sensor.json`).
 
 **`paste_back_apply`** · P1 · M3 · **repo**
 ```text
@@ -576,16 +590,27 @@ F-012, F-016 · AC-F012-06…-08, -12, AC-F016-02, -03, -04 · SR-33, SR-35.
 
 **`launch_prepare`** · P1 · M2 (preflight subset) / M3 (fingerprint, auth) · **spawn** (`claude -v`; `claude auth status` only after the fingerprint and block checks pass, and only on a cache miss; P2 probes on a version change), **mem**
 ```text
-Rust  LaunchPrepareReq { project_id: ProjectId, step: StepKey, entry: EntryPoint }
-TS    { projectId: string; step: string; entry: EntryPoint }
+Rust  LaunchPrepareReq { project_id: ProjectId, step: StepKey, entry: EntryPoint, mode: PrepareMode }
+      PrepareMode = Normal | FreshWithContext     // FreshWithContext: a new chain whose prompt starts with the last
+                                                  // signed packet and the step's declared inputs (AC-F010-09, DR-113)
+TS    { projectId: string; step: string; entry: EntryPoint; mode: "normal" | "freshWithContext" }
 Res   PrepareOutcome = Ready(LaunchPreview) | Blocked { blockers: Vec<Blocker>, warnings: Vec<String> }
       LaunchPreview { plan_id: PlanId, expires_in_ms: u32, prompt: Vec<PromptSegment>, argv: Vec<String>,
                       env_names: Vec<EnvName>, run_settings_sha256: Sha256, confirm: Vec<ConfirmReason>,
                       rearm: Option<RearmNeed>, warnings: Vec<String>, remaps: Vec<String> }
       RearmNeed = IdleConfirmation { chain: ChainId } | SensorBusy { tasks: u32 } | Exited { chain: ChainId }
-Err   NotFound · ReadOnly · Io
+Err   NotFound · ReadOnly · NotAllowed ("fresh-not-continuing": `freshWithContext` on a step that doesn't continue a chain) · Io
 ```
-`progress: Channel<LaunchProgress>` · F-008, F-010, F-017 · AC-F008-01…-21, -24, AC-F010-01, -02, -03, -09, -10, AC-F017-02 · SR-01, SR-03…SR-09, SR-17, SR-19, SR-24, SR-28. The order of checks is fixed (ADR-021, DR-120). The UI never sends argv.
+`progress: Channel<LaunchProgress>` · F-008, F-010, F-017 · AC-F008-01…-21, -24, AC-F010-01, -02, -03, -09, -10, -11, AC-F017-02 · SR-01, SR-03…SR-09, SR-17, SR-19, SR-24, SR-28. The order of checks is fixed (ADR-021, DR-120). The UI never sends argv. `mode: "freshWithContext"` is what the broken-chain banner's "Start a fresh chain with context" button sends, and what S-8's ambiguous-fork branch uses; it never reads the old transcript. Mock fixtures: `requests/launch_prepare.json` (normal) and `requests/launch_prepare.fresh.json`; the `brokenChain` scenario answers the normal request with `TranscriptMissing` and the fresh one with `Ready`.
+
+**`chain_resume_prepare`** · P1 · M3 · **spawn** (as `launch_prepare`), **mem**
+```text
+Rust  ChainResumePrepareReq { chain: ChainId }
+TS    { chain: string }
+Res   PrepareOutcome                                   // plan for the chain's last step, `--resume <uuid>`, no new prompt
+Err   NotFound · ReadOnly · NotAllowed ("chain-live", "chain-handed-off") · Io
+```
+`progress: Channel<LaunchProgress>` · F-009, F-010, F-020, F-026 · AC-F009-05, AC-F020-10, AC-F026-07 · SR-13, SR-14, SR-18, SR-19. Resume from a tab, from Interrupted sessions or from the Run log. Runs the full preflight (DR-120); Billy then calls `launch_start` with the plan, so the same native confirmation applies. A missing transcript returns `Blocked { TranscriptMissing }`, which offers `launch_prepare { mode: "freshWithContext" }`. Mock fixtures: `requests/chain_resume_prepare.json`, `responses/chain_resume_prepare.json` (Ready) and the `brokenChain` scenario.
 
 **`launch_start`** · P1 · M2 (fake binary) / M3 (PTY tab) · **app** (`runs/<runId>/settings.json`, `run.json` before spawn), **spawn** (PTY)
 ```text
@@ -831,7 +856,16 @@ TS    { projectId: string; stage: number; seenSha256: string }
 Res   PacketView
 Err   Cancelled · Stale (packet changed) · NotAllowed ("not-signed-form", "undecided-early-condition" for Stage 2)
 ```
-F-013, F-004 · AC-F013-09, AC-F004-12 · SR-24a, SR-47. A packet whose `APPROVED BY` is `<name> on <date>` but wasn't written by Foreman's signing counts as signed only after this native confirmation ("Did you sign Stage N yourself? Claude writing a name never signs a packet."); the confirmation records the packet hash, so any later change voids it (DR-135). Not in the design doc's table.
+F-013, F-004 · AC-F013-09, AC-F004-12 · SR-24a, SR-47. A packet whose `APPROVED BY` is `<name> on <date>` but wasn't written by Foreman's signing counts as signed only after this native confirmation ("Did you sign Stage N yourself? Claude writing a name never signs a packet."); the confirmation records the packet hash, so any later change voids it (DR-135). 
+
+**`packet_repair_prepare`** · P2 · M4 · **spawn** (as `launch_prepare`), **mem**
+```text
+Rust  PacketRepairPrepareReq { project_id: ProjectId, stage: Stage }
+TS    { projectId: string; stage: number }
+Res   PrepareOutcome          // rearm of the stage's chain; prompt "Fix only these problems in docs/handoff/stage-NN.md: … Do not change anything else."
+Err   NotFound · ReadOnly · NotAllowed ("no-problems", "not-cli-packet", "chain-handed-off")
+```
+`progress: Channel<LaunchProgress>` · F-013, F-010 · AC-F013-11 · SR-13, SR-18, SR-28. The problem list comes from Rust's own validation of the current packet, never from the webview; the prompt passes `check_prompt`. Billy continues with `rearm_start` (its native idle dialog applies). Mock fixtures: `requests/packet_repair_prepare.json`, `responses/packet_repair_prepare.json`.
 
 **`metrics_export`** · P1 · M3 · writes to a path chosen in the Rust save dialog
 ```text
@@ -840,7 +874,19 @@ TS    Record<symbol, never>
 Res   ExportResult    // "saved" with display path | "cancelled"
 Err   Io
 ```
-F-026 · AC-F026-04…-06 · SR-52.
+F-026 · AC-F026-04…-06 · SR-52, SR-30 (`WritePurpose::UserExport`: `.md` only, path from the save dialog).
+
+**`metrics_view`** · P2 · M4 · **no**
+```text
+Rust  MetricsViewReq { project_id: Option<ProjectId> }      // None = every project
+TS    { projectId: string | null }
+Res   MetricsView { per_surface: Vec<SurfaceMetrics>, manual_edits_by_stage: Vec<StageEdits>,
+                    stages_through_foreman: u32, baseline: Option<BaselineComparison>, runs_counted: u32 }
+      SurfaceMetrics { surface: Surface, median_time_to_start_ms: u32, p95_time_to_start_ms: u32,
+                       median_active_ms_per_step: u32 }
+Err   NotFound · Io
+```
+F-026 · AC-F026-08, AC-F026-09, AC-SM-04 · SR-52, NFR-09, NFR-21. The metrics strip on the Run log screen (`docs/design/mockups/run-log.html`). Numbers come from the same functions as `metrics_export`, so the two always agree. Mock fixtures: `requests/metrics_view.json` (`projectId: null`) and `requests/metrics_view.project.json`; the empty-registry scenario returns zero runs.
 
 **`runs_clear`** · P2 (Settings) · M4 · **app** (deletes `runs/`, `events/`)
 ```text
@@ -1056,7 +1102,7 @@ TS    { projectId: string; stage: number }
 Res   ExportResult
 Err   NotFound · Io
 ```
-F-027 · AC-F027-01…-03 · NFR-14.
+F-027 · AC-F027-01…-03 · NFR-14, SR-30 (`WritePurpose::UserExport`).
 
 ### 4.15 Command count by group
 
@@ -1064,28 +1110,28 @@ F-027 · AC-F027-01…-03 · NFR-14.
 |---|---|---|
 | App | `app_bootstrap`, `settings_get`, `settings_update`, `settings_pick_tool`, `today_get`, `do_next` | 6 |
 | First run / Doctor | `blueprint_pick_repo`, `template_health`, `doctor_run`, `doctor_capture_login_path`, `doctor_login_path_apply`, `probe_folder_open`, `probe_run` | 7 |
-| Projects | `projects_list`, `setup_pick_folder`, `setup_preview`, `setup_apply`, `project_open`, `project_url_set`, `condition_set`, `variable_set`, `blueprint_repin`, `project_remove` | 10 |
+| Projects | `projects_list`, `setup_pick_folder`, `setup_preview`, `setup_apply`, `project_open`, `project_url_set`, `condition_set`, `variable_set`, `blueprint_repin`, `project_remove`, `project_pin_set` | 11 |
 | Steps | `step_view`, `run_input_set`, `optional_part_set`, `run_override_set`, `step_mark_done`, `step_skip`, `action_preview`, `action_apply`, `wait_start`, `clipboard_copy` | 10 |
 | Chat | `chat_copy_and_open`, `chat_link_set`, `paste_back_preview`, `paste_back_apply` | 4 |
-| Launch | `launch_prepare`, `launch_start`, `config_ack`, `auth_key_allowlist_add`, `project_env_approve` | 5 |
+| Launch | `launch_prepare`, `chain_resume_prepare`, `launch_start`, `config_ack`, `auth_key_allowlist_add`, `project_env_approve` | 6 |
 | Terminal | `pty_attach`, `pty_write`, `pty_paste`, `pty_resize`, `pty_flow`, `pty_interrupt`, `pty_terminate`, `rearm_start`, `rearm_continue`, `terminal_link_open` | 10 |
 | Files | `file_open`, `file_reveal`, `terminal_open_here` | 3 |
 | Decisions / recovery | `pending_changes_list`, `pending_change_accept`, `pending_change_reject`, `item_kind_confirm`, `progress_rebuild_preview`, `progress_rebuild_apply` | 6 |
-| Packets / run log | `packet_view`, `packet_normalize_apply`, `packet_signature_confirm`, `metrics_export`, `runs_clear`, `runs_search` | 6 |
+| Packets / run log | `packet_view`, `packet_normalize_apply`, `packet_signature_confirm`, `packet_repair_prepare`, `metrics_export`, `metrics_view`, `runs_clear`, `runs_search` | 8 |
 | Gates (P2) | `gate_view`, `gate_item_attest`, `gate_import_results`, `gate_import_confirm`, `gate_fix_start` | 5 |
 | Signing (P2) | `sign_preview`, `sign_apply`, `sign_retry_commit`, `tamper_restore` | 4 |
 | Lessons, manifest, assembler (P2) | `lessons_status`, `manifest_view`, `manifest_mark`, `assembler_view`, `assembler_paste_preview`, `assembler_paste_apply` | 6 |
 | Desktop, overlay, run sheet (P2) | `desktop_open`, `desktop_handoff`, `add_step`, `add_item`, `run_sheet_export` | 5 |
-| **Total** | P1 (incl. P1 + P2 commands): 60 · P2-only: 27 | **87** |
+| **Total** | P1 (incl. P1 + P2 commands): 60 · P2-only: 31 | **91** |
 
-Commands this contract adds to the design doc's §3.4 table, each needed by an acceptance criterion: `settings_pick_tool`, `packet_signature_confirm`, `doctor_login_path_apply`, `probe_run`, `setup_pick_folder`, `project_url_set`, `blueprint_repin`, `run_override_set`, `action_preview`/`action_apply`, `wait_start`, `clipboard_copy` (replaces `fix_request_copy`), `auth_key_allowlist_add`, `project_env_approve`, `rearm_continue`, `terminal_open_here`, `item_kind_confirm`, `progress_rebuild_preview`/`_apply`, `packet_normalize_apply`. The design doc's wildcard groups (`gate_*`, `lessons_*`, `manifest_*`, `assembler_*`) are expanded in §4.11–§4.14.
+This file is the only command list; the design doc points here (Stage 4.7 fix pass). The Stage 4.7 review added `chain_resume_prepare`, `packet_repair_prepare`, `metrics_view` and `project_pin_set`, the `mode` field of `launch_prepare` and the `source` field of `paste_back_preview`, each needed by an acceptance criterion.
 
 ## 5. Channels
 
 | Channel type | Wire | Created by | Payload | Rules |
 |---|---|---|---|---|
 | **PTY output** `Channel<tauri::ipc::Response>` | `InvokeResponseBody::Raw` → `ArrayBuffer` | `launch_start`, `rearm_start`, `rearm_continue`, `pty_attach`, `probe_folder_open` | Raw PTY bytes, chunks ≤ 64 KB (`Response::new(Vec<u8>)`) | Never JSON (a `Channel<Vec<u8>>` would send a number array). The webview writes with `term.write(new Uint8Array(buf), cb)` and calls `pty_flow(paused=true)` above 1 MB pending (NFR-08). Ordered per channel. One channel per run; a re-arm's relaunch gets a new run and a new channel; the old buffer is archived client-side. Tests: `pty::channel_sends_raw_bytes`, `pty::burst_1mb_backpressure`. |
-| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found }` · `Contract { outcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code }` · `Spawning` · `Done` | Phases arrive in DR-120's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
+| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `chain_resume_prepare`, `packet_repair_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found }` · `Contract { outcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code }` · `Spawning` · `Done` | Phases arrive in DR-120's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
 | **Sign progress** `Channel<SignProgress>` (P2) | JSON | `sign_apply`, `sign_retry_commit` | `ReRead` · `Write { path }` · `HashObject { path }` · `WriteTree` · `CommitTree { signed: bool }` · `UpdateRef` · `RefreshIndex` · `ReadBack { path, ok }` · `Done { commit }` | One message per plumbing step (ADR-012). Test: `sign::progress_matches_plumbing_order`. |
 
 Channels need no capability permission (SR-22). The TS client wraps each in `#lib/ipc/tauri.ts`; components receive callbacks, never `Channel` objects.

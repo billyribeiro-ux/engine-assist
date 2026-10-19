@@ -7,7 +7,7 @@ Every rule has an ID (`DR-NNN`), exactly one owning module (named as in design d
 
 Modules used: `template`, `template::grammar`, `lock`, `rules`, `policy`, `resolver`, `sanitize`, `steps`, `chain`, `launch`, `packet`, `git`, `decisions`, `pathpolicy` (all in `foreman-core`), `app::rearm`, `app::watch` (in `foreman-app`).
 
-**Counts:** 128 rules (§1–§14); bracket-token inventory of Stages 0–5, the Stage Gate and F.2: **22 distinct tokens** in v2.1 (51 occurrences) plus the `[optional: …]` part B-5 adds in v2.2 (§6, DR-082).
+**Counts:** 129 rules (§1–§14); bracket-token inventory of Stages 0–5, the Stage Gate and F.2: **22 distinct tokens** in v2.1 (51 occurrences) plus the `[optional: …]` part B-5 adds in v2.2 (§6, DR-082).
 
 ---
 
@@ -75,7 +75,7 @@ Modules used: `template`, `template::grammar`, `lock`, `rules`, `policy`, `resol
 **DR-020 · `template::grammar` · Lexical form.** A directive is an `HtmlBlock` whose literal starts with `<!-- fm:` and ends with `-->`; it may span lines. After `fm:<name>` come whitespace-separated tokens. `fm:step`, `fm:verify` and `fm:grammar` tokens are `key=value` (key `[a-z-]+`, value without whitespace); `fm:if` takes one expression; `fm:end` takes none. An `fm:` comment inside a list item, a blockquote, a paragraph (inline HTML) or a fence is `grammar.not-block-level` ("annotations must be block-level").
 *Example:* the two-line 2.2 comment in PROPOSAL B-1 parses into one directive. `> - item <!-- fm:verify a=attest -->` → `grammar.not-block-level` at its line. *Test:* `grammar::block_level_only` (AC-F001-12).
 
-**DR-021 · `template::grammar` · Grammar version.** The first `HtmlBlock` after the title must be `<!-- fm:grammar v=<n> -->` with `n ≥ 1`. Missing → `grammar.missing-version` (the whole template is not runnable). `v=1` is grammar v1 (this section). For `v>1`, unknown directives and keys are warnings (DR-035) and known ones are read as v1.
+**DR-021 · `template::grammar` · Grammar version.** The first `HtmlBlock` after the title must be `<!-- fm:grammar v=<n> -->` with `n ≥ 1`. Missing → `grammar.missing-version` (the whole template is not runnable). `v=1` is grammar v1 (this section). For `v>1` (newer than this Foreman supports), a step whose `fm:step` has a key v1 doesn't know becomes `needsNewerForeman` (shown, never runnable); unknown directives and keys elsewhere are warnings; known ones are read as v1 (DR-035). Template health then says "This blueprint uses grammar v<n>; update Foreman to run every step".
 *Example (v2.2):* line 2 of the annotated file, after `bp:1 # The Claude Build Blueprint`: `<!-- fm:grammar v=1 -->`. *Test:* `grammar::version_required`.
 
 **DR-022 · `template::grammar` · `fm:step` keys.** Keys, value grammar and defaults:
@@ -108,7 +108,7 @@ A key on a kind it isn't allowed on is `grammar.key-not-allowed`; a repeated non
 *Example:* `bp:630 … Chair: **Fable 5.1** · effort **high** (Max plan) — or **Opus 5.5** · effort **xhigh** (Pro plan / to save usage)` → `start=fable@high/plan alt=pro-plan:opus@xhigh`. *Test:* `grammar::alt_rules_closed_set`.
 
 **DR-025 · `template::grammar` · Run inputs.** `in=<name>:<type>[:remember]`, `<name>` matching `^[A-Za-z][A-Za-z0-9_]{0,63}$`, `<type>` ∈ `text multiline`. A run input binds to the prompt token whose inner text, with each space replaced by `_`, equals `<name>` exactly. A declared input with no matching token, or a run-input token (DR-082) with no declaration on its step, is `grammar.input-binding`.
-*Examples:* `bp:426 We're going with concept [X] (with these changes: [changes]). Now` → on 1.2: `in=X:text in=changes:text`. `bp:458 Here are the validation results: [paste numbers]. If they missed the` → on 1.4: `in=paste_numbers:multiline`. `bp:810 3. Legal and compliance for selling to [TARGET_USERS] in [jurisdictions]:` → on 3.2: `in=jurisdictions:text:remember`. (PROPOSAL B-1 places `in=X:text` on 1.1, but `[X]` is in 1.2's prompt; under this rule it belongs on 1.2.) *Test:* `grammar::input_binding`.
+*Examples:* `bp:426 We're going with concept [X] (with these changes: [changes]). Now` → on 1.2: `in=X:text in=changes:text`. `bp:458 Here are the validation results: [paste numbers]. If they missed the` → on 1.4: `in=paste_numbers:multiline`. `bp:810 3. Legal and compliance for selling to [TARGET_USERS] in [jurisdictions]:` → on 3.2: `in=jurisdictions:text:remember`. (PROPOSAL B-1 now puts `in=X:text` on 1.2, where `[X]` appears.) *Test:* `grammar::input_binding`.
 
 **DR-026 · `template::grammar` · Annotation paths.** `out`, `appends` and `requires` values are repo-relative paths (never relative to `cwd`), comma-separated, no spaces, checked with `pathpolicy::check_write(path, TemplateOut)` for `out`/`appends` and `check_read` for `requires` (DR-160). In the gate and F.2 templates only, the literal `NN` in a `stage-NN` file name is replaced at instantiation by the two-digit stage number.
 *Examples:* 2.2's `out=spec/council/r1-market.md,…` (PROPOSAL B-1) while its prompt says `council/r1-market.md` relative to `spec/`; Gate B (v2.2): `out=docs/handoff/stage-NN.md` → for `5:gate.B`, `docs/handoff/stage-05.md`. `out=../docs/x.md` → `grammar.path-policy` naming the rule. *Test:* `grammar::paths_repo_relative`, `grammar::nn_instantiation`.
@@ -143,8 +143,8 @@ Precedence `!` > `&` > `|`; no spaces inside a `when=` value; nesting depth ≤ 
 **DR-034 · `template::grammar` · Item IDs.** Item IDs match `^[a-z][a-z0-9-]{0,47}$` and are unique across the whole template (`grammar.duplicate-id`), because the lock keys items by ID alone (`docs/contracts/files.md` §3.3). Reordering bullets with their IDs keeps each ID with its text.
 *Example:* Stage 5's `staging` and a later stage's `staging` → duplicate; the later one must be named, e.g., `staging-load`. *Test:* `grammar::item_ids_unique`.
 
-**DR-035 · `template::grammar` · Unknown directives and keys.** Within the declared grammar version, an unknown directive (`fm:foo`) or key is an error; when the declared version is higher than the parser's, it's a warning and the directive is read as far as v1 understands it.
-*Example:* `<!-- fm:step id=1.1 surfaces=chat -->` → `grammar.unknown-key` under `v=1`; warning under `v=2`. *Test:* `grammar::unknown_key_by_version` (AC-F001-13).
+**DR-035 · `template::grammar` · Unknown directives and keys.** Within the declared grammar version, an unknown directive (`fm:foo`) or key is an error. When the declared version is higher than the parser's: an `fm:step` with an unknown key makes that step `needsNewerForeman` (listed and shown, never runnable, never on Today; Foreman can't know what the key changes); an unknown key on `fm:verify` or an unknown directive is warning `grammar.newer-grammar` and the rest is read as v1 understands it. Template health shows "Update Foreman" with the count of affected steps.
+*Example:* `<!-- fm:step id=1.1 surfaces=chat -->` → `grammar.unknown-key` under `v=1`; under `v=2`, step 1.1 is `needsNewerForeman` and Template health says "Update Foreman: 1 step needs a newer version". `<!-- fm:note text=x -->` under `v=2` → warning only. *Test:* `grammar::unknown_key_by_version` (AC-F001-13).
 
 **DR-036 · `template::grammar` · Action vocabulary.** An `action` step's behavior comes from a Rust table keyed by step ID (SR-34), never from text: `council-setup` → `write-blocks` (the six `markdown` fences under `### Council setup` → `spec/.claude/agents/<name>.md`, names from each fence's `name:` line, which must be one of `market-analyst user-advocate product-visionary principal-engineer growth-strategist red-team`); `1.4b` → `copy-file` (`docs/handoff/stage-01.md` plus its attachments → `spec/01-app-brief.md`, PROPOSAL B-8). An action step whose ID isn't in the table is `grammar.unknown-action`.
 *Example:* `bp:546 name: market-analyst` in the first fence → `spec/.claude/agents/market-analyst.md`. A fence with `name: ../../evil` → `grammar.unknown-action-target`. *Test:* `actions::destinations_fixed` (AC-F007-02).
@@ -206,7 +206,7 @@ Precedence `!` > `&` > `|`; no spaces inside a `when=` value; nesting depth ≤ 
 
 ## 4. Tags, conditions, applicable path, overlay (`rules`)
 
-**DR-050 · `rules` · Step applicability.** For each step, `applicable_path` computes one of `applicable`, `skippable`, `skipped(reason)`, `notApplicable(reason)`, `undecided(condition)`, `needsAnnotation`, from tag, `when` (three-valued, DR-051) and the overlay:
+**DR-050 · `rules` · Step applicability.** For each step, `applicable_path` computes one of `applicable`, `skippable`, `skipped(reason)`, `notApplicable(reason)`, `undecided(condition)`, `needsAnnotation`, `needsNewerForeman` (DR-035), from tag, `when` (three-valued, DR-051) and the overlay:
 
 | Tag | `when` | `when` value | State | Skip control |
 |---|---|---|---|---|
@@ -257,6 +257,18 @@ Gate instances, F.2 instances and packets are core. These states are derived on 
 
 **DR-062 · `rules` · Overlay round trip.** Overlay JSON round-trips unchanged; added steps appear in the applicable path in position; packets list them in `SKIPPED:` when skipped.
 *Test:* `rules::overlay_roundtrip` (property, AC-F025-04).
+
+**DR-063 · `rules` · Late-condition evidence (assembler prefill, P2).** The build-package assembler (F-023) proposes a value for each late condition that is still `undecided`, from **paths only**: the Stage 4 packet's REPO FILES entries and the paths that exist in the project (never file contents). Matching is on the repo-relative path, lowercased:
+
+| Condition | Evidence that proposes `yes` |
+|---|---|
+| `has_database` | a path under `docs/migrations/`, or a file ending in `.sql`, or named `schema.prisma` |
+| `has_uploads` | a path component containing `upload` or `attachments-storage` |
+| `has_email` | a path component containing `email` or `mail` (e.g. `docs/email-templates/`) |
+| `has_integrations` | a path under `docs/integrations/`, or a component containing `webhook` or `integration` |
+
+With no evidence the condition stays **`undecided`**; the assembler never proposes `no`. A proposal is shown with its evidence ("from: `docs/migrations/0001.sql`") and takes effect only when Billy confirms it, which records `condition_set` with the note "from evidence: <path>" (DR-052's window applies). A condition Billy already decided is never changed.
+*Example:* Foreman's own Stage 4 REPO FILES has no migrations, uploads, email or integration paths → all four stay `undecided` until Billy answers them; TradeLog's fixture lists `docs/migrations/0001_init.sql` → `has_database` proposed `yes`. *Test:* `rules::late_condition_evidence` (AC-F023-06).
 
 ## 5. Step kinds, states and close-out (`steps`)
 
@@ -482,7 +494,7 @@ Out-of-order transitions are rejected. In P1 the same sequence is a `manual` che
 
 ## 11. Signing and git (`git`)
 
-**DR-140 · `git` · Allowed operations.** `git::run` takes only: `init`, `rev-parse` (`--show-toplevel`, `--git-path`, `--git-common-dir`, `<rev>:<path>`), `config --get`/`--show-origin --show-scope`, `cat-file blob`, `ls-tree`, `hash-object [-w] --no-filters`, `update-index --add --cacheinfo`, `read-tree` (temporary index only), `write-tree`, `commit-tree`, `update-ref`, `show <rev>:<path>` (raw blob). Never `status`, `diff`, `add`, `commit` (SR-45). Every call carries the SR-45 `-c` overrides and environment and a 60 s timeout.
+**DR-140 · `git` · Allowed operations.** `git::run` takes only: `init`, `rev-parse` (`--show-toplevel`, `--git-path`, `--git-common-dir`, `--verify -q HEAD`, `<rev>:<path>`), `symbolic-ref -q HEAD`, `config --get`/`--show-origin --show-scope`, `cat-file blob`, `ls-tree`, `hash-object [-w] --no-filters`, `update-index --add --cacheinfo`, `read-tree <tip>`/`read-tree --empty` (temporary index only), `write-tree`, `commit-tree --no-gpg-sign`, `update-ref`, `show <rev>:<path>` (raw blob). ADR-012's operation enum is exactly this list. Never `status`, `diff`, `add`, `commit` (SR-45). Every call carries the SR-45 `-c` overrides and environment and a 60 s timeout.
 *Test:* `git::status_and_diff_never_run_filters` (static allowlist check), `git::invocation_snapshot`.
 
 **DR-141 · `git` · Own repo only.** Before any operation, `rev-parse --show-toplevel` (resolved) must equal the project root (or the blueprint repo root for blueprint reads); a folder inside an enclosing repo is refused, and setup offers `git init` (SR-44).
@@ -491,10 +503,12 @@ Out-of-order transitions are rejected. In P1 the same sequence is a `manual` che
 **DR-142 · `git` · Change detection by hash.** "Changed since HEAD" is `hash-object --no-filters <file>` ≠ `rev-parse HEAD:<path>` (missing at HEAD counts as changed). The blueprint pin refuses a changed file (showing both hashes); signing commits a path only if it changed.
 *Example:* pinning with an edited blueprint → "claude-build-blueprint.md differs from HEAD (working a3f9c1… vs HEAD 7d02e4…)". *Test:* `lock::dirty_blueprint_refused` (AC-F002-02).
 
-**DR-143 · `git` · The commit.** For a set of paths: re-read each through `store` and compare with the reviewed hash; `hash-object -w --no-filters --stdin` per path; `GIT_INDEX_FILE=<app-data>/tmp/git-index-<uuid> read-tree <tip>`; `update-index --add --cacheinfo 100644,<oid>,<path>` per path; `write-tree`; `commit-tree <tree> -p <tip> -m "handoff: stage NN"` (decision commits: `-m "foreman: <file>"`); `update-ref <ref> <new> <old>`; current branch only: `update-index --cacheinfo` on the real index for those paths. Paths: the packet, its attachments, the stage record, decision files with pending changes, and `docs/lessons.md` if changed (PROPOSAL B-3 commits it with the packet).
-*Test:* `sign::pathspec_only`, `sign::untracked_new_packet`, `sign::other_branch_leaves_worktree_head_and_index`, `sign::concurrent_ref_move_fails` (AC-F014-06…-09).
+**DR-143 · `git` · The commit.** For a set of paths: re-read each through `store` and compare with the reviewed hash; `hash-object -w --no-filters --stdin` per path; `GIT_INDEX_FILE=<app-data>/tmp/git-index-<uuid> read-tree <tip>`; `update-index --add --cacheinfo 100644,<oid>,<path>` per path; `write-tree`; `commit-tree <tree> -p <tip> --no-gpg-sign -m "handoff: stage NN"` (decision commits: `-m "foreman: <file>"`); `update-ref <ref> <new> <old>`; current branch only: `update-index --cacheinfo` on the real index for those paths. Paths: the packet, its attachments, the stage record, decision files with pending changes, and `docs/lessons.md` if changed (PROPOSAL B-3 commits it with the packet). The commit OID is stored in `progress.json` `signing[NN].commit`, never in the stage record (which the commit contains).
+- **HEAD state** (current branch). Unborn (`rev-parse --verify -q HEAD` fails, e.g. right after setup's `git init`): `read-tree --empty`, `commit-tree` without `-p`, `update-ref HEAD <new> 0000000000000000000000000000000000000000`. Detached (`symbolic-ref -q HEAD` exits 1): refused with "Check out a branch first"; decision changes stay pending and signing stays possible once a branch is checked out.
+- **Real-index refresh.** The last step retries on `index.lock` 5 times, 200 ms apart. On failure the commit stands; `progress.json` records `indexRefreshPending`, Foreman retries on open and focus, and the banner "Index not refreshed; don't commit until this clears" shows until a retry succeeds.
+*Example:* Foreman's own project right after setup (`git init`, no commits): the first `condition_set` before Stage 5 makes the repo's first commit, `foreman: project.json`, with no parent. *Test:* `sign::pathspec_only`, `sign::untracked_new_packet`, `sign::other_branch_leaves_worktree_head_and_index`, `sign::concurrent_ref_move_fails` (AC-F014-06…-09), `sign::unborn_head_first_commit`, `sign::detached_head_refused` (AC-F020-08), `sign::index_locked_refresh_retried` (AC-F014-06).
 
-**DR-144 · `git` · Sign mode.** `--no-gpg-sign` unless `config --show-origin --show-scope commit.gpgSign` is `true` from global or system scope and every applicable `gpg.*` key is global or system scope; then `-S`. Repo-scope signing settings are ignored with a notice.
+**DR-144 · `git` · Sign mode.** v1 always commits with `commit-tree --no-gpg-sign`, at every scope of signing configuration (Stage 4.7 decision); `-S` is never passed and `gpg.program` never runs. Doctor shows a notice when `config --show-origin --show-scope commit.gpgSign` is `true` anywhere ("Foreman's commits aren't GPG-signed in v1").
 *Test:* `git::repo_gpg_program_never_runs` (AC-F014-12).
 
 **DR-145 · `git` · Read-back.** After `update-ref`, `cat-file blob <commit>:<path>` for every path must hash to what Foreman wrote; otherwise the stage stays `commitPending` with the diff ("Your repo's commit hooks changed the packet"). The stamp runs only after read-back passes.
@@ -543,7 +557,7 @@ Out-of-order transitions are rejected. In P1 the same sequence is a `manual` che
 
 ## 15. Gaps and contradictions found while writing this file
 
-These are for the Stage 4.7 review; each rule above states the choice made.
+These were for the Stage 4.7 review; each rule above states the choice made. **Resolved in the 4.7 fix pass:** items 1–6, 9, 13 and 14 in PROPOSAL B-1 (which now names DR-020 to DR-038 as its normative grammar); items 10 and 11 in ADR-012; item 12 in DR-143 and AC-F014-06; item 7 stays as DR-113.
 
 1. **`fm:if` vs fenced prompts.** PROPOSAL B-1 says `fm:if` is block-level and that the PDF is unchanged, but every prompt is a fenced code block, inside which an HTML comment is literal text. DR-032 splits a prompt into several fences around `fm:if` blocks (block-level, invisible comments, but the PDF shows the prompt as two or three code boxes). Alternative: line-level markers inside the fence, filtered by the render script.
 2. **`kind=followup` means two things.** r6 F-007 defines followup as "copy and focus terminal", but PROPOSAL B-1's 2.3 example uses `kind=followup` for a step MASTER-SPEC treats as re-armed. DR-068 and lint DR-042 reconcile them.
@@ -554,8 +568,8 @@ These are for the Stage 4.7 review; each rule above states the choice made.
 7. **Chain start not applicable.** 3.2 is "same chat" as 3.1, which is conditional; for Foreman 3.1 doesn't apply and 3.2 would lose the Stage 2 packet pasted in 3.1. DR-113 starts a fresh chain with context.
 8. **Packet formats don't mark condition-dependent keys** (Stage 3's `PRICING`… when 3.1 doesn't apply; Foreman's own `stage-03.md` omits them). DR-136 accepts `not applicable: <reason>` only with a non-empty SKIPPED queue.
 9. **Packet formats are inside prompt fences**, not separate fences (ADR-005 says "fences starting `=== HANDOFF PACKET`"). DR-017 extracts them from inside the fence.
-10. **Stage record and commit OID** (ADR-012 §6): the record is in the commit it would describe; `docs/contracts/files.md` §3.4 keeps the OID in app data.
-11. **ADR-012's operation enum** lists `Status` and `DiffNoExt`, which revised SR-45 now forbids; DR-140 follows SR-45 (ADR-012 needs an amendment).
+10. **Stage record and commit OID**: the record is in the commit it would describe; the OID is kept in app data (`progress.json` `signing[NN].commit`). Resolved in ADR-012 (decision 7) in the Stage 4.7 fix pass.
+11. **ADR-012's operation enum** listed `Status` and `DiffNoExt`, which revised SR-45 forbids. Resolved in the Stage 4.7 fix pass: the enum is now exactly DR-140's list.
 12. **Signing paths.** PROPOSAL B-3 commits `docs/lessons.md` with the packet; r6 F-014's path list omits it. DR-143 includes it when changed.
 13. **Item IDs and the lock.** The lock keys items by ID alone, so IDs must be unique across the template (DR-034); the proposal's examples (`staging`, `fresh-clone`) don't say so.
 14. **`[BUDGET_TIME]`'s example value is a placeholder** (`[your numbers]`), so the TradeLog harness fixture "from the blueprint's example variables" can't resolve it without a concrete value (DR-083).

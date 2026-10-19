@@ -14,12 +14,6 @@
 
 **Decisions:** `docs/adr/` (index: `docs/adr/README.md`). Every library version and API named here was checked on 2026-10-19 against crates.io, the npm registry, the crate or package source, the Rust std source, or the official docs, unless it's marked **UNVERIFIED**.
 
-> **Differences from the frozen spec, needing Billy's approval (§9).**
-> 1. **Frontend:** Billy chose **SvelteKit 3.1.0 in SPA mode** (adapter-static 4.0.0, `ssr = false`, file-based routes) over the plain Svelte 5 + Vite + hash-router recommendation (ADR-002).
-> 2. **Signing mechanics:** revised SR-42 makes current-branch signing **plumbing-only** (`hash-object --no-filters` … `commit-tree` … `update-ref`) with `commit.gpgSign=false` unless signing config comes from global/system scope. MASTER-SPEC §8 and r6 F-014 still say `git add` + `git commit --only` (ADR-012).
->
-> This doc and the ADRs follow the decisions above. The frozen texts must be aligned at the Stage 2/3 sign or by Change Request.
-
 ---
 
 ## 1. Context and scope
@@ -148,7 +142,7 @@ src-tauri/              foreman-app: Tauri shell, IPC, watcher, sensor ingest, p
 ```
 
 - `#![forbid(unsafe_code)]` everywhere; `unwrap`/`expect` denied outside tests; `clippy::pedantic` on the core; `-D warnings` (SR-62).
-- `clippy.toml` `disallowed-methods` confines `Command::new`/`CommandBuilder::new` to `foreman-sys::spawn` (SR-02, SR-44) and `std::fs` to `foreman-core::store` (SR-31a).
+- `clippy.toml` `disallowed-methods` confines `Command::new`/`CommandBuilder::new` to `foreman-sys::spawn` (SR-02, SR-44) and `std::fs` to `foreman-core::store` (including `store::outside` and `store::git_exclude`), `foreman-app::logging` (the size-rotating diagnostics writer, `logs/` in app data only), the `foreman-sensor` crate (its event-file writer), and test code (`#[cfg(test)]`, `tests/`) (SR-31a, AC-XC-30).
 
 **Core dependencies** (exact pins, SR-61):
 
@@ -326,19 +320,7 @@ src/
 
 **Commands.** Each is listed in `ipc::COMMANDS`, passed to `AppManifest::commands`, and granted only to the `main-window` capability. Each takes exactly one request struct with `deny_unknown_fields` and no `flatten`; Rust validates lengths, enums and IDs. The webview never supplies a path, program, argv, URL or env value that Rust uses unvalidated (SR-24).
 
-| Group | Commands (P1 unless marked) |
-|---|---|
-| App | `app_bootstrap`, `settings_get`, `settings_update`, `today_get`, `do_next` |
-| First run / Doctor | `blueprint_pick_repo` (Rust dialog), `template_health`, `doctor_run`, `doctor_capture_login_path` (consented shell), `probe_folder_open` (P2) |
-| Projects | `projects_list`, `setup_preview`, `setup_apply`, `project_open`, `condition_set`, `variable_set`, `project_remove` |
-| Steps | `step_view` (prompt, argv, env names, blockers, value sources), `run_input_set`, `optional_part_set`, `step_mark_done`, `step_skip` |
-| Chat | `chat_copy_and_open`, `chat_link_set`, `paste_back_preview` (Rust reads the clipboard), `paste_back_apply`, `fix_request_copy` |
-| Launch | `launch_prepare`, `launch_start(planId, ack, output: Channel<Response>)`, `config_ack` |
-| Terminal | `pty_attach(runId, output)`, `pty_write` (live runs only), `pty_paste` (Rust clipboard + SR-28 sanitizing), `pty_resize`, `pty_flow`, `pty_interrupt`, `pty_terminate(confirm)`, `rearm_start(stepId, idleConfirmed)`, `terminal_link_open(url)` (Rust confirm dialog) |
-| Files | `file_open(projectId, path)` (SR-25a), `file_reveal` |
-| Decisions | `pending_changes_list`, `pending_change_accept`, `pending_change_reject` |
-| Packets / Run log | `packet_view`, `metrics_export` (Rust save dialog), `runs_clear` |
-| P2 | `gate_*`, `sign_preview`, `sign_apply`, `tamper_restore`, `lessons_*`, `manifest_*`, `assembler_*`, `desktop_open`, `add_step`, `run_sheet_export`, `runs_search` |
+The command list, request and response types, errors and mock fixtures live in **`docs/contracts/ipc.md`**, which is the single source; this doc no longer keeps its own table. No request carries an approval: every confirmation (launch confirmation, config acknowledgement, Terminate, re-arm idle assertion, accepting an outside change, signing, security-relevant settings) is a native dialog raised by Rust, and the webview's buttons only request the action (`docs/contracts/ipc.md` IPC-R11, SR-24a).
 
 **Channels.** PTY output uses `Channel<tauri::ipc::Response>` with `Response::new(bytes)`. That's `InvokeResponseBody::Raw`, which arrives as an `ArrayBuffer`. A `Channel<Vec<u8>>` would serialize a JSON number array (blanket `Serialize` impl in tauri 2.12.4 `src/ipc/mod.rs`; `@tauri-apps/api` 2.12.4 `Channel` docs). `pty_attach` replays the last 2,000 lines. Channels need no capability permission (SR-22).
 
@@ -370,15 +352,22 @@ sequenceDiagram
   participant C as foreman-core
   participant P as PTY / claude
   B->>UI: ⌘↵ on step (or ⌘⇧↵ Do next)
-  UI->>A: launch_prepare(projectId, stepId) [lookStart logged]
-  A->>S: claude -v (every launch)
-  A->>C: store::outside reads → fingerprint(), auth_key_hits()
+  UI->>A: launch_prepare(projectId, stepId, mode) [lookStart logged]
+  par every launch
+    A->>S: claude -v
+  and
+    A->>C: store::outside reads → fingerprint(), auth_key_hits()
+  end
   A->>S: claude auth status (cwd, env) only if 3–4 pass and cache misses
   A->>C: evaluate_preflight, resolve, check_prompt, plan_session, build_argv, build_env, run_settings
   C-->>A: LaunchPlan | Blockers
-  A-->>UI: preview (prompt, argv, env names) + confirm reason? | blockers
-  B->>UI: Run (confirm if required)
-  UI->>A: launch_start(planId, ack, Channel)
+  A-->>UI: preview (prompt, argv, env names) + confirm reasons (context only) | blockers
+  B->>UI: Run
+  UI->>A: launch_start(planId, Channel)
+  opt plan has confirm reasons
+    A->>B: native dialog (Rust) naming the reasons
+    B-->>A: Run or Cancel (Cancel → Cancelled, nothing spawned)
+  end
   A->>C: store.write(runs/<id>/settings.json 0600), store.write(run.json running)
   A->>S: PtySession::spawn(abs claude, argv, cwd, env)
   S->>P: openpty + spawn (setsid, fds closed)
@@ -390,32 +379,33 @@ sequenceDiagram
   A-->>UI: run:status
 ```
 
-1. `launch_prepare` re-resolves from current state; the UI never sends argv. The order of checks is fixed (ADR-021): version → fingerprint + block scan → acknowledgement → auth (fail closed) → transcript → inputs → run inputs → prompt hygiene → argv/env → run settings → confirmation reason (SR-19, including "Claude Code updated X → Y").
-2. The plan is stored under a one-time `planId`, valid for 60 s and for the exact project revision and fingerprint.
-3. The run record is written **before** spawn (SR-19, NFR-11). The PTY cwd must be a directory reached through the no-symlink walk; portable-pty would otherwise fall back silently to `$HOME` (ADR-006).
-4. The run log records time-to-start, entry point, input interventions and Copy-prompt usage (F-026). The argv is stored with the prompt replaced by its hash (SR-52).
+1. `launch_prepare` re-resolves from current state; the UI never sends argv. `mode: freshWithContext` starts a new chain with context instead of resuming (broken chain, DR-113); resuming a chain from a tab or the Run log uses `chain_resume_prepare`. The order of checks is fixed (ADR-021): version → fingerprint + block scan → acknowledgement → auth (fail closed) → transcript → inputs → run inputs → prompt hygiene → argv/env → run settings → confirmation reason (SR-19, including "Claude Code updated X → Y"). `claude -v` runs in parallel with the fingerprint reads; its spawn time counts toward NFR-05, not NFR-04.
+2. **Confirmations are native** (SR-24a; `docs/contracts/ipc.md` IPC-R11). `launch_start` takes only the `planId`. If the plan has confirmation reasons, Rust shows them in a native dialog and acts on the answer; the webview's preview shows the reasons only as context. The config acknowledgement (`config_ack`) is a native dialog too.
+3. The plan is stored under a one-time `planId`, valid for 60 s and for the exact project revision and fingerprint.
+4. The run record is written **before** spawn (SR-19, NFR-11). The PTY cwd must be a directory reached through the no-symlink walk; portable-pty would otherwise fall back silently to `$HOME` (ADR-006).
+5. The run log records time-to-start, active time, entry point, input interventions and Copy-prompt usage (F-026). The argv is stored with the prompt replaced by its hash (SR-52).
 
 #### 3.5.2 Re-arm a continuing step
 
-1. Billy presses Run on a `session=continue` step. `plan_session` → `Continue`, or `Broken` (transcript missing, offering "Start a fresh chain with context").
-2. If the process is alive, idle is required:
-   - P1: Billy clicks "Claude is idle and nothing is running in the background".
-   - P2: the sensor reports idle; otherwise "N background tasks still running: Wait / End anyway".
-3. Write `\x03`, then `/exit\r`. Wait ≤ 10 s (P2: `SessionEnd` with `prompt_input_exit`). On timeout: "Claude didn't exit. End it yourself, then press Continue." No signal is sent without Billy's explicit Terminate confirmation (SR-13).
+1. Billy presses Run on a `session=continue` step. `plan_session` → `Continue`, or `Broken` (transcript missing, offering "Start a fresh chain with context", `launch_prepare { mode: freshWithContext }`). The UI then calls `rearm_start(planId)`; no request field carries the idle assertion.
+2. If the process is alive, idle is required, confirmed in a **native dialog** raised by Rust (SR-24a):
+   - P1: "Claude is idle and nothing is running in the background", Continue or Cancel.
+   - P2: the sensor reports idle; otherwise the native dialog says "N background tasks still running" with Wait and End anyway.
+3. Write `\x03`, then `/exit\r`. Wait ≤ 10 s (P2: `SessionEnd` with `prompt_input_exit`). On timeout: "Claude didn't exit. End it yourself, then press Continue." No signal is sent without Billy's explicit Terminate confirmation, which is a native dialog too (`pty_terminate(runId)`, SR-13, SR-24a).
 4. Archive the old buffer and write the divider `── <step> · <model> · <effort> · <mode> · permission grants reset ──`.
 5. Relaunch through 3.5.1 with `--resume <uuid>`. `--session-id` is used only at chain start, or with `--fork-session` if S-8 passes (SR-14). Effort follows S-3's branch.
 6. Only `rearm_start` (a user invoke) can begin this; no event can (SR-18).
 
 #### 3.5.3 Chat: copy, and paste back (P1)
 
-1. `chat_copy_and_open`: Rust resolves the prompt, checks it (SR-28), writes it to the clipboard, and opens the stored conversation URL or Project URL if it matches `https://claude.ai/…` (SR-25). This is the time-to-start "sent" moment.
-2. `paste_back_preview(stepId)`: Rust reads the clipboard (text only, ≤ 1 MB, never logged; SR-56), then normalizes, splits (packet / attachments / extras) and validates. It computes each target through `check_write` and returns diffs with bidi, zero-width and control characters shown visibly (SR-26, SR-35), under a one-time `previewId`.
+1. `chat_copy_and_open`: Rust resolves the prompt, checks it (SR-28), writes it to the clipboard, and opens the stored conversation URL or Project URL if it matches `https://claude.ai/…` (SR-25). Time-to-start ends here: the filled prompt is on the clipboard and the target chat is open, the same end point the by-hand baseline uses (AC-KC-01).
+2. `paste_back_preview(stepId, kind, source)`: Rust reads the clipboard (or, in P2 with `source: sensor`, the run's `last_assistant_message`) (text only, ≤ 1 MB, never logged; SR-56), then normalizes, splits (packet / attachments / extras) and validates. It computes each target through `check_write` and returns diffs with bidi, zero-width and control characters shown visibly (SR-26, SR-35), under a one-time `previewId`.
 3. `paste_back_apply(previewId)`: writes each target with `store.write` against the stamps captured at preview time. A newer file causes a conflict, which is reported with exactly which targets were written.
 4. A valid packet implies Mark done; an invalid one offers Copy fix request.
 
 #### 3.5.4 Packet lands (P1)
 
-1. A notify/FSEvents hint (debounced 250 ms) arrives for an interest-set path (`docs/handoff/stage-NN*.md`, declared `out` paths, `.foreman/*.json`). Ignored and secret patterns are dropped (SR-50).
+1. A notify/FSEvents hint (debounced 250 ms) arrives for an interest-set path, matched exactly (ADR-013, DR-162): `docs/handoff/stage-NN.md` and `stage-NN-attachments.md`, `docs/lessons.md`, declared `out` paths, `.foreman/{project,overlay,blueprint.lock}.json`. Ignored and secret patterns are dropped (SR-50).
 2. `store::Root::read` re-reads the file: no-symlink walk, regular file, `nlink == 1`, 1 MB cap (SR-31). The watch root's ancestors are `lstat`-checked.
 3. `normalize_packet` and `validate_packet` run with the applicable-path context. The runtime updates, `rev` bumps, `packet:changed` fires, and the UI refetches `packet_view` within 1 s (NFR-06).
 4. A signed stage whose on-disk packet differs from the committed blob is a tamper event (P2, SR-46).
@@ -424,25 +414,27 @@ sequenceDiagram
 #### 3.5.5 Sign a packet (P2, F-014; ADR-012)
 
 1. `sign_preview` checks the close-out sequence for the stage type (MASTER-SPEC §8), lessons presence, chain idle (or confirmation), and the fields Foreman will add (SKIPPED, SUBSTITUTIONS, ATTESTED). It returns a diff and the packet SHA-256.
-2. `sign_apply(previewId)`:
+2. `sign_apply(previewId)`: Rust shows the native signing dialog (name, date, "Signing stage-05.md @ a3f9c1", conditions, chain state, SR-24a); Cancel changes nothing. Then:
    1. Re-read and compare the hash (SR-42).
    2. Write APPROVED BY and the added fields, `.foreman/stages/stage-NN.json`, and pending decision changes, each with a CAS `store.write`.
-   3. Commit by plumbing through `git::run`, with SR-45's environment and `-c` overrides:
-      1. `hash-object -w --no-filters --stdin` per path;
-      2. temporary `GIT_INDEX_FILE` from the tip, `update-index --cacheinfo`, `write-tree`;
-      3. `commit-tree` (`--no-gpg-sign` unless signing config is global/system scope);
-      4. `update-ref <ref> <new> <old>`;
-      5. current branch only: `update-index --cacheinfo` on the real index for those paths only.
+   3. Check HEAD (current branch): detached (`symbolic-ref -q HEAD` fails) → refused, "Check out a branch first"; unborn (`rev-parse --verify -q HEAD` fails) → a parentless first commit.
+   4. Commit by plumbing through `git::run`, with SR-45's environment and `-c` overrides (ADR-012, DR-143):
+      1. dirty check per path: `hash-object --no-filters` vs `rev-parse HEAD:<path>`; only changed paths are committed;
+      2. `hash-object -w --no-filters --stdin` per path;
+      3. temporary `GIT_INDEX_FILE`: `read-tree <tip>` (unborn: `read-tree --empty`), `update-index --cacheinfo`, `write-tree`;
+      4. `commit-tree --no-gpg-sign` (always in v1; unborn: no `-p`);
+      5. `update-ref <ref> <new> <old>` (unborn: old = the zero OID);
+      6. current branch only: `update-index --cacheinfo` on the real index for those paths only, retried 5 × 200 ms on `index.lock`; on failure `indexRefreshPending` is recorded and the banner "Index not refreshed; don't commit until this clears" shows until a retry on open or focus succeeds.
 
       Another branch (SR-43) uses the same plumbing against that branch's tip and leaves HEAD, the index and the working tree untouched.
-   4. Read-back: `cat-file blob <commit>:<path>` for every path, comparing hashes. The stage stays `signed (commit pending)` until this passes; then the stamp animation runs.
+   5. Read-back: `cat-file blob <commit>:<path>` for every path, comparing hashes. The stage stays `signed (commit pending)` until this passes; then the stamp animation runs. The commit OID goes to `progress.json` `signing[NN].commit`, never into the stage record (the record is inside that commit).
 
 #### 3.5.6 Outside change to a decision file (P1, F-022; ADR-022)
 
 1. On open, a watcher hint, a launch or a sign, a repo decision file's SHA-256 differs from `approvals/<projectId>.json`.
 2. Rust parses it. If it's unparsable or from a newer schema, the project goes read-only. `classify_outside_change(approved, on_disk)` splits variable-only changes (auto-accepted with a toast) from decision changes.
 3. Decision changes go to a Pending outside change with a **redacted** diff (SR-55). The effective config stays the approved copy in `approvals/<projectId>/` (SR-40).
-4. Accept updates the approved copy and hash. Reject writes the approved content back with a CAS write; a newer edit means a conflict and the review repeats.
+4. Accept (a native dialog raised by Rust, SR-24a) updates the approved copy and hash. Reject writes the approved content back with a CAS write; a newer edit means a conflict and the review repeats.
 5. Foreman's own changes: committed at once by plumbing before Stage 5 is signed; afterwards they're pending until the signing commit (R-10).
 
 ### 3.6 File layout
@@ -469,6 +461,7 @@ templates/<sha256>.md                         locked blueprint text
 cache/fingerprints/<cwdHash>.json             redacted config snapshot + stat cache + auth cache (SR-55)
 bin/foreman-sensor-<hash>  ·  probe/          P2
 logs/foreman.log[.1-.4]                       diagnostics, 10 MB × 5, redacted
+recovered/<timestamp>-<name>                  leftover temp files that differed from their target (shown, never deleted; ADR-010)
 ```
 
 ## 4. Alternatives considered
@@ -518,6 +511,7 @@ logs/foreman.log[.1-.4]                       diagnostics, 10 MB × 5, redacted
 | SR-22 | `capabilities/main-window.json` (listen/unlisten, start-dragging, internal-toggle-maximize, app commands); plugins only via `app::os` | M0 · M2 | 014 |
 | SR-23 | `build.rs` `AppManifest::commands(ipc::COMMANDS)`; contract test | M0 | 004, 014 |
 | SR-24 | One request struct per command (`deny_unknown_fields`, no `flatten`), validation, proptest fuzz; `pty_write` live runs only | M2 · M3 (`pty_write`) | 004, 006 |
+| SR-24a | Native confirmations raised by Rust in `app::os` (`tauri-plugin-dialog`); no approval field in any request (IPC-R11); tests `ipc::security_confirmations_are_native`, `settings::security_fields_require_native_confirm` | M2 · M3 · M4 | 014, 008, 012 |
 | SR-25 | `app::os::open_url` allowlist after URL parsing | M3 | 014 |
 | SR-25a | `sys::open` (`open -b <editor id>`, `.md/.json/.txt`, policy-checked; `open -R`); opener `open_js_links_on_click(false)` | M2 · M3 | 014 |
 | SR-26 | Rust → typed node tree → Svelte; lint bans; `core::sanitize::visible_escapes` in diffs and views | M2, M5 | 002 |
@@ -536,9 +530,9 @@ logs/foreman.log[.1-.4]                       diagnostics, 10 MB × 5, redacted
 | SR-42 | `sys::git` plumbing commit + read-back (P1 decision commits in M1; signing M4) | M1, M4 | 012 |
 | SR-43 | Plumbing against the other branch's tip; HEAD, index and working tree untouched | M4 | 012 |
 | SR-44 | `sys::git::run`, the single entry point, built in M1 | M1 | 012, 003 |
-| SR-45 | Fixed env + `-c` list + `--no-filters` + scope-checked signing + timeout | M1 | 012 |
+| SR-45 | Fixed env + `-c` list + DR-140's plumbing operations only + `--no-filters` + `commit-tree --no-gpg-sign` always + timeout | M1 | 012 |
 | SR-46 | Watcher + committed-blob compare → tamper event | M4 | 012, 013 |
-| SR-47 | Core gate state machine; `signable` property test | M4 | (F-015) |
+| SR-47 | Core gate state machine; `signable` property test; outside signatures need a native confirmation bound to the packet hash (`packet_signature_confirm`, DR-135) | M3 (outside signatures) · M4 | 022 (F-015) |
 | SR-50 | `check_read` secret patterns on folded keys; watcher filter | M1, M3 | 011, 013 |
 | SR-51 | No keychain API; cargo-deny bans `security-framework` and `keyring` (verified absent from the macOS graph) | M0 | 016 |
 | SR-52 | `run.json`/index: argv with `<prompt sha256:…>`, env names only | M2 | 018 |
@@ -546,7 +540,7 @@ logs/foreman.log[.1-.4]                       diagnostics, 10 MB × 5, redacted
 | SR-54 | `app::logging` redaction layer + size-rotating writer | M4 | 018 |
 | SR-55 | `core::fingerprint::redact`; snapshots `0600`, deleted with the project | M3 | 021 |
 | SR-56 | `app::os` clipboard (explicit actions, ≤ 1 MB, never logged); notification templates | M3 · M4 (inbox notifications) | 006, 014 |
-| SR-57 | `sys::spawn`/`PtySession` lifecycle (`env_clear`, setsid via portable-pty / `process_group(0)` for non-PTY, umask 022, SIGHUP on quit, Interrupted, `catch_unwind`) | M2 | 007, 006 |
+| SR-57 | `sys::spawn`/`PtySession` lifecycle (`env_clear`, setsid via portable-pty for the PTY child, `process_group(0)` for non-PTY children (accepted in Stage 4.7), umask 022, SIGHUP on quit, Interrupted, `catch_unwind`) | M2 | 007, 006 |
 | SR-60 | cargo-deny bans on `aarch64-apple-darwin` (verified clean); CSP `connect-src`; `protocol.allow=never`; `sandbox-exec` deny-network run | M0, M5 | 016 |
 | SR-61 | Exact pins; `deny`, `audit`; pnpm 12 policy (`allowBuilds`, `minimumReleaseAge: 10080`, lockfile scan); SHA-pinned Actions | M0 | 016, 024 |
 | SR-62 | Crate attributes + clippy config | M0 | 003 |
@@ -582,8 +576,8 @@ logs/foreman.log[.1-.4]                       diagnostics, 10 MB × 5, redacted
 
 - WCAG 2.2 AA through bits-ui primitives in `#lib/components/ui` wrappers and the tokens (Stage 4.5 contrast table, NFR-35).
 - Keyboard: the shortcut registry; xterm's `attachCustomKeyEventHandler` routes ⌘-chords to the app (except ⌘C/⌘V/⌘A/⌘F); ⌘⇧E leaves the terminal, so there's no trap.
-- VoiceOver: an `aria-live` region; xterm `screenReaderMode`; `--ax-screen-reader` when VoiceOver is on.
-- Reduce Motion, Reduce Transparency and Increase Contrast media queries.
+- VoiceOver: an `aria-live` region. A Settings toggle, "Screen reader mode", turns on xterm `screenReaderMode` and adds `--ax-screen-reader` to CLI launches (Foreman doesn't detect VoiceOver).
+- Reduce Motion and Increase Contrast are CSS media queries in the webview (`prefers-reduced-motion`, `prefers-contrast: more`, whose tokens reach ≥ 7:1). Reduce Transparency is detected the same way (`prefers-reduced-transparency`); the webview reports it and Increase Contrast to Rust (`settings_update` `osDisplay`), which turns the window's vibrancy off (ADR-014).
 - Proof: axe in Playwright, a keyboard-only script, and the M5 VoiceOver pass.
 
 ### 5.5 Performance (against NFR IDs)
@@ -593,8 +587,8 @@ logs/foreman.log[.1-.4]                       diagnostics, 10 MB × 5, redacted
 | NFR-01 cold start ≤ 1.5 s | SvelteKit route chunks; terminal module lazy-loaded; `app_bootstrap` reads only `projects.json` + `progress.json`; Doctor async after first paint | Startup mark; S-0 |
 | NFR-02 switch ≤ 300 ms | Template cache by hash; no git calls on switch | `criterion` `bench_project_open` |
 | NFR-03 template ≤ 50 ms | One comrak pass (r1 measured 1.7 ms) + directive parse; cache | `criterion` on golden + 20,000-line synthetic |
-| NFR-04 resolve + preflight ≤ 50 ms | Pure core; fingerprint stat cache; auth cache; first-ever scan of a cwd excluded and shown | `criterion` `bench_prepare_launch` |
-| NFR-05 spawn ≤ 250 ms | `claude -v` is the only per-launch process before spawn (its latency is **UNVERIFIED** until S-0) | Run-log timestamps |
+| NFR-04 resolve + preflight ≤ 50 ms | Pure core; fingerprint stat cache; auth cache; first-ever scan of a cwd excluded and shown. Measured **excluding** the `claude -v` spawn, which runs in parallel with the fingerprint | `criterion` `bench_prepare_launch` |
+| NFR-05 spawn ≤ 250 ms | Keystroke to spawn includes preflight (NFR-04) and the parallel `claude -v`, the only per-launch process before spawn (its latency is **UNVERIFIED** until S-0) | Run-log timestamps |
 | NFR-06 packet ≤ 1 s | 250 ms debounce + re-read + validate | Fake-writer integration test |
 | NFR-07 UI ≤ 100 ms | No heavy JS work; WebGL terminal | Playwright traces |
 | NFR-08 1 MB burst | 64 KB chunks; xterm write callbacks; `pty_flow` back-pressure | PTY integration test |
@@ -616,7 +610,7 @@ The swapped-out content must match the `ReadStamp` from Foreman's read; otherwis
 | Area | Path |
 |---|---|
 | File schemas | Integer `schemaVersion`; pure forward migrations with goldens for every historical version; newer files open read-only (ADR-023) |
-| Blueprint | Grammar `v=1`; unknown keys are errors within v1 and warnings for v>1 (ADR-005); pin upgrade in v1.1 (F-104) |
+| Blueprint | Grammar `v=1`; unknown keys are errors within v1. For v>1, a step with an unknown key is `needsNewerForeman` (shown, not runnable), other unknowns are warnings, and Template health says "Update Foreman" (ADR-005, DR-035); pin upgrade in v1.1 (F-104) |
 | Tauri | 3.0.0-alpha.5 on crates.io (`@tauri-apps/api` `next` 3.0.0-alpha.3). Tauri code is confined to `foreman-app`, while core and sys are Tauri-free (ADR-001, ADR-003) |
 | SvelteKit | 3.x minors. Stores, the IPC client and components use only `goto`/`$app/state` through `#lib/nav` (ADR-002) |
 | TypeScript | 6.0.3 until svelte-check, typescript-eslint (`<6.1.0`) and kit accept 7.x (ADR-019) |
@@ -655,7 +649,7 @@ A failed probe disables only the dependent feature; an inconclusive one keeps th
 | xterm 6 in WKWebView with the real TUI | S-0 decision rule | S-0 |
 | Strict `style-src` with SvelteKit's `app.html` style attribute, Svelte transitions, bits-ui, xterm | S-0 rule: `style-src 'unsafe-inline'` only, recorded in ADR-014 | S-0 |
 | SvelteKit 3 `version.json` focus/visibility check with `pollInterval: 0` (**UNVERIFIED**) | S-0. If it fetches, `connect-src` gains `'self'` | S-0 |
-| Non-PTY children get `process_group(0)`, not `setsid` (no safe stable `setsid` in std 1.99.1) | Stage 4.7 confirms the SR-57 reading; fallback is spawning via portable-pty | ADR-007, `spawn::no_inherited_fds` |
+| Non-PTY children get `process_group(0)`, not `setsid` (no safe stable `setsid` in std 1.99.1) | Accepted in Stage 4.7 (SR-57 amended); fallback is spawning via portable-pty | ADR-007, `spawn::no_inherited_fds` |
 | Fds inherited by non-PTY children from system frameworks | `spawn::no_inherited_fds` in M2; same fallback | ADR-007 |
 | `RENAME_SWAP` unsupported, or directory `F_FULLFSYNC` failing on a volume | Defined fallbacks, logged | ADR-010 tests (directory sync on APFS is **UNVERIFIED** until M0 on Billy's Mac) |
 | Plugin folder layout for fingerprinting (**UNVERIFIED**) | Fingerprint the whole `plugins/` directory if unresolved | ADR-021 |
@@ -667,15 +661,4 @@ None for design. Each UNVERIFIED item has a spike or test with both outcomes def
 
 ## 9. Change control note
 
-Three items depart from, or tighten, the frozen MASTER-SPEC text. Each needs Billy's approval: at the Stage 2 sign if it's still open, otherwise as a Change Request from `docs/templates/change-request.md`.
-
-1. **Frontend: SvelteKit 3 SPA** (Billy's decision; ADR-002).
-   - Update MASTER-SPEC §10 (Frontend row) and §13 (Rejected: "SvelteKit 3 SPA"), r6 §6 and §7 item 1, and r7's DRI record and pinned list (+ `@sveltejs/kit` 3.1.0, `@sveltejs/adapter-static` 4.0.0).
-   - The Stage 2 packet's STACK line still says "in-house typed hash router".
-2. **Signing by plumbing; repo-scope signing config ignored** (revised SR-42/SR-45 from the Stage 3 security review; ADR-012). MASTER-SPEC §8 ("`git add -- <paths>` then `git commit --only`") and r6 F-014 Phase 2 need aligning.
-3. **The MASTER-SPEC §12 SR IDs** are superseded by `docs/requirements.md`'s mapping table. MASTER-SPEC §10's "Hardening" row cites the old SR-06/SR-08.
-
-Two smaller refinements are within the spec's intent and need no CR:
-
-- dropping the unused `@tauri-apps/plugin-*` JS packages from r7's pinned list;
-- reading SR-57's `setsid` as `process_group(0)` for non-PTY children (Stage 4.7 to confirm).
+No open departures from the frozen spec. The Master Spec records SvelteKit 3 (§10, ADR-002) and signing by plumbing (§8, aligned in the Stage 4.7 fix pass, ADR-012), and the Stage 2 packet records SvelteKit 3; `docs/requirements.md`'s mapping table governs SR IDs. Reading SR-57's `setsid` as `process_group(0)` for non-PTY children was accepted in the Stage 4.7 review. Any later change goes through a Change Request (`docs/templates/change-request.md`).

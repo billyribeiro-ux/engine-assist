@@ -5,16 +5,7 @@ Inputs: `docs/handoff/stage-02.md`, `docs/MASTER-SPEC.md` (frozen v1.0), `spec/c
 
 This file says what v1 contains, the order it's built in, and how each part is proven. Stage 4.6 tickets reference the acceptance-criterion IDs here (`AC-F008-06`, `AC-M0-03`, …). Behavior comes from r6 and the Master Spec. Where they're silent and a criterion needed a decision, the conservative option was taken and listed in §7.
 
-**Frontend correction (Billy, 2026-10-19).** The frontend is **SvelteKit 3 in SPA mode**: file-based routes, `adapter-static`, `ssr = false`, and shared code under `#lib` (SvelteKit 3 replaces the generated `$lib` alias with a `#lib` Node subpath import declared in `package.json`; [migration guide](https://svelte.dev/docs/kit/migrating-to-sveltekit-3)). This file uses those terms. Master Spec §10, r6 §6 and `docs/handoff/stage-02.md` still say Svelte 5 + Vite + a hash router. Billy can override that at the Stage 2 sign (Master Spec §10), so the override has to be recorded there; after the sign it would need a CR. `docs/requirements.md` (SR-20) already covers SvelteKit's bootstrap script, which needs the hash Tauri injects at compile time, and keeps `kit.csp` unset.
-
-**Requirements newer than the frozen spec.** `docs/requirements.md` (revised after the Stage 3 security review) tightens several behaviors that r6 and the Master Spec describe differently. Where they conflict, this file follows `requirements.md`, and the Master Spec needs the matching update when Stage 3 is signed:
-- SR-42: current-branch signing uses git plumbing (temporary index, `hash-object -w --no-filters`, `commit-tree --no-gpg-sign`, `update-ref`), not `git add` + `git commit --only` (Master Spec §8, r6 F-014).
-- SR-09: the run settings deny `Read`/`Edit` on absolute `//` paths for `.foreman/` and app data and set `disableBypassPermissionsMode`, instead of `Read(./.foreman/**)`.
-- SR-06: the fingerprint covers more sources than r6 F-008.
-- SR-19: confirmations are also needed for a model change and for the first launch after a Claude Code update.
-- SR-56: notifications ship in P1 with `wait` steps.
-- SR-01: the spawn allowlist adds `/usr/bin/open`.
-- SR-25a, SR-29: an editor setting and terminal-link handling.
+The frontend is **SvelteKit 3 in SPA mode**: file-based routes, `adapter-static`, `ssr = false`, and shared code under `#lib` (SvelteKit 3 replaces the generated `$lib` alias with a `#lib` Node subpath import declared in `package.json`; [migration guide](https://svelte.dev/docs/kit/migrating-to-sveltekit-3)), as the Master Spec §10 records. Where `docs/requirements.md` is more specific than r6 or the Master Spec (signing by plumbing, run-settings deny rules, the fingerprint set, confirmation reasons, native confirmations, P1 notifications), this file follows `requirements.md`.
 
 ---
 
@@ -61,7 +52,7 @@ Milestones: **M0**–**M5** (§2). "P1" and "P2" are the phases of Master Spec �
 | F-016 | Lessons capture | P2 (P1: by hand) | M4 |
 | F-017 | Today and Do next | P1: Next step + ⌘⇧↵ · P2: inbox | M2 · M4 |
 | F-018 | Projects and setup | P1: setup form · P2: wizard | M2 · M4 |
-| F-019 | First run, Doctor, contract probes | P1: first run, version, auth, git, probe-folder trust · P2: full Doctor, probes | M2 (probe-folder trust in M3) · M4 |
+| F-019 | First run, Doctor, contract probes | P1: first run, version, auth, git · P2: probe-folder trust, full Doctor, probes | M2 · M4 |
 | F-020 | State, persistence, resilience | P1 | M1 (run records and restart in M3) |
 | F-021 | Path policy | P1 | M1 |
 | F-022 | Outside-change review for decision files | P1 | M1 (review UI in M2, live detection in M3) |
@@ -116,13 +107,13 @@ Scaffold, quality gates, CI, release build, and the seven spikes. No feature cod
 | AC-M0-04 | **Given** a planted type error, a planted fake secret, a clippy warning, and a known-vulnerable dependency, each in turn **when** `pnpm verify` and CI run **then** each one fails them (then the plant is reverted) | ci |
 | AC-M0-05 | **Given** CI **then** it runs Semgrep (Rust and TypeScript rule packs), a gitleaks secret scan, the full test suite and a CycloneDX SBOM per build (cargo and pnpm) | ci |
 | AC-M0-06 | **Given** `cargo deny` **then** its bans list rejects HTTP clients (reqwest, hyper client, ureq, isahc, surf) and the keychain crates `security-framework` and `keyring`, sources are crates.io only, and licenses are checked; lockfiles are committed and direct `foreman-core` crates are pinned to exact versions | ci |
-| AC-M0-17 | **Given** the JS toolchain and CI **then** `package.json` uses exact versions, every install uses `--frozen-lockfile`, dependency install scripts are disabled except an explicit `onlyBuiltDependencies` list, a 7-day minimum release age applies, there are no git or tarball dependencies, and GitHub Actions are pinned by commit SHA with `permissions: contents: read` (CI jobs `pnpm-policy`, `actions-pinned`) | ci |
+| AC-M0-17 | **Given** the JS toolchain and CI **then** `package.json` uses exact versions, every install uses `--frozen-lockfile`, dependency build scripts are denied by default through `allowBuilds` in `pnpm-workspace.yaml` (only the packages listed there may run them; `strictDepBuilds: true` makes an unapproved one fail the install), a 7-day minimum release age applies (`minimumReleaseAge: 10080`, strict: every pinned JS version must be at least 7 days old on M0 day, or install fails), there are no git or tarball dependencies, and GitHub Actions are pinned by commit SHA with `permissions: contents: read` (CI jobs `pnpm-policy`, `actions-pinned`). **When** a planted dependency with a `postinstall` script is added **then** install fails in CI (then the plant is reverted) | ci |
 | AC-M0-07 | **Given** Foreman's crates **then** they carry `#![forbid(unsafe_code)]` and `unwrap`/`expect` are denied outside tests | ci |
 | AC-M0-08 | **Given** the Tauri config **then** a snapshot test pins the production CSP (`default-src 'self'; script-src 'self'; style-src 'self'` plus Tauri's compile-time hashes, never `'unsafe-inline'` or `'unsafe-eval'`; `img-src 'self' data:`; `font-src 'self'`; `connect-src ipc: http://ipc.localhost`; `object-src 'none'`; `base-uri 'none'`; `form-action 'none'`; `frame-ancestors 'none'`), SvelteKit's `kit.csp` unset, a separate `devCsp` allowing only the Vite dev server, `dangerousDisableAssetCspModification` off, `freezePrototype: true`, `withGlobalTauri: false`, `assetProtocol.enable: false`, `capabilities: ["main-window"]` listed explicitly, `dragDropEnabled: false`, the devtools feature off in release builds, the `brownfield` IPC pattern, and no remote URL in any capability. `style-src 'unsafe-inline'` appears only if S-0's fail branch was taken and the ADR records it | unit |
 | AC-M0-09 | **Given** the capability files **then** a snapshot fails on any permission beyond `core:event:allow-listen`, `core:event:allow-unlisten`, `core:window:allow-start-dragging`, `core:window:allow-internal-toggle-maximize` and Foreman's own commands; every app command is declared through `AppManifest::commands` and granted to the main window only | unit |
 | AC-M0-10 | **Given** a `sandbox-exec` deny-network profile **when** a full harness run and the app's first-run path run under it **then** everything passes and Foreman makes no request of its own | int |
 | AC-M0-11 | **Given** `pnpm release` **when** it runs **then** it runs `pnpm verify`, builds an ad-hoc signed Apple Silicon `Foreman.app` reproducibly from the lockfiles and `rust-toolchain.toml`, and copies it to `/Applications` only after Billy confirms; the runbook's rollback to `Foreman-previous.app` works | manual |
-| AC-M0-12 | **Given** `pnpm dev:web` **when** it runs **then** the frontend opens in the Desktop Browser pane in mock-IPC mode | manual |
+| AC-M0-12 | **Given** `pnpm dev:mock` **when** it runs **then** the frontend opens in the Desktop Browser pane in mock-IPC mode | manual |
 | AC-M0-13 | **Given** each of S-0, S-1′, S-3, S-7′, S-8, S-12, S-23 **when** it has run on Billy's Mac **then** `docs/spikes/<id>.md` records the result, the branch taken under its Master Spec §9 decision rule, and every document that branch changes (the ADR, or the affected ACs in this file) | manual |
 | AC-M0-14 | **Given** S-0 **then** its report covers Shift+Tab, a 5 KB paste, resize while streaming, ⌘K routing, ⌘C/⌘V in the terminal, VoiceOver, memory with 3 tabs after 30 minutes, and the strict CSP with Bits UI, Svelte transitions, xterm and the SvelteKit bootstrap script. A fundamental TUI failure stops M1 and reopens the shell choice | manual |
 | AC-M0-15 | **Given** Foreman's own Stage 5 **when** Billy runs its steps by hand **then** each is logged in `docs/metrics-baseline.md` (the CLI by-hand baseline for the kill check) | manual |
@@ -144,7 +135,7 @@ Scaffold, quality gates, CI, release build, and the seven spikes. No feature cod
 
 `foreman-core` with no Tauri dependency: F-001 (P1 scope), F-002, F-003 (P1 harness), F-004, F-005, F-006 (P1), F-007, F-013 (P1 validation), F-020, F-021, F-022.
 
-**Entry:** blueprint v2.2 with the B-1 annotations for Stages 1–2, the Stage Gate and F.2 exists in the `claude-blueprint` repo (approved at the Stage 2 sign).
+The blueprint v2.2 annotations for Stages 1–2, the Stage Gate and F.2 (approved as PROPOSAL B-1 at the Stage 2 sign) are written by M1's first ticket (M1-01), whose exit item is that they're committed in the `claude-blueprint` repo and parse cleanly; they aren't an entry condition.
 
 | ID | Exit criterion |
 |---|---|
@@ -172,7 +163,7 @@ M2 contains Foreman's first process spawns (`claude -v`, `claude auth status`, `
 
 ### M3 · Runners (blueprint Stages 8–9) · end of phase 1 · kill check
 
-F-008 (P1), F-009 (P1), F-010, F-012 (P1), F-013 watcher and normalization, F-026 (P1), plus the M3 criteria of F-015 (close-out checklist), F-019 (probe-folder trust), F-020 (run records, restart) and F-022 (live detection). Gates, lessons and signing stay by hand.
+F-008 (P1), F-009 (P1), F-010, F-012 (P1), F-013 watcher and normalization, F-026 (P1), plus the M3 criteria of F-015 (close-out checklist), F-020 (run records, restart) and F-022 (live detection). Gates, lessons and signing stay by hand.
 
 | ID | Exit criterion |
 |---|---|
@@ -189,10 +180,10 @@ F-008 (P1), F-009 (P1), F-010, F-012 (P1), F-013 watcher and normalization, F-02
 
 | ID | Kill-check criterion | Source |
 |---|---|---|
-| AC-KC-01 | **Time to start a step**, from the moment Billy begins looking for the next step (opening the blueprint or prompts file by hand; focusing Foreman or pressing Do next) to the prompt being sent (spawn for CLI; Copy and open for chat). **Given** Foreman's median per surface over TradeLog Stages 1–2 and the by-hand median for the same surface **then** Foreman's median is lower, for chat and for CLI | Export metrics vs baseline |
-| AC-KC-02 | **Active time per stage**, from the first step started to the packet signed, excluding waits (Claude working, the 7-day test), so Foreman's own overhead (dialogs, confirmations, re-arm) counts. **Given** Foreman's median per surface and the by-hand median for the same surface **then** Foreman's median is lower, for chat and for CLI | Export metrics vs baseline |
+| AC-KC-01 | **Time to start a step**, from the moment Billy begins looking for the next step (opening the blueprint or prompts file by hand; focusing Foreman or pressing Do next) to the step being ready to run. The end point is the same on both sides: for CLI, the spawn (by hand: Enter on the typed command); for chat, **the filled prompt on the clipboard and the target chat open** (in Foreman, when Copy and open returns; by hand, when Billy has copied the edited prompt and the right chat is in front). **Given** Foreman's median per surface over TradeLog Stages 1–2 and the by-hand median for the same surface **then** Foreman's median is lower, for chat and for CLI | Export metrics vs baseline |
+| AC-KC-02 | **Active time per step**, from the step's time-to-start start point to the step done (packet saved, Mark done or exit), excluding waits (Claude working, the 7-day test), so Foreman's own overhead (dialogs, confirmations, re-arm, paste-back) counts. **Given** Foreman's median per surface over TradeLog Stages 1–2 and the by-hand median per surface **then** Foreman's median is lower, for chat and for CLI | Export metrics vs baseline |
 | AC-KC-03 | **Manual prompt edits.** **Given** every TradeLog Stage 1–2 step run through Foreman **then** none needed a manual prompt edit (any change to resolved prompt text outside declared run inputs). The export lists each step's run-input interventions and every Copy prompt on a CLI step (the proxy); Billy's Stage 9 attestation explains each proxy event | Export metrics + attestation |
-| AC-KC-04 | **Baseline present.** **Given** a surface **then** the baseline has by-hand entries for it (CLI from Foreman's own Stage 5 onward; chat from the first chat steps Billy runs by hand in any project); a surface without baseline data can't pass | `docs/metrics-baseline.md` |
+| AC-KC-04 | **Baseline present.** **Given** a surface **then** the baseline has by-hand entries for it: CLI from Foreman's own Stage 5 onward (ticket M0-19); chat from **at least 10 chat steps** Billy runs by hand, in any project, between M0 and the kill check (named in ticket M0-19). A surface with fewer entries can't pass | `docs/metrics-baseline.md` |
 | AC-KC-05 | **Decision.** **Given** AC-KC-01 to AC-KC-04 all hold **then** M4 starts. **Given** any fails **then** work stops and no M4 ticket starts; the simplification is proposed as a Change Request (Master Spec §16) for Billy to approve | Stage 9 packet |
 
 ### M4 · Complete v1 (blueprint Stages 11–12; Stage 10 Electrical not applicable, `payments = no`)
@@ -206,7 +197,8 @@ Every P2 part of every feature, except F-030 P2 (M5): F-001 (Stages 0–5, Gate)
 | EX-M4-03 | Foreman signs a packet end to end on a fixture repo with lint-staged + Prettier hooks, unrelated staged changes and another-branch signing (AC-F014-05 to AC-F014-11). |
 | EX-M4-04 | A forced failure in each runner shows a clear message and writes a log entry; a forced crash loses no state (Stage 11 inspection; AC-XC-18, AC-F020-10). |
 | EX-M4-05 | Every screen has working empty, loading, error, locked and not-applicable states (Stage 12 inspection). |
-| EX-M4-06 | From here on, Foreman's own remaining gates run inside Foreman (dogfood). |
+
+**Foreman's own close-out in v1.** Foreman's own build doesn't run inside Foreman in v1: its Stages 11–17 close out by hand (attest, lessons, APPROVED BY, commit), as Stages 5–10 did. Running a project that was started outside Foreman needs adoption, which is v1.1 (§1.3). TradeLog is the project that runs through Foreman (EX-M3-07, EX-M5-06).
 
 ### M5 · Finishes (blueprint Stages 13–17)
 
@@ -259,7 +251,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | AC-F001-10 | **Given** `bypassPermissions` anywhere in the blueprint **when** parsed **then** it is an error | unit | M1 |
 | AC-F001-11 | **Given** an item of kind `auto` **when** parsed **then** the diagnostic says "auto items need Foreman v1.1" and the item is treated as `attest` | unit | M1 |
 | AC-F001-12 | **Given** an `fm:` comment inside a list item or inline **when** parsed **then** the error says "annotations must be block-level" with the line | unit | M1 |
-| AC-F001-13 | **Given** an unknown annotation key **when** the grammar is v1 **then** it is an error; **when** the declared grammar version is higher **then** it is a warning | unit | M1 |
+| AC-F001-13 | **Given** an unknown annotation key **when** the grammar is v1 **then** it is an error; **when** the declared grammar version is higher than Foreman supports **then** a step whose `fm:step` has an unknown key is `needsNewerForeman` (shown, not runnable), an unknown directive or key anywhere else is a warning, and Template health says "Update Foreman" (DR-035) | unit | M1 |
 | AC-F001-14 | **Given** an `fm:if` block nested inside another **when** parsed **then** it is an error | unit | M1 |
 | AC-F001-15 | **Given** errors only in a stage the project doesn't use **when** the project opens **then** it opens; that stage's steps are not runnable; the errors are listed (Template health in M4) | unit | M1 |
 
@@ -268,7 +260,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | ID | Criterion | Test | M |
 |---|---|---|---|
 | AC-F001-16 | **Given** a pinned project **when** two inspection bullets are swapped without moving their IDs **then** both show "re-confirm kind" | unit | M1 |
-| AC-F001-17 | **Given** an item showing "re-confirm kind" **when** Billy tries to attest it **then** attest is disabled until he confirms the kind; the confirmation is stored in app data `approvals` | comp | M4 |
+| AC-F001-17 | **Given** an item showing "re-confirm kind" **when** Billy tries to attest it **then** attest is disabled until he confirms the kind in a native dialog raised by Rust; the confirmation is stored in app data `approvals`. *int:* a scripted native dialog; Cancel leaves the kind unconfirmed and attest disabled. *comp:* the webview shows the old and new bullet text as context and has no approve path of its own | int, comp | M4 |
 | AC-F001-18 | **Given** the blueprint repo is missing or unreadable **when** Foreman starts **then** first run shows "Choose your blueprint repo", and existing projects open read-only from their cached lock | int | M2 |
 
 ### F-002 · Blueprint lock
@@ -278,7 +270,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | ID | Criterion | Test | M |
 |---|---|---|---|
 | AC-F002-01 | **Given** a clean blueprint repo **when** a project is pinned **then** `.foreman/blueprint.lock.json` holds `schemaVersion, blueprintRepoCommit, blueprintPath, sourceSha256, blueprintVersion, grammarVersion, pinnedAt` and `{textSha256, kind}` per item; the full text is in app data at `templates/<sourceSha256>.md`; the repo holds no copy | int | M1 |
-| AC-F002-02 | **Given** the blueprint file has uncommitted changes **when** pinning **then** the pin is refused and the dialog shows `git status` for that file | int | M1 |
+| AC-F002-02 | **Given** the blueprint file has uncommitted changes **when** pinning **then** the pin is refused, showing the working-file and HEAD hashes (`hash-object --no-filters` vs `rev-parse HEAD:<path>`, DR-142) | int | M1 |
 | AC-F002-03 | **Given** Stage 1 is signed **when** a re-pin is attempted **then** it is refused ("upgrading the pin is v1.1"); before Stage 1 is signed it is allowed | unit | M1 |
 
 **US-F002-2.** As Billy, I want a project to recover its template on a new machine and to refuse a tampered one, so that I never run steps from the wrong text.
@@ -410,11 +402,11 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | AC-F008-09 | **Given** the auth result is cached **when** the fingerprint is unchanged **then** `auth status` isn't re-run; **when** it changed **then** it is re-run; only `authMethod` and the exit code are read or stored | int | M3 |
 | AC-F008-22 | **Given** a blocked key-value in **user** settings that Billy has allowlisted in Settings (by hash) **then** it no longer blocks; the same key-value in any project source still blocks | int | M3 |
 | AC-F008-23 | **Given** a config snapshot kept for diffs **then** values under `env` or `headers`, any `apiKey*` key, any key containing `token`, `secret` or `password` at any depth, and any string matching the secret-scanner patterns are stored as `‹redacted sha256:8›`; diffs show "value changed"; snapshots are 0600 | unit | M3 |
-| AC-F008-24 | **Given** a Claude config file larger than 256 KB in the fingerprint set **then** the launch is blocked, naming the file | int | M3 |
+| AC-F008-24 | **Given** a Claude config file in the fingerprint set larger than its cap (256 KB; `~/.claude.json` 64 MB, parsed as a stream that keeps only `mcpServers` paths) **then** the launch is blocked, naming the file. **Given** a read-only fingerprint source outside the repo that is a symlink to a regular file outside every registered project **then** Foreman follows it, hashes the target and records both the link and the target; a symlink inside repo content is still refused | int | M3 |
 | AC-F008-10 | **Given** inputs **when** a signed packet the prompt references is missing **then** the launch is blocked; **when** another referenced path is missing **then** it warns with the reason ("02-teardown.md not found: 2.1 was not applicable"); for a continuing step, only the transcript file's existence is checked, never its contents | int | M3 |
 | AC-F008-11 | **Given** a required run input is empty **then** Run is blocked | unit | M2 |
 | AC-F008-12 | **Given** a resolved prompt that, after leading whitespace is trimmed, starts with `-`, `/` or `!` **then** the launch is blocked | prop | M2 |
-| AC-F008-13 | **Given** `prepare_launch` with cached data **when** benchmarked **then** it is p95 ≤ 50 ms | bench | M3 |
+| AC-F008-13 | **Given** `prepare_launch` with cached data **when** benchmarked, excluding the `claude -v` spawn (which runs in parallel with the fingerprint and is counted in NFR-05) **then** it is p95 ≤ 50 ms | bench | M3 |
 
 **US-F008-2.** As Billy, I want the exact argv, environment and settings fixed by Foreman and visible before I run, so that the session starts exactly as the template says.
 
@@ -424,11 +416,11 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | AC-F008-15 | **Given** Foreman's own environment holds `ANTHROPIC_API_KEY`, `CLAUDE_CODE_USE_BEDROCK`, `AWS_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `AZURE_*`, `DYLD_*`, `NODE_OPTIONS`, `BASH_ENV`, `ENV`, `GIT_*`, and Billy's pass-through list names some of them **when** the fake binary records the child environment **then** it was built from `env_clear()` and holds only HOME, USER, LOGNAME, SHELL, TMPDIR, LANG, LC_*, PATH, FOREMAN_RUN_ID, TERM=xterm-256color, COLORTERM=truecolor, the pass-through list, and `CLAUDE_CODE_OAUTH_TOKEN` and `CLAUDE_CONFIG_DIR` when present; none of the always-removed variables; and a PATH whose entries are all absolute, existing, outside registered projects and not world-writable (empty, `.` and relative entries dropped) | int | M2 |
 | AC-F008-16 | **Given** a launch **then** a fresh `<app-data>/runs/<runId>/settings.json` (mode 0600, app data only, hash in the run record) holds `disableAllHooks: false`, `permissions.disableBypassPermissionsMode: "disable"`, and deny rules `Read(//<repo>/.foreman/**)`, `Edit(//<repo>/.foreman/**)`, `Read(//<app-data>/**)`, `Edit(//<app-data>/**)` with absolute paths for both cwd = project and cwd = spec (M4: plus the sensor hooks), and is passed as `--settings` | unit | M2 |
 | AC-F008-17 | **Given** any step **when** shown **then** its resolved prompt, exact argv and the names (not values) of the child environment variables are one click away under the primary action | comp | M2 |
-| AC-F008-18 | **Given** an overlay-added step, a mode or model different from the template's (after model policy), the first launch in a project, `auto`/`dontAsk` in an interactive session, or the first launch after Claude Code's version changed ("Claude Code updated X → Y") **when** Billy runs it **then** a confirmation dialog names the reason; otherwise no dialog appears (one case per reason) | comp | M2 |
+| AC-F008-18 | **Given** an overlay-added step, a mode or model different from the template's (after model policy), the first launch in a project, `auto`/`dontAsk` in an interactive session, or the first launch after Claude Code's version changed ("Claude Code updated X → Y") **when** Billy runs it **then** a native confirmation dialog raised by Rust names the reason; otherwise no dialog appears (one case per reason). *int:* a scripted native dialog; Cancel returns `Cancelled`, spawns nothing and writes no run record. *comp:* the webview's preview lists the same reasons as context and `launch_start` carries no approval field | int, comp | M2 |
 | AC-F008-19 | **Given** a launch **when** spawn happens **then** the run record with status `running` already exists on disk | int | M2 |
-| AC-F008-20 | **Given** VoiceOver is on **when** a CLI step launches **then** argv includes `--ax-screen-reader` | int | M3 |
+| AC-F008-20 | **Given** Settings → Screen reader mode is on **when** a CLI step launches **then** argv includes `--ax-screen-reader` (and xterm runs with `screenReaderMode`); off, neither | int | M3 |
 | AC-F008-21 | **Given** Claude Code's version differs from the last verified version **when** Billy runs a step **then** the contract probes run first (AC-F019-15) | int | M4 |
-| AC-F008-25 | **Given** a launch **when** the fake binary checks its process state **then** it runs in its own session (`setsid`), with no inherited file descriptors above 2 and umask 022 | int | M2 |
+| AC-F008-25 | **Given** a launch **when** the fake binary checks its process state **then** the PTY child runs in its own session (`setsid`, through portable-pty), with no inherited file descriptors above 2 and umask 022; non-PTY children (`claude -v`, `claude auth status`, git, `/usr/bin/open`) run in their own process group (`process_group(0)`) with the same fd and umask rules | int | M2 |
 
 ### F-009 · Terminal runner
 
@@ -469,7 +461,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 |---|---|---|---|
 | AC-F010-01 | **Given** a `session=new` step **when** it launches **then** Foreman generates a UUID, passes `--session-id <uuid>` and never `--resume` | int | M3 |
 | AC-F010-02 | **Given** every continuing step in the harness **when** its argv is built **then** it has `--resume <uuid>` plus its full flags and never `--session-id` (except with `--fork-session`, and only if S-8 confirms that works, AC-F010-15) | prop | M3 |
-| AC-F010-03 | **Given** a continuing step whose chain process is alive **when** Billy presses Run **then** Foreman asks him to confirm "Claude is idle and nothing is running in the background" (P1) and sends nothing before he confirms | comp | M3 |
+| AC-F010-03 | **Given** a continuing step whose chain process is alive **when** Billy presses Run **then** Rust asks him in a native dialog to confirm "Claude is idle and nothing is running in the background" (P1) and sends nothing before he confirms; Cancel changes nothing | comp | M3 |
 | AC-F010-04 | **Given** Billy confirms **then** Foreman writes Ctrl-C, then `/exit` + Enter, in that order; waits up to 10 s for exit; relaunches in the same tab with `--resume <uuid>`, the step's flags, `--settings` and the prompt; and writes the divider `── <step> · <model> · <effort> · <mode> · permission grants reset ──` | int | M3 |
 | AC-F010-05 | **Given** the process hasn't exited after 10 s **then** Foreman shows "Claude didn't exit. End it yourself, then press Continue." and sends no SIGTERM or SIGKILL without explicit confirmation | int | M3 |
 | AC-F010-06 | **Given** the chain's process already exited **when** Billy runs the next step **then** re-arm is just the relaunch | int | M3 |
@@ -553,7 +545,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | AC-F013-06 | **Given** a packet edited from outside (editor, Claude, git checkout) **then** it is re-validated and the problems shown update | int | M3 |
 | AC-F013-07 | **Given** a fake writer creates a packet **then** it is visible and validated in the UI at p95 ≤ 1 s | int | M3 |
 | AC-F013-08 | **Given** a CLI-written packet needing normalization **then** the changes are shown and written atomically only after Billy confirms | int | M3 |
-| AC-F013-09 | **Given** a packet that validates with `APPROVED BY: <name> on <YYYY-MM-DD>` (signed by hand in P1) **then** the stage counts as signed and the Next step moves to the next applicable stage | int | M3 |
+| AC-F013-09 | **Given** a packet that validates with `APPROVED BY: <name> on <YYYY-MM-DD>` (signed by hand in P1) **then** the stage counts as signed only after Billy confirms it in a native dialog that binds the packet's SHA-256 (`packet_signature_confirm`, DR-135); then the Next step moves to the next applicable stage. Any later change to the file voids the confirmation; Cancel leaves the stage unsigned | int | M3 |
 | AC-F013-10 | **Given** the watcher fails to start or stops **then** a warning shows, steps still run, and packets are validated when Billy opens the stage | int | M3 |
 
 **US-F013-3.** As Billy, I want each packet problem paired with a fix action, so that fixing is one click.
@@ -582,13 +574,13 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 |---|---|---|---|
 | AC-F014-04 | **Given** the packet changed after Billy reviewed it **when** he signs **then** signing is refused and the dialog re-renders | int | M4 |
 | AC-F014-05 | **Given** signing **then** phase 1 writes APPROVED BY and the added fields atomically and writes `.foreman/stages/stage-NN.json` (step states, run IDs, intended and observed models, efforts and modes, prompt SHA-256s, gate results, attestations, durations, packet hash after signing, session UUIDs) | int | M4 |
-| AC-F014-06 | **Given** a repo with unrelated staged and unstaged changes **when** signing on the current branch **then** the commit "handoff: stage NN" is made with plumbing only, in this order: a temporary index from HEAD, `hash-object -w --no-filters` per path, `update-index --cacheinfo`, `write-tree`, `commit-tree --no-gpg-sign`, `update-ref HEAD <new> <old>`, then `update-index --cacheinfo` on the real index for those paths only. It contains only the packet, attachments, stage record and decision files with pending changes, and the unrelated changes stay as they were | int | M4 |
+| AC-F014-06 | **Given** a repo with unrelated staged and unstaged changes **when** signing on the current branch **then** the commit "handoff: stage NN" is made with plumbing only, in this order: a temporary index from HEAD, `hash-object -w --no-filters` per path, `update-index --cacheinfo`, `write-tree`, `commit-tree --no-gpg-sign`, `update-ref HEAD <new> <old>`, then `update-index --cacheinfo` on the real index for those paths only. It contains only the packet, attachments, stage record, decision files with pending changes and `docs/lessons.md` if changed, and the unrelated changes stay as they were. **Given** `index.lock` is held during the real-index refresh **then** Foreman retries 5 times, 200 ms apart; if it still fails, the commit stands, `indexRefreshPending` is recorded, the banner "Index not refreshed; don't commit until this clears" shows, and the retry on the next open or focus clears it | int | M4 |
 | AC-F014-07 | **Given** a repo with lint-staged + Prettier hooks, a filter driver and a repo-scope gpg program **when** signing **then** no hook, filter or gpg program runs (all git use goes through `git::run`, AC-XC-04), this is recorded in the stage record, and read-back passes | int | M4 |
 | AC-F014-08 | **Given** a new untracked packet and stage record **when** signing **then** both are committed | int | M4 |
 | AC-F014-09 | **Given** Sign on another branch **then** the same plumbing runs against that branch's tip (temporary `GIT_INDEX_FILE`, `hash-object -w --no-filters`, `update-index --cacheinfo`, `write-tree`, `commit-tree --no-gpg-sign`, `update-ref`); HEAD, the index and the working tree are unchanged; nothing is written to the working tree; the stage shows "signed on <branch> (not merged)" and the resolver reads the packet from that ref | int | M4 |
 | AC-F014-10 | **Given** a commit whose content differs from what Foreman wrote (a mismatch injected in the fixture) **when** every path is read back from the commit **then** Foreman shows "Your repo's commit hooks changed the packet" with the diff | int | M4 |
 | AC-F014-11 | **Given** the git commit fails **then** the stage is `signed (commit pending)` with stderr, Retry commit and Open terminal here; the stamp runs only after read-back passes | int | M4 |
-| AC-F014-12 | **Given** `commit.gpgSign` or a gpg program set in the repo's `.git/config` **then** it is never used (only global or system scope counts, per `git config --show-origin`); **given** any git call that hangs **then** the 60 s timeout ends the wait with a clear message | int | M4 |
+| AC-F014-12 | **Given** `commit.gpgSign` or a gpg program set at any scope (repo, global or system) **then** it is never used: every commit is `commit-tree --no-gpg-sign` in v1, and Doctor notes that Foreman's commits aren't GPG-signed (DR-144); **given** any git call that hangs **then** the 60 s timeout ends the wait with a clear message | int | M4 |
 | AC-F014-13 | **Given** Foreman is killed between phase 1 and phase 2 **when** it restarts **then** the stage shows `signed (commit pending)` with Retry commit | int | M4 |
 | AC-F014-14 | **Given** decision changes pending in app data after Stage 5 is signed **when** the next stage is signed **then** they are written and committed in that signing commit | int | M4 |
 
@@ -689,7 +681,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | AC-F019-05 | **Given** a fake `claude` reporting each auth method **then** Doctor passes only `claude.ai` and `oauth_token` | int | M2 |
 | AC-F019-06 | **Given** git is found **then** Doctor shows its version; no git version floor is enforced | int | M2 |
 | AC-F019-07 | **Given** Foreman starts or a launch fails **then** Doctor runs asynchronously and the footer dot shows its status | comp | M2 |
-| AC-F019-08 | **Given** first run **then** Foreman opens `claude` in the fixed `<app-data>/probe/` folder in a terminal tab so Billy can accept the trust dialog once | int | M3 |
+| AC-F019-08 | **Given** first run **then** Foreman opens `claude` in the fixed `<app-data>/probe/` folder in a terminal tab so Billy can accept the trust dialog once | int | M4 |
 
 **US-F019-2.** As Billy, I want Doctor to check everything a blueprint run depends on, so that breaks show up in Doctor, not in a terminal tab.
 
@@ -729,7 +721,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 
 | ID | Criterion | Test | M |
 |---|---|---|---|
-| AC-F020-08 | **Given** Stage 5 isn't signed and the repo has unrelated staged changes **when** a decision changes **then** Foreman commits only that decision file at that moment, using the signing plumbing and read-back (SR-42), and the unrelated changes stay as they were | int | M1 |
+| AC-F020-08 | **Given** Stage 5 isn't signed and the repo has unrelated staged changes **when** a decision changes **then** Foreman commits only that decision file at that moment, using the signing plumbing and read-back (SR-42), and the unrelated changes stay as they were. **Given** an unborn HEAD (no commits yet) **then** the commit is the repo's first (`read-tree --empty`, `commit-tree` without `-p`, `update-ref HEAD <new> 0000…`). **Given** a detached HEAD **then** the commit is refused with "Check out a branch first" and the decision change stays pending | int | M1 |
 | AC-F020-09 | **Given** Stage 5 is signed **when** a decision changes **then** it stays pending in app data and goes into the repo only with the next signing commit | int | M1 |
 
 **US-F020-3.** As Billy, I want sessions and state to survive a crash, so that a force-quit costs me nothing.
@@ -752,7 +744,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | AC-F021-03 | **Given** the `council-setup` destinations under `spec/.claude/agents/` and the decision-file writers under `.foreman/` **then** they are the only allowed exceptions | unit | M1 |
 | AC-F021-04 | **Given** a directory component that is a symlink **then** resolution through the directory-handle API refuses the write | int | M1 |
 | AC-F021-05 | **Given** any generated path **when** accepted **then** its final location is inside the project root or app data | prop | M1 |
-| AC-F021-06 | **Given** `CLAUDE.md` **then** it is writable only at the repo root, only through the assembler, after a confirmation that says "Claude Code loads this file in every session" | comp | M4 |
+| AC-F021-06 | **Given** `CLAUDE.md` **then** it is writable only at the repo root, only through the assembler, after a native confirmation raised by Rust that says "Claude Code loads this file in every session". *int:* a scripted native dialog; Cancel writes nothing. *comp:* the assembler panel shows the diff as context and has no approve path of its own | int, comp | M4 |
 | AC-F021-07 | **Given** a read of repo content **then** it is allowed only in registered project folders, the blueprint repo and app data (plus the fixed list in AC-XC-30), resolves component by component, and refuses a symlink at any component (`O_NOFOLLOW` on the last) | int | M1 |
 
 ### F-022 · Outside-change review
@@ -762,7 +754,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | ID | Criterion | Test | M |
 |---|---|---|---|
 | AC-F022-01 | **Given** each decision file (`project.json` decision fields: conditions, model policy, verify commands; `overlay.json`: skips, additions; `blueprint.lock.json`) edited from outside **when** the project loads **then** it is Pending outside change and Foreman's effective config is the last approved one (one case per file) | int | M1 |
-| AC-F022-02 | **Given** a pending change **then** the review shows the diff, redacted as in AC-F008-23, with Accept and Reject; Accept stores the new approved hash (and, before Stage 5 is signed, commits by pathspec); Reject restores the approved content through an atomic write | comp | M2 |
+| AC-F022-02 | **Given** a pending change **then** the review shows the diff, redacted as in AC-F008-23, with Accept and Reject; Accept raises a native dialog in Rust ("Accept this change to <file>? It changes: <decision keys>") and only then stores the new approved hash (and, before Stage 5 is signed, commits by plumbing); Reject restores the approved content through an atomic write. *int:* a scripted native dialog; Cancel leaves the approved copy, hash and pending change unchanged. *comp:* the review screen shows the redacted diff as context | int, comp | M2 |
 | AC-F022-03 | **Given** only variables changed **then** they reload with a toast and no review | int | M1 |
 | AC-F022-04 | **Given** Foreman is open **when** Claude, an editor or a git checkout changes a decision file **then** the pending review appears without a restart | int | M3 |
 | AC-F022-05 | **Given** the file changes again while the review is open **when** Billy clicks Reject or Accept **then** the action is refused and the new diff is shown | int | M2 |
@@ -783,7 +775,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | AC-F023-03 | **Given** a 4.8 packet fixture **then** REPO FILES is parsed and each path shows exists, missing or empty, with Paste into (clipboard to file through the path policy, with an overwrite diff) and Reveal | int | M4 |
 | AC-F023-04 | **Given** a malicious REPO FILES entry for each path-policy case **then** it is refused | int | M4 |
 | AC-F023-05 | **Given** any row missing or empty **then** the attest item "the package is complete" isn't offered | comp | M4 |
-| AC-F023-06 | **Given** the panel **then** it asks the late conditions, prefilled from evidence (e.g. `docs/migrations/` present → `has_database = yes`), each editable | int | M4 |
+| AC-F023-06 | **Given** the panel **then** it asks the late conditions that are still undecided, each with a proposal from path evidence per DR-063 (e.g. `docs/migrations/` present → `has_database = yes`); with no evidence a condition stays `undecided` (never prefilled `no`); each proposal takes effect only when Billy confirms it, and each is editable | int | M4 |
 
 ### F-024 · Desktop handoff
 
@@ -815,10 +807,10 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | ID | Criterion | Test | M |
 |---|---|---|---|
 | AC-F026-01 | **Given** a run **then** `runs/<runId>/run.json` records argv, cwd, step, chain, timings, outcome, prompt SHA-256, time-to-start, the entry point (Do next, palette, stage view), the number of run-input interventions, and any Copy prompt on a CLI step; a line is added to `runs/index-YYYY-MM.jsonl` | int | M3 |
-| AC-F026-02 | **Given** time-to-start **then** it runs from focusing Foreman or pressing Do next to the spawn (CLI) or Copy and open (chat) | unit | M3 |
+| AC-F026-02 | **Given** time-to-start **then** it runs from focusing Foreman or pressing Do next to the spawn (CLI), or, for chat, to the moment the filled prompt is on the clipboard and the target chat is open (when Copy and open returns); the by-hand baseline uses the same end points (AC-KC-01) | unit | M3 |
 | AC-F026-03 | **Given** a run **then** `run.json`, the monthly index and the Run log screen store the argv with its final positional prompt replaced by `<prompt sha256:…>`, never the prompt text, and only the names of environment variables, never their values | int | M2 |
-| AC-F026-04 | **Given** Export metrics **then** it writes, through the Rust save dialog, a Markdown summary of both measures per surface and per stage, in the table layout of `docs/metrics-baseline.md`, including manual-edit proxies | unit | M3 |
-| AC-F026-05 | **Given** active time per stage in P1 (no sensor) **then** only `wait`-step time is excluded automatically; the export shows elapsed time and excluded waits separately so Billy excludes Claude-working time the same way as in the baseline | unit | M3 |
+| AC-F026-04 | **Given** Export metrics **then** it writes, through the Rust save dialog, a Markdown summary of both measures (time to start and active time, each per step) per surface and per stage, in the table layout of `docs/metrics-baseline.md`, including manual-edit proxies | unit | M3 |
+| AC-F026-05 | **Given** active time per step in P1 (no sensor) **then** only `wait`-step time is excluded automatically; the export shows elapsed time and excluded waits separately so Billy excludes Claude-working time the same way as in the baseline | unit | M3 |
 | AC-F026-06 | **Given** no runs **when** Billy exports **then** the tables are written with a note that no runs were recorded | unit | M3 |
 
 **US-F026-2.** As Billy, I want to search past runs and see the metrics live, so that I can resume work and watch the success metric.
@@ -827,7 +819,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 |---|---|---|---|
 | AC-F026-07 | **Given** the Run log screen **then** it searches every run with argv, session name and outcome, offers Resume where the transcript exists, and shows an empty state when there are no runs | comp | M4 |
 | AC-F026-08 | **Given** 100,000 index entries **then** the panel reads the index and opens within the project-switch target | bench | M4 |
-| AC-F026-09 | **Given** Settings → Metrics **then** it shows median and p95 time-to-start, manual-edit count per stage, stages run through Foreman, and the comparison with `docs/metrics-baseline.md`, and the numbers match the run log | int | M4 |
+| AC-F026-09 | **Given** the Run log screen's metrics strip (`docs/design/mockups/run-log.html`) **then** it shows median and p95 time-to-start and median active time per step for each surface, manual-edit count per stage, stages run through Foreman, and the comparison with `docs/metrics-baseline.md` (`metrics_view`), and the numbers match the run log and Export metrics | int | M4 |
 | AC-F026-10 | **Given** output tails older than 90 days **then** they are pruned; **when** Billy clicks Clear run history **then** run records, tails and events are removed | int | M4 |
 
 ### F-027 · Run sheet export
@@ -901,7 +893,7 @@ These criteria apply to Foreman as a whole, not to one feature.
 | AC-XC-01 | **Given** the codebase **then** clippy `disallowed-methods` rejects `std::process::Command::new` and `portable_pty::CommandBuilder::new` outside the `spawn` module; every spawn uses an argv array; no shell is constructed outside `doctor::capture_login_path` | ci | M2 |
 | AC-XC-02 | **Given** a spawn request **then** relative paths, unlisted programs, paths inside a registered project, and symlinks into a writable project folder are rejected; the path is re-checked (exists, executable) before every spawn; the allowlist is `claude`, `git`, `/usr/bin/open` (only in AC-XC-28's forms) and `node`/`pnpm`/`cargo` with `--version` only | unit | M1 |
 | AC-XC-03 | **Given** every argv Foreman builds **then** `-p`/`--print` never appears | ci | M2 |
-| AC-XC-04 | **Given** every git call **then** it goes through `git::run` (clippy `disallowed-methods` elsewhere), with an environment from `env_clear()` plus `HOME`, a fixed `PATH`, `LANG`, `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0` (and `GIT_INDEX_FILE` only for Foreman's temporary index); `-c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.pager=cat -c core.editor=true -c sequence.editor=true -c commit.gpgSign=false -c tag.gpgSign=false -c core.sshCommand=false -c credential.helper= -c protocol.allow=never`; `--no-ext-diff --no-textconv` on diffs; `--ignore-submodules=all` on status; blobs only via `hash-object -w --no-filters`; and a 60 s timeout. A fixture repo's hooks, filter drivers and gpg program never run | int | M1 |
+| AC-XC-04 | **Given** every git call **then** it goes through `git::run` (clippy `disallowed-methods` elsewhere), with an environment from `env_clear()` plus `HOME`, a fixed `PATH`, `LANG`, `GIT_TERMINAL_PROMPT=0`, `GIT_OPTIONAL_LOCKS=0` (and `GIT_INDEX_FILE` only for Foreman's temporary index); `-c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.pager=cat -c core.editor=true -c sequence.editor=true -c commit.gpgSign=false -c tag.gpgSign=false -c core.sshCommand=false -c credential.helper= -c protocol.allow=never`; only the plumbing operations of DR-140 (never `status`, `diff`, `add` or `commit`); blobs only via `hash-object -w --no-filters`; commits only via `commit-tree --no-gpg-sign`; and a 60 s timeout. A fixture repo's hooks, filter drivers and gpg program never run | int | M1 |
 
 **US-XC-2.** As Billy, I want the webview treated as less trusted than Rust, so that rendered content can't reach the file system or processes.
 
@@ -940,8 +932,8 @@ These criteria apply to Foreman as a whole, not to one feature.
 | AC-XC-27 | **Given** the main webview **then** it is built in Rust with `on_navigation` allowing only the app origin (and the dev server in debug builds) and `on_new_window` returning Deny; a navigation or `window.open` to a remote URL is refused | e2e | M2 |
 | AC-XC-28 | **Given** an Open file request **then** it goes through one Rust function: the path passes the read policy, the extension is `.md`, `.json` or `.txt`, and it opens with `/usr/bin/open -b <editor bundle id> <absolute path>`, never the default app; a `.md` symlink to an `.app` and executable types are refused; Reveal uses `open -R` on a policy-checked path; Open terminal here opens Terminal by bundle ID; the opener plugin has `open_js_links_on_click(false)` | int | M2 |
 | AC-XC-29 | **Given** clipboard reads **then** they happen only in Rust, only on Billy's explicit action, as text only, capped at 1 MB, never polled and never logged | unit | M3 |
-| AC-XC-30 | **Given** reads outside project folders, the blueprint repo and app data **then** only the fixed list in one Rust module is read: user and managed settings; `mcpServers` in `~/.claude.json`; `~/.claude/{CLAUDE.md,agents,skills,commands,rules,output-styles}`; ancestor `CLAUDE.md`/`CLAUDE.local.md` and their `@` imports; transcript existence (never contents); `/etc/paths`, `/etc/paths.d/*`, `/etc/shells`; the blueprint auto-detect candidates; `git config user.name`. clippy `disallowed-methods` rejects `std::fs` outside the fs module | ci | M1 |
-| AC-XC-31 | **Given** child processes **then** each starts from `env_clear()` plus the allowlist, in its own session, with no inherited fds above 2 and umask 022 (AC-F008-25); on quit, after the guard, children get SIGHUP; after a crash, runs show as Interrupted and are never relaunched automatically | int | M2 |
+| AC-XC-30 | **Given** reads outside project folders, the blueprint repo and app data **then** only the fixed list in one Rust module is read: user and managed settings; `mcpServers` in `~/.claude.json`; `~/.claude/{CLAUDE.md,agents,skills,commands,rules,output-styles}`; ancestor `CLAUDE.md`/`CLAUDE.local.md` and their `@` imports; transcript existence (never contents); `/etc/paths`, `/etc/paths.d/*`, `/etc/shells`; the blueprint auto-detect candidates; `git config user.name`. clippy `disallowed-methods` rejects `std::fs` everywhere except the modules allowed in `clippy.toml`: `foreman-core::store` (including `store::outside` and `store::git_exclude`), `foreman-app::logging` (the size-rotating diagnostics writer, `logs/` in app data only), the `foreman-sensor` crate (its event-file writer), and test code (`#[cfg(test)]`, `tests/`) | ci | M1 |
+| AC-XC-31 | **Given** child processes **then** each starts from `env_clear()` plus the allowlist, the PTY child in its own session (`setsid`) and every non-PTY child in its own process group (`process_group(0)`), with no inherited fds above 2 and umask 022 (AC-F008-25); on quit, after the guard, children get SIGHUP; after a crash, runs show as Interrupted and are never relaunched automatically | int | M2 |
 | AC-XC-32 | **Given** bidi controls, zero-width characters or C0/C1 controls in content **when** shown in any diff, confirmation or packet view **then** they appear as visible escapes and are flagged | comp | M2 |
 
 **US-XC-5.** As Billy, I want Foreman fully usable by keyboard and VoiceOver in both themes, so that it meets WCAG 2.2 AA (AR-01).
@@ -950,8 +942,8 @@ These criteria apply to Foreman as a whole, not to one feature.
 |---|---|---|---|
 | AC-XC-20 | **Given** every screen in Night and Vellum **then** axe-core finds zero violations, and regressions fail `pnpm verify` | comp | M5 |
 | AC-XC-21 | **Given** the full v1 workflow **then** it completes keyboard-only with visible focus (2 px ring, 2 px offset) everywhere and no keyboard trap | e2e | M5 |
-| AC-XC-22 | **Given** VoiceOver **then** every control and status is labeled and status changes are announced through a live region; xterm's `screenReaderMode` is on when VoiceOver is | manual | M5 |
-| AC-XC-23 | **Given** Reduce Motion, Reduce Transparency and Increase Contrast, each on **then** motion stops, window effects turn off, and contrast increases | manual | M5 |
+| AC-XC-22 | **Given** VoiceOver **then** every control and status is labeled and status changes are announced through a live region; with Settings → Screen reader mode on, xterm's `screenReaderMode` is on and CLI launches add `--ax-screen-reader` | manual | M5 |
+| AC-XC-23 | **Given** Reduce Motion, Reduce Transparency and Increase Contrast, each on **then** motion stops (`prefers-reduced-motion`); the webview reports `prefers-reduced-transparency: reduce` to Rust and window effects turn off; and the `prefers-contrast: more` tokens apply, with every text/background pair in the contrast table at ≥ 7:1 (checked by `contrast-check.py`) | unit, manual | M5 |
 | AC-XC-24 | **Given** the design tokens **then** every text pair is ≥ 4.5:1 and large text and UI components ≥ 3:1 in both themes | unit | M5 |
 | AC-XC-25 | **Given** any status **then** it is shown by shape plus color, never color alone | comp | M5 |
 | AC-XC-26 | **Given** the components **then** a lint rule finds no hard-coded color, size or spacing, and every screen matches its mockup in both themes | ci | M5 |
@@ -988,6 +980,7 @@ Source: `docs/requirements.md` (revised after the Stage 3 security review). Mile
 | SR-22 | M0 · M2 | AC-M0-09, AC-XC-06 |
 | SR-23 | M0 | AC-M0-09 |
 | SR-24 | M2 · M3 (`pty_write`) | AC-XC-05, AC-XC-06, AC-F009-19 |
+| SR-24a | M2 (launch, decisions, settings) · M3 (re-arm, Terminate, config ack, outside signatures, terminal links) · M4 (signing, assembler, item kinds) | AC-F008-18, AC-F022-02, AC-F010-03, AC-F009-04, AC-F013-09, AC-F021-06, AC-F001-17; tests `ipc::security_confirmations_are_native`, `settings::security_fields_require_native_confirm` |
 | SR-25 | M3 · M4 (Doctor links) | AC-XC-08, AC-F012-02, AC-F012-03 |
 | SR-25a | M2 ◆ · M3 | AC-XC-28, AC-F029-07 |
 | SR-26 | M2 · M3 · M5 (rendering re-check) | AC-F030-04, AC-XC-32, AC-F012-13, AC-XC-20 |
@@ -1008,7 +1001,7 @@ Source: `docs/requirements.md` (revised after the Stage 3 security review). Mile
 | SR-44 | M1 | AC-XC-04, AC-F014-07 |
 | SR-45 | M1 | AC-XC-04, AC-F014-12 |
 | SR-46 | M4 | AC-F014-15 |
-| SR-47 | M4 | AC-F014-01, AC-F015-02, AC-F015-10 |
+| SR-47 | M3 (outside signatures) · M4 | AC-F013-09, AC-F014-01, AC-F015-02, AC-F015-10; test `packet::outside_signature_needs_confirmation` |
 | SR-50 | M1 · M3 (watcher) | AC-XC-11, AC-F013-04 |
 | SR-51 | M0 ◆ | AC-XC-12, AC-M0-06, AC-F008-09 |
 | SR-52 | M2 | AC-F026-03, AC-F026-01 |
@@ -1032,7 +1025,7 @@ Source: `docs/requirements.md` (revised after the Stage 3 security review). Mile
 | PR-08 | M1 | AC-XC-30, AC-F019-03 |
 | AR-01 | M3 (`--ax-screen-reader`) · M5 | AC-F008-20, AC-XC-20, AC-XC-21, AC-XC-22, AC-XC-23, AC-XC-24, AC-XC-25 |
 
-Every SR, PR and AR in `docs/requirements.md` is mapped, including the new SR-19, SR-25a, SR-28, SR-29, SR-31a, SR-55, SR-56 and SR-57. SR-11 and SR-12 are v1.1. Every requirement is re-verified by the Stage 14 security review (EX-M5-03).
+Every SR, PR and AR in `docs/requirements.md` is mapped, including the new SR-19, SR-24a, SR-25a, SR-28, SR-29, SR-31a, SR-55, SR-56 and SR-57. SR-11 and SR-12 are v1.1. Every requirement is re-verified by the Stage 14 security review (EX-M5-03).
 
 ◆ **Where this differs from `requirements.md`'s stage column, and why:**
 - SR-01: `git` is spawned through `git::run` from M1 (Stage 6, SR-44), so the allowlist applies there before Stage 7.
@@ -1051,7 +1044,7 @@ Every SR, PR and AR in `docs/requirements.md` is mapped, including the new SR-19
 | NFR-01 | Cold start to interactive Today p95 ≤ 1.5 s | M2 (instrumented) · M5 (release build) | Timestamp from process start to first Today render in the run log; local perf test; Stage 14.2 |
 | NFR-02 | Project switch p95 ≤ 300 ms (19 stages, 200 run records) | M2 · M5 | criterion on the load path + frontend mark |
 | NFR-03 | Template load p95 ≤ 50 ms (cached ≤ 5 ms) | M1 | criterion on the golden blueprint (AC-F001-07) |
-| NFR-04 | Resolution + `prepare_launch` p95 ≤ 50 ms | M1 (resolution) · M3 (preflight) | criterion (AC-F006-16, AC-F008-13) |
+| NFR-04 | Resolution + `prepare_launch` p95 ≤ 50 ms | M1 (resolution) · M3 (preflight) | criterion (AC-F006-16, AC-F008-13), measured excluding the `claude -v` spawn, which runs in parallel with the fingerprint and counts inside NFR-05 |
 | NFR-05 | Keystroke to spawn p95 ≤ 250 ms | M3 | Run-log timestamps |
 | NFR-06 | Packet visible ≤ 1 s p95 | M3 | Integration test with a fake writer (AC-F013-07) |
 | NFR-07 | Input to visual feedback ≤ 100 ms; no main-thread task > 50 ms | M2 · M5 | Playwright trace in the mock-IPC suite |
@@ -1108,8 +1101,8 @@ Each fills a point where r6 and the Master Spec are silent, choosing the more co
 1. No git version floor is defined anywhere, so none is enforced: Doctor only shows git's version, and a missing git blocks the git-dependent actions (setup `git init`, lock restore, signing) (AC-F019-06, AC-F002-07, AC-F018-05, AC-F014-03).
 2. Doctor failures don't block creating a project; launches stay blocked by F-008's preflight (AC-F019-04, NFR-13).
 3. The P1 first-run template step shows the version and diagnostics only; the full Template health screen is P2 (AC-F019-02).
-4. Probe-folder trust needs a terminal tab, so it moves from M2 to M3 (AC-F019-08).
-5. A packet whose `APPROVED BY` is `<name> on <date>` counts as signed in P1 without a commit check (AC-F013-09).
+4. Probe-folder trust needs a terminal tab and isn't needed before P2's probes, so it moves from M2 to M4 (AC-F019-08; moved from M3 in the Stage 4.7 fix pass).
+5. (Deleted in the Stage 4.7 fix pass. An outside signature counts only after Billy's native confirmation, AC-F013-09, SR-47.)
 6. In P1, a hand-signed Stage 2 packet doesn't count as signed while any early condition is undecided (AC-F004-12).
 7. In P1, steps that `append` to a file (F.2 to `docs/lessons.md`) offer no paste-back write; Billy appends by hand until F-016 (AC-F012-14).
 8. Normalizing a packet Claude wrote is shown first and written only after Billy confirms (AC-F013-08).
@@ -1125,12 +1118,12 @@ Each fills a point where r6 and the Master Spec are silent, choosing the more co
 18. A missing `docs/lessons.md` refuses the append rather than recreating the file (AC-F016-04).
 19. Desktop launches use the same allowlisted path, environment allowlist and auth check as CLI launches (AC-F024-01).
 20. A run sheet with unresolved tokens is exported with each one marked, not refused (AC-F027-03).
-21. In P1, active time per stage excludes only `wait`-step time automatically; Billy excludes Claude-working time by hand, as he does in the baseline (AC-F026-05).
+21. In P1, active time per step excludes only `wait`-step time automatically; Billy excludes Claude-working time by hand, as he does in the baseline (AC-F026-05).
 22. Kill check: a surface without by-hand baseline data can't pass; each Copy-prompt-on-CLI proxy event needs an explanation in Billy's attestation; a failed check stops M4 and goes to a CR (AC-KC-03, AC-KC-04, AC-KC-05).
 23. The inspector is part of F-030 P2 and ships in M5 with the sheet strip; until then the M4 gate, packet and lessons views live in the stage workspace and their own screens.
 24. The TradeLog harness's argv snapshots join it in M3, when the argv builder exists (AC-F003-02).
 25. For S-23's fail branch, the Master Spec §9 wording is used (no fork; the CLI chain continues), not r5 §4's (fork only).
 26. A shortcut that doesn't apply to the selection does nothing except show a one-line reason (AC-F028-03).
-27. Where the revised `docs/requirements.md` conflicts with r6 or the Master Spec, the requirement wins in this file (signing plumbing, run-settings deny rules, fingerprint set, confirmation reasons, P1 notifications; listed under "Requirements newer than the frozen spec" at the top); the Master Spec needs the matching update at the Stage 3 sign.
+27. Where `docs/requirements.md` is more specific than r6 or the Master Spec, the requirement wins in this file (signing plumbing, run-settings deny rules, fingerprint set, confirmation reasons, native confirmations, P1 notifications).
 28. The editor setting (an app bundle ID, required by SR-25a) joins Settings in M2, with the first Open in editor action; with no editor set, Open in editor is disabled (AC-F029-07).
 29. The spawn controls that `requirements.md` places in Stage 7 are built in M2 and proven with the fake binary, while the PTY launch stays in M3 as the milestone plan says (§2, M2).

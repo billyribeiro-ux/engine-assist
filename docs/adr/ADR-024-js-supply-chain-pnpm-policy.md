@@ -27,6 +27,7 @@ Verified from the pnpm 12.14.0 package (npm `latest` 12.14.0; `CHANGELOG.md` in 
 - **`trustPolicy`** (for example `no-downgrade`) exists, with `trustPolicyExclude`.
 - An unrecognized setting in `pnpm-workspace.yaml` **fails** with `ERR_PNPM_UNRECOGNIZED_WORKSPACE_SETTINGS` when the project pins a pnpm version the running pnpm satisfies, so misspelled policy keys can't silently drop policy.
 - `pnpm install --frozen-lockfile` is the CI default.
+- **`strictDepBuilds`** exists in 12.x (CHANGELOG: an install "no longer fails when that dependency's own dependencies have build scripts nobody approved … as it does without `strictDepBuilds`"), and unapproved builds fail with `ERR_PNPM_IGNORED_BUILDS` (CHANGELOG, `pnpm add`/`update`/`remove`). Its default value wasn't readable from the 12.14.0 package (the CLI ships as a native binary), so Foreman sets it explicitly (Stage 4.7 fix pass, checked 2026-10-19).
 
 ## Decision
 
@@ -38,6 +39,7 @@ Verified from the pnpm 12.14.0 package (npm `latest` 12.14.0; `CHANGELOG.md` in 
   ```yaml
   minimumReleaseAge: 10080          # 7 days, in minutes; strict by default when set explicitly
   trustPolicy: no-downgrade
+  strictDepBuilds: true             # an unapproved build script fails the install (ERR_PNPM_IGNORED_BUILDS)
   allowBuilds:                      # exact list fixed at M0 from `pnpm approve-builds`; default deny
     esbuild: true                   # example; only packages whose postinstall is reviewed
   ```
@@ -57,10 +59,11 @@ Verified from the pnpm 12.14.0 package (npm `latest` 12.14.0; `CHANGELOG.md` in 
 
 - New package versions are usable only after 7 days, including security fixes. An urgent fix uses `minimumReleaseAgeExclude` with a dated reason in this ADR's log.
 - `allowBuilds` must be reviewed whenever a dependency adds a postinstall script; CI fails until it's decided.
+- Because setting `minimumReleaseAge` makes it strict, **every pinned JS version must be at least 7 days old on M0 day**; a pin newer than that fails `pnpm install`. The M0 pins are re-checked against their publish dates before the scaffold is committed, and a too-new pin is stepped back to the newest version that is old enough (recorded in this ADR's log).
 
 ## Verification
 
-CI jobs `pnpm-policy` (lockfile scan, single TypeScript, exact versions), `pnpm-audit`, `actions-pinned`, `install` (`--frozen-lockfile`). The Stage 5 gate proves that a planted vulnerable dependency fails CI (SR-63).
+CI jobs `pnpm-policy` (lockfile scan, single TypeScript, exact versions), `pnpm-audit`, `actions-pinned`, `install` (`--frozen-lockfile`). The Stage 5 gate proves that a planted vulnerable dependency fails CI (SR-63), and that a planted dependency with a `postinstall` script (not in `allowBuilds`) fails install (AC-M0-17).
 
 ## Revisit when
 

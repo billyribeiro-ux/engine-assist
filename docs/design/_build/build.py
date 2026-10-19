@@ -173,6 +173,10 @@ STRIPS = {
     # Wizard preview before the project exists
     "preview": {0: ("na", "idea_known = yes"), 1: ("ready", ""), 2: ("locked", ""), 3: ("locked", ""),
                 4: ("locked", ""), 5: ("locked", ""), **ANNOT, 10: ("undecided", "payments = undecided")},
+    # TradeLog during Stage 4 (assembler; payments decided no)
+    "s4": {0: ("na", "idea_known = yes"), 1: ("signed", ""), 2: ("signed", ""), 3: ("signed", ""),
+           4: ("progress", "assembling the build package"), 5: ("locked", "until Stage 4 is signed"), **ANNOT,
+           10: ("na", "payments = no")},
     # TradeLog during the Stage 5 gate (later snapshot; payments decided no)
     "s5": {0: ("na", "idea_known = yes"), 1: ("signed", ""), 2: ("signed", ""), 3: ("signed", ""),
            4: ("signed", ""), 5: ("inspecting-current", "gate in progress"), **ANNOT,
@@ -194,6 +198,11 @@ SIDE_STAGES = {
            ("lock", "muted", "2", "Architect's Design Studio", "locked", False),
            ("lock", "muted", "3", "Permits & Zoning", "locked", False),
            ("lock", "muted", "4", "Construction Drawings", "locked", False),
+           ("lock", "muted", "5", "Site Prep & Excavation", "locked", False),
+           ("dashsq", "muted", "6–18", "Need annotation", "need annotation", False)],
+    "s4": [("hatch", "muted", "0", "Land Survey", "not applicable", False),
+           ("stamp", "pass", "1–3", "Signed", "signed", False),
+           ("dot", "accent", "4", "Construction Drawings", "in progress", True),
            ("lock", "muted", "5", "Site Prep & Excavation", "locked", False),
            ("dashsq", "muted", "6–18", "Need annotation", "need annotation", False)],
     "s5": [("hatch", "muted", "0", "Land Survey", "not applicable", False),
@@ -243,7 +252,7 @@ def sidebar(active: str) -> str:
     <a class="side-item" href="today.html"{cur("today")}>{icon("tray")}Today<span class="badge" aria-label="5 items waiting on you">5</span></a>
     <div class="side-head" id="side-projects">Projects</div>
     <ul aria-labelledby="side-projects">
-      <li><a class="side-item" href="workspace.html"{tl_cur}>{icon("folder")}TradeLog<span class="meta">Stage {"5" if stage_key == "s5" else ("1" if stage_key == "s1" else "2")}</span></a>{stages}</li>
+      <li><a class="side-item" href="workspace.html"{tl_cur}>{icon("folder")}TradeLog<span class="meta">Stage {stage_key[1:] if stage_key in ("s1", "s4", "s5") else "2"}</span></a>{stages}</li>
       <li><a class="side-item" href="#foreman">{icon("folder")}Foreman<span class="badge" aria-label="1 problem">{glyph("cross", "fail")}</span></a></li>
       <li><a class="side-item" href="#swings">{icon("folder")}Swings<span class="badge" aria-label="Packet waiting for your signature"><span class="dot attention"></span></span></a></li>
     </ul>

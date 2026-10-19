@@ -46,7 +46,8 @@ Both layers live in `foreman-core`.
   Exceptions are typed `WritePurpose` variants, never strings from content:
   - `CouncilSetup(AgentName)` → the fixed set `spec/.claude/agents/<known>.md`;
   - `DecisionFile(Kind)` → `.foreman/{project,overlay,blueprint.lock}.json` and `.foreman/stages/stage-NN.json`;
-  - `AssemblerClaudeMd` → root `CLAUDE.md`, only with a UI confirmation token;
+  - `AssemblerClaudeMd` → root `CLAUDE.md`, only after the native confirmation Rust raises ("Claude Code loads this file in every session", SR-24a); no token or flag from the webview;
+  - `UserExport` → a path outside every project, chosen by Billy in the Rust save dialog (`metrics_export`, `run_sheet_export`), `.md` extension only, refused inside any registered project's `.foreman/`, `.git` or `.claude`; written with the same atomic rules (SR-30, `docs/contracts/files.md` FILE-R9);
   - `GitExclude` → handled by the dedicated exclude writer (SR-32, ADR-010), never by `check_write`.
 - `check_read(rel)`: the same syntax rules, plus the SR-50 secret patterns (`.env*`, `*.pem`, `*.key`, `id_*`, `*.p12`, `.npmrc`, `.netrc`, and `.ssh/`, `.aws/`, `.config/gcloud/` components), compared on the folded key.
 

@@ -11,7 +11,8 @@ Each ticket is sized for one Claude Code session (1–4 hours of Billy's time). 
 - **Likely files** follow design doc §3.2 and §3.3: `crates/foreman-core`, `crates/foreman-sys`, `crates/foreman-sensor`, `crates/fake-claude`; `foreman-app` is the Tauri crate in `src-tauri/`; the SvelteKit 3 SPA is `src/routes` and `src/lib` (imported as `#lib/...`).
 - A test named in **Required tests** is created by the first ticket that lists it; a later ticket that lists the same name extends it with new cases.
 - Spike tickets are run by Billy on his Mac; each writes `docs/spikes/<id>.md`. Every later ticket that a spike branch changes names that spike in **Depends on**.
-- The order below is the build order: every ticket's dependencies appear above it.
+- The order below is the build order: every ticket's dependencies appear above it. One exception: M3-18 was moved into the M4 section in the Stage 4.7 fix pass and keeps its ID (it says "moved from M3").
+- A ticket that ends with **`Manual: yes`** is run by Billy on his Mac (spikes, real runs, the kill check): its proof is a report or a recorded run, and no automated test is expected from it.
 
 ---
 
@@ -68,7 +69,7 @@ Stage: 5
 Depends on: M0-01
 ADRs: ADR-004, ADR-002
 Threats mitigated: T-005
-Likely files: src-tauri/src/ipc/mod.rs, src-tauri/src/ipc/error.rs, src-tauri/src/ipc/commands/app.rs, src-tauri/build.rs, src/lib/ipc/contract.ts, src/lib/ipc/tauri.ts, src/lib/ipc/mock.ts, src/lib/ipc/index.ts, src/lib/ipc/bindings/, src/lib/ipc/fixtures/, package.json (`dev:web`, `dev:mock`)
+Likely files: src-tauri/src/ipc/mod.rs, src-tauri/src/ipc/error.rs, src-tauri/src/ipc/commands/app.rs, src-tauri/build.rs, src/lib/ipc/contract.ts, src/lib/ipc/tauri.ts, src/lib/ipc/mock.ts, src/lib/ipc/index.ts, src/lib/ipc/bindings/, src/lib/ipc/fixtures/, package.json (`dev:mock`)
 Acceptance criteria:
 - AC-M0-02 (typed IPC layer with its mock implementation)
 - AC-M0-12
@@ -98,12 +99,13 @@ Stage: 5
 Depends on: M0-01
 ADRs: ADR-016, ADR-024
 Threats mitigated: T-001, T-069, T-101, T-103
-Likely files: deny.toml, Cargo.lock, crates/foreman-core/Cargo.toml (exact pins), pnpm-workspace.yaml (allowBuilds, minimumReleaseAge, trustPolicy), .npmrc, package.json, pnpm-lock.yaml, scripts/check-lockfile-sources.mjs
+Likely files: deny.toml, Cargo.lock, crates/foreman-core/Cargo.toml (exact pins), pnpm-workspace.yaml (allowBuilds default deny, strictDepBuilds, minimumReleaseAge, trustPolicy), .npmrc, package.json, pnpm-lock.yaml, scripts/check-lockfile-sources.mjs
 Acceptance criteria:
 - AC-M0-06
 - AC-M0-17 (package and lockfile part)
 - AC-XC-12
 - Given a planted `reqwest` dependency, a `keyring` dependency, and a git-sourced npm package, each in turn, when `cargo deny` or the lockfile scan runs, then each fails
+- Given `minimumReleaseAge: 10080` is strict once set, then every pinned JS version is at least 7 days old on M0 day (checked against its publish date before the scaffold is committed); a too-new pin is stepped back and logged in ADR-024
 Required tests:
 - none named (CI jobs `deny`, `audit`, `pnpm-audit`, `pnpm-policy`; plants run in M0-07)
 Out of scope: GitHub Actions pinning (M0-08).
@@ -118,6 +120,7 @@ Likely files: package.json (`verify` script), scripts/verify.sh, .gitleaks.toml,
 Acceptance criteria:
 - AC-M0-03
 - AC-M0-04 (`pnpm verify` part: a planted type error, fake secret, clippy warning and known-vulnerable dependency each fail it, then are reverted)
+- AC-M0-17 (plant part: a planted dependency with a `postinstall` script, not in `allowBuilds`, fails `pnpm install` with `strictDepBuilds: true`, then is reverted)
 Required tests:
 - none named (the plant script `scripts/plants/run.sh` is the proof)
 Out of scope: CI-only jobs (Semgrep, SBOM) in M0-08.
@@ -199,6 +202,7 @@ Required tests:
 - pty::paste_strips_escape_sequences (real-TUI manual check, recorded in the report)
 - csp::production_config_snapshot (updated to the branch taken)
 Out of scope: production terminal code (M3-09 to M3-13).
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M0-13] Spike S-1′: per-launch hooks as a contract probe
 Class: HARD
@@ -212,9 +216,11 @@ Acceptance criteria:
 - Given `claude --init-only --settings <file with exec-form hooks>` in a trusted probe folder, when the hooks fire for `SessionStart` and the listed events, then the pass branch applies: the sensor ships in P2 (M4-07 to M4-10 stay)
 - Given the hooks don't fire, then the fail branch applies: no sensor, the manual idle confirmation stays; AC-F011-* and AC-F010-14's sensor part are removed from M4 in `docs/scope.md`, and M4-07 to M4-10 are cancelled except the P1 fallbacks
 - Given the run settings deny rules `Read(//<repo>/.foreman/**)`, when a session tries `.FOREMAN/`, then the report says whether the case variant is denied; if not, the variants are listed explicitly in the run settings (M2-09)
+- Given a probe repo whose absolute path contains a space (e.g. `~/Developer/Trade Log`), then the report says whether the `//` deny rules still parse and deny; if not, the escaping rule is recorded in ADR-021 and encoded in M2-09
 Required tests:
 - run_settings::deny_case_variant_probe (manual, recorded in the report)
 Out of scope: the sensor binary (M4-07).
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M0-14] Spike S-3: effort on resume
 Class: HARD
@@ -230,6 +236,7 @@ Acceptance criteria:
 Required tests:
 - none named (manual; the branch is encoded by chain::effort_on_resume_branches in M3-14)
 Out of scope: none.
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M0-15] Spike S-7′: settings `env` and `apiKeyHelper` in a trusted repo
 Class: HARD
@@ -242,9 +249,11 @@ Acceptance criteria:
 - AC-M0-13 (S-7′)
 - Given a trusted repo whose `.claude/settings.json` sets `env` and `apiKeyHelper`, when the fingerprint and block rules (SR-06, SR-07) are applied by hand to it, then the pass branch applies if they catch every billing-changing input: rules as specified
 - Given an input they miss, then the fail branch applies: any project `env` block also blocks the launch until Billy approves it (AC-F008-07 is kept and built in M3-03)
+- Given Billy's real `~/.claude` and `~/.claude.json`, then the report records their sizes (against the 256 KB and 64 MB caps) and every symlink among the fingerprint sources (link and target), so ADR-021's caps and symlink rule are checked against his machine
 Required tests:
 - none named (manual; encoded by preflight::blocks_<key> in M3-03)
 Out of scope: none.
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M0-16] Spike S-8: graceful end, signals and forks
 Class: HARD
@@ -261,6 +270,7 @@ Acceptance criteria:
 Required tests:
 - none named (manual; encoded by rearm::ctrl_c_then_exit_order and chain::fork_argv)
 Out of scope: none.
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M0-17] Spike S-12: PATH in a Finder-launched build
 Class: HARD
@@ -276,6 +286,7 @@ Acceptance criteria:
 Required tests:
 - none named (manual; AC-F019-14 is re-checked in M4-14)
 Out of scope: none.
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M0-18] Spike S-23: `--desktop --resume`
 Class: HARD
@@ -291,6 +302,7 @@ Acceptance criteria:
 Required tests:
 - none named (manual; encoded in M4-29)
 Out of scope: none.
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M0-19] By-hand baseline and Stage 5 close
 Class: MECHANICAL
@@ -303,9 +315,11 @@ Acceptance criteria:
 - AC-M0-15
 - AC-M0-16
 - AC-M0-13 (all seven reports present, each naming its branch and the documents it changed)
+- AC-KC-04 (baseline sources named): the CLI baseline is every Stage 5 step Billy runs by hand; the **chat baseline is at least 10 chat steps Billy runs by hand, in any project, between M0 and the kill check**, logged in `docs/metrics-baseline.md` with the same end points as Foreman (filled prompt on the clipboard and the target chat open; AC-KC-01)
 Required tests:
 - none named
 Out of scope: none.
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ---
 
@@ -321,6 +335,7 @@ Likely files: claude-blueprint repo `claude-build-blueprint.md` (v2.2), crates/f
 Acceptance criteria:
 - Given DR-038's reference annotations, when they are written into the blueprint (block-level `fm:` comments per DR-006/DR-007, `fm:grammar v=1`, `fm:verify` per INSPECTION, `fm:if` parts per DR-032), then the PDF render is unchanged except for the prompt split DR-032 describes, and a pinned copy is stored as the core fixture
 - Given domain-rules §15 gaps 5, 14 and 15, then the annotation follows the choice each rule states (`in=X` on 1.2, a concrete `BUDGET_TIME` example value in the harness fixture, no `fm:if commercial` around 1.4)
+- Exit (formerly M1's entry criterion): blueprint v2.2 with the B-1 annotations for Stages 1–2, the Stage Gate, F.2 and Council setup is committed in the `claude-blueprint` repo, parses with zero errors, and its commit is the one the TradeLog and Foreman fixtures pin
 Required tests:
 - template::golden_v2_2 (pinned in M1-16)
 Out of scope: Stages 0 and 3–5 (M4-04).
@@ -337,6 +352,7 @@ Acceptance criteria:
 - AC-F020-07
 Required tests:
 - schema::all_versions_migrate, schema::newer_version_read_only, schema::read_does_not_rewrite
+- schema::older_build_header_read_banner (a newer file: the tolerant header read gives the read-only banner and identity, ADR-023)
 Out of scope: individual file schemas (M1-27, M1-29).
 
 ### [M1-03] Path policy: lexical write and read checks
@@ -391,6 +407,7 @@ Acceptance criteria:
 Required tests:
 - atomic::crash_injection, atomic::refuses_planted_tmp_symlink, atomic::refuses_newer_file
 - atomic::noreplace_conflict, atomic::swap_unsupported_fallback, atomic::dir_sync_fallback
+- atomic::leftover_temp_differs_moved_to_recovered (a stale `.foreman-tmp` that differs from its target goes to `<app-data>/recovered/` and is shown, never deleted; ADR-010)
 Out of scope: the `info/exclude` writer (M1-09).
 
 ### [M1-06] Reads outside projects and secret-file exclusion
@@ -399,7 +416,7 @@ Stage: 6
 Depends on: M1-04
 ADRs: ADR-011
 Threats mitigated: T-057, T-068
-Likely files: crates/foreman-core/src/store/outside.rs, crates/foreman-core/src/pathpolicy.rs (secret patterns), crates/foreman-core/tests/read_scope.rs
+Likely files: crates/foreman-core/src/store/outside.rs, crates/foreman-core/src/pathpolicy.rs (secret patterns), crates/foreman-core/tests/read_scope.rs, clippy.toml (`std::fs` allowed only in the modules AC-XC-30 lists)
 Acceptance criteria:
 - AC-XC-30
 - AC-XC-11
@@ -428,10 +445,11 @@ Stage: 6
 Depends on: M1-07, M0-03
 ADRs: ADR-012
 Threats mitigated: T-039, T-040, T-041, T-042, T-043
-Likely files: crates/foreman-core/src/git.rs (closed `GitOp` enum, arg builders), crates/foreman-sys/src/git.rs, crates/foreman-sys/tests/git.rs, crates/foreman-sys/tests/fixtures/hostile-repo/, docs/adr/ADR-012-git-integration.md (amend: drop `Status`/`DiffNoExt`, DR-140)
+Likely files: crates/foreman-core/src/git.rs (closed `GitOp` enum, arg builders), crates/foreman-sys/src/git.rs, crates/foreman-sys/tests/git.rs, crates/foreman-sys/tests/fixtures/hostile-repo/, the closed `GitOp` enum equal to DR-140's list (no `Status`, `Diff`, `Add`, `Commit`, `LsFiles`; ADR-012 decision 1)
 Acceptance criteria:
 - AC-XC-04
 - Given a folder with no repo of its own inside an enclosing repo, when any git op runs, then `git::run` refuses (rev-parse `--show-toplevel` must equal the project root)
+- Given the `GitOp` enum, then it is exactly DR-140's list, every `CommitTree` carries `--no-gpg-sign`, and `ReadTree` is refused without Foreman's temporary `GIT_INDEX_FILE`
 Required tests:
 - git::single_entry_point, git::invocation_snapshot, git::env_cleared, git::timeout
 - git::no_hooks_on_any_command, git::filter_driver_never_runs, git::status_and_diff_never_run_filters
@@ -461,8 +479,12 @@ Likely files: crates/foreman-sys/src/git/commit.rs, crates/foreman-sys/tests/com
 Acceptance criteria:
 - Given a repo with unrelated staged and unstaged changes, when `commit_paths(paths, message)` runs on the current branch, then it uses only the SR-42 plumbing sequence, the commit holds exactly those paths, the unrelated changes stay, and every path is read back from the commit and compared by hash
 - Given the ref moved between `commit-tree` and `update-ref`, then `update-ref <new> <old>` fails and nothing is overwritten
+- Given an unborn HEAD (a fresh `git init`), then the commit uses `read-tree --empty`, `commit-tree` without `-p` and `update-ref HEAD <new> 0000…`, and becomes the repo's first commit (DR-143)
+- Given a detached HEAD (`symbolic-ref -q HEAD` exits 1), then the commit is refused with "Check out a branch first" and nothing is written
+- Given the paths to commit, then only those whose `hash-object --no-filters` differs from `rev-parse HEAD:<path>` are committed, and every commit is `--no-gpg-sign` (DR-142, DR-144)
 Required tests:
 - sign::pathspec_only, sign::readback_detects_mismatch, sign::untracked_new_packet, sign::concurrent_ref_move_fails
+- sign::unborn_head_first_commit, sign::detached_head_refused
 Out of scope: signing UX and other-branch mode (M4-20, M4-21).
 
 ### [M1-11] Template parser: structure, items and bounds
@@ -492,7 +514,7 @@ Likely files: crates/foreman-core/src/template/grammar.rs, crates/foreman-core/s
 Acceptance criteria:
 - AC-F001-10
 - AC-F001-12
-- AC-F001-13
+- AC-F001-13 (a newer grammar: a step with an unknown key is `needsNewerForeman`, other unknowns warn, Template health says "Update Foreman"; DR-021, DR-035)
 - AC-F005-06
 Required tests:
 - grammar::block_level_only, grammar::version_required, grammar::key_table, grammar::start_vocabulary, grammar::alt_rules_closed_set
@@ -752,10 +774,11 @@ ADRs: ADR-012, ADR-022
 Threats mitigated: T-080
 Likely files: crates/foreman-core/src/decisions.rs, src-tauri/src/decisions.rs, crates/foreman-sys/tests/decision_commit.rs
 Acceptance criteria:
-- AC-F020-08
+- AC-F020-08 (including the unborn-HEAD first commit and the detached-HEAD refusal, where the decision change stays pending)
 - AC-F020-09
 Required tests:
 - decisions::pending_from_stage5_not_flagged, sign::pathspec_only (decision-file case)
+- sign::unborn_head_first_commit (setup's `git init`, then the first `condition_set`), sign::detached_head_refused (decision change stays pending)
 Out of scope: including pending decisions in a signing commit (M4-20).
 
 ### [M1-29] App-data file contracts
@@ -861,6 +884,7 @@ Likely files: src/lib/ipc/mock.ts, src/lib/ipc/fixtures/, src/lib/ipc/contract.t
 Acceptance criteria:
 - EX-M2-02
 - Given the mock rules in `docs/contracts/ipc.md` §7.2 (every command, deterministic clock and IDs, scenarios, scripted PTY, scripted native dialogs, mirrored security behaviors, not in the release bundle), then each has a passing test
+- Given the commands and fields the Stage 4.7 review added (`launch_prepare.mode`, `paste_back_preview.source`, `chain_resume_prepare`, `packet_repair_prepare`, `metrics_view`, `project_pin_set`), then each has the request and response fixtures `docs/contracts/ipc.md` names (P2 commands answer from fixtures until their feature ticket lands)
 Required tests:
 - ipc::rejects_unknown_fields (mirrored in the mock)
 Out of scope: none.
@@ -964,7 +988,7 @@ Likely files: crates/foreman-core/src/launch/run_settings.rs, crates/foreman-cor
 Acceptance criteria:
 - AC-F008-16
 Required tests:
-- run_settings::contents_snapshot, run_settings::deny_paths_absolute, run_settings::fresh_per_run
+- run_settings::contents_snapshot, run_settings::deny_paths_absolute (including a repo path with a space), run_settings::fresh_per_run
 - run_settings::deny_case_variant_probe (S-1′ result encoded: case variants listed if needed)
 Out of scope: sensor hooks (M4-08).
 
@@ -1069,7 +1093,7 @@ Acceptance criteria:
 - AC-F001-18
 Required tests:
 - fs_policy::read_scope (auto-detect candidates only)
-Out of scope: probe-folder trust (M3-18), full Template health (M4-06).
+Out of scope: probe-folder trust (M3-18, now in M4), full Template health (M4-06).
 
 ### [M2-17] Project setup backend
 Class: HARD
@@ -1190,7 +1214,7 @@ Threats mitigated: T-003, T-063
 Likely files: src-tauri/src/ipc/commands/decisions.rs, src/lib/components/OutsideChangeReview.svelte, src/lib/components/ConditionControl.svelte (mockup: docs/design/mockups/outside-change.html)
 Acceptance criteria:
 - AC-F004-11
-- AC-F022-02
+- AC-F022-02 (int: a scripted native dialog, Cancel leaves the approved copy, hash and pending change unchanged; comp: the review shows the redacted diff as context)
 - AC-F022-05
 Required tests:
 - decisions::reject_restores_via_cas, ipc::security_confirmations_are_native (`pending_change_accept`)
@@ -1205,13 +1229,13 @@ Threats mitigated: T-003, T-032
 Likely files: crates/foreman-core/src/launch/mod.rs (`needs_confirmation`), src-tauri/src/launch.rs, src-tauri/src/ipc/commands/launch.rs (`launch_prepare`), src/lib/components/StepActions.svelte, src/lib/components/LaunchPreview.svelte
 Acceptance criteria:
 - AC-F008-17
-- AC-F008-18
+- AC-F008-18 (int: Rust raises the native dialog from a scripted answer, Cancel returns `Cancelled` with nothing spawned and no run record; comp: the preview shows the reasons as context and `launch_start` takes only `planId`)
 - AC-F008-03 (Run blocked with the path named)
 - Given a plan, then its `planId` is single-use, valid 60 s, and bound to the project revision
+- Given `launch_prepare { mode: "freshWithContext" }` on a non-continuing step, then `NotAllowed("fresh-not-continuing")` (the fresh-chain behavior itself is M3-15)
 Required tests:
-- preflight::confirm_required_for_{overlay_step,mode_change,auto_and_dontask,first_launch,version_change}
-- preflight::confirm_required_for_mode_change, preflight::confirm_required_for_version_change
-- ipc::security_confirmations_are_native (launch confirmation)
+- preflight::confirm_required_for_{overlay_step,mode_change,auto_and_dontask,first_launch,version_change}, one test per reason: preflight::confirm_required_for_overlay_step, preflight::confirm_required_for_mode_change, preflight::confirm_required_for_auto_and_dontask, preflight::confirm_required_for_first_launch, preflight::confirm_required_for_version_change
+- ipc::security_confirmations_are_native (launch confirmation; static check over every `*Req.ts` binding)
 Out of scope: spawning in the PTY (M3-10); fingerprint and auth phases (M3-01 to M3-05).
 
 ### [M2-26] Core shortcuts and the terminal drawer shell
@@ -1274,8 +1298,10 @@ Acceptance criteria:
 - AC-F008-06
 - AC-F008-24
 - Given the plugin folder layout is unverified (design doc §7), then the whole `plugins/` directory of each enabled plugin is fingerprinted
+- Given `~/.claude.json`, then it is parsed as a stream under its own 64 MB cap and only the `mcpServers` paths are kept; given a read-only source outside the repo that is a symlink to a regular file outside every registered project, then the target is hashed and both link and target are recorded (ADR-021)
 Required tests:
 - preflight::hook_script_change_detected, preflight::ancestor_claude_md_detected, preflight::user_mcp_server_detected (one test per source)
+- fingerprint::claude_json_streamed_64mb, fingerprint::outside_symlink_followed_to_regular_file, fingerprint::outside_symlink_into_project_blocks
 Out of scope: the banner (M3-02).
 
 ### [M3-02] Config-change banner and acknowledgement
@@ -1331,7 +1357,7 @@ Likely files: crates/foreman-core/src/launch/preflight.rs (`evaluate_preflight`)
 Acceptance criteria:
 - AC-F008-01
 - AC-F008-10
-- AC-F008-13
+- AC-F008-13 (NFR-04 measured excluding the `claude -v` spawn, which runs in parallel with the fingerprint and counts toward NFR-05)
 - EX-M3-04
 Required tests:
 - launch::progress_phase_order, compat::blocks_below_floor
@@ -1360,6 +1386,7 @@ Threats mitigated: T-098
 Likely files: src-tauri/src/os.rs (notification templates), src-tauri/src/ipc/commands/steps.rs (`wait_start`), src-tauri/tests/notify.rs
 Acceptance criteria:
 - AC-F007-09
+- Given a `wait` date that passed while Foreman wasn't running, then the notification fires at the next launch (notifications are P1, Master Spec §12)
 Required tests:
 - notify::body_template_snapshot
 Out of scope: inbox notifications (M4-25).
@@ -1420,7 +1447,7 @@ Acceptance criteria:
 - AC-F009-06 (cap per S-0's branch)
 - AC-F009-08
 - AC-F009-18
-- AC-F008-20
+- AC-F008-20 (driven by the Settings "Screen reader mode" toggle, `settings_update.screenReaderMode`; Foreman doesn't detect VoiceOver)
 Required tests:
 - terminal::options_snapshot, terminal::no_answerback_injection
 Out of scope: paste and links (M3-12).
@@ -1453,6 +1480,7 @@ Acceptance criteria:
 - AC-F009-09
 Required tests:
 - rearm::no_kill_without_idle_or_confirm (terminate path), lifecycle::crash_leaves_interrupted (SIGHUP on quit)
+- ipc::security_confirmations_are_native (`pty_terminate` and the quit guard: a scripted Cancel sends no signal)
 Out of scope: none.
 
 ### [M3-14] Session chains: planning and session flags
@@ -1478,7 +1506,7 @@ Stage: 9
 Depends on: M3-14, M3-10, M3-13
 ADRs: ADR-008
 Threats mitigated: T-029, T-031
-Likely files: src-tauri/src/rearm.rs, src-tauri/src/ipc/commands/terminal.rs (`rearm_start`, `rearm_continue`), src-tauri/tests/rearm.rs
+Likely files: src-tauri/src/rearm.rs, src-tauri/src/ipc/commands/terminal.rs (`rearm_start`, `rearm_continue`), src-tauri/src/ipc/commands/launch.rs (`launch_prepare` `mode: freshWithContext`), src-tauri/tests/rearm.rs
 Acceptance criteria:
 - AC-F010-03
 - AC-F010-04 (S-8's branch)
@@ -1490,6 +1518,7 @@ Acceptance criteria:
 - AC-XC-19
 Required tests:
 - rearm::ctrl_c_then_exit_order, rearm::no_kill_without_idle_or_confirm, rearm::only_from_user_action, rearm::stale_plan_not_spawned
+- ipc::security_confirmations_are_native (`rearm_start`: the P1 idle assertion is a native dialog; a scripted Cancel sends nothing)
 Out of scope: sensor idle (M4-10).
 
 ### [M3-16] Restart, interrupted sessions and rebuild from the repo
@@ -1498,10 +1527,11 @@ Stage: 9
 Depends on: M3-15
 ADRs: ADR-010, ADR-023
 Threats mitigated: T-059
-Likely files: src-tauri/src/state.rs, src-tauri/src/ipc/commands/decisions.rs (`progress_rebuild_preview`, `progress_rebuild_apply`), src-tauri/tests/restart.rs
+Likely files: src-tauri/src/state.rs, src-tauri/src/ipc/commands/decisions.rs (`progress_rebuild_preview`, `progress_rebuild_apply`), src-tauri/src/ipc/commands/launch.rs (`chain_resume_prepare`), src-tauri/tests/restart.rs
 Acceptance criteria:
 - AC-F010-12
-- AC-F020-10
+- AC-F020-10 (Resume goes through `chain_resume_prepare`, then the normal `launch_start` with its preflight and native confirmation)
+- AC-F009-05 (Resume part, same command)
 - AC-F020-11
 - AC-F020-12
 Required tests:
@@ -1523,19 +1553,6 @@ Acceptance criteria:
 Required tests:
 - steps::followup_copy_or_relaunch, steps::finish_rules, policy::switches_never_typed, policy::override_scope
 Out of scope: Now/Next strip (M4-11).
-
-### [M3-18] Probe-folder trust at first run
-Class: HARD
-Stage: 9
-Depends on: M3-10, M2-16
-ADRs: ADR-017
-Threats mitigated: T-037
-Likely files: src-tauri/src/doctor.rs (`probe_folder_open`), src/routes/first-run/+page.svelte
-Acceptance criteria:
-- AC-F019-08
-Required tests:
-- probe::runs_only_in_probe_dir (trust-tab case)
-Out of scope: contract probes (M4-12).
 
 ### [M3-19] Watcher
 Class: HARD
@@ -1655,11 +1672,11 @@ Stage: 9
 Depends on: M3-10, M3-23, M2-10
 ADRs: ADR-018
 Threats mitigated: T-072
-Likely files: crates/foreman-core/src/runlog.rs (`export_metrics`), src-tauri/src/ipc/commands/packets.rs (`metrics_export`), crates/foreman-core/tests/metrics.rs
+Likely files: crates/foreman-core/src/runlog.rs (`export_metrics`), src-tauri/src/ipc/commands/packets.rs (`metrics_export`, written through `WritePurpose::UserExport`), crates/foreman-core/tests/metrics.rs
 Acceptance criteria:
 - AC-F026-01
-- AC-F026-02
-- AC-F026-04
+- AC-F026-02 (chat time-to-start ends when the filled prompt is on the clipboard and the target chat is open, the baseline's end point)
+- AC-F026-04 (time to start and active time per step, median per surface)
 - AC-F026-05
 - AC-F026-06
 - AC-F017-06
@@ -1697,7 +1714,7 @@ Out of scope: none.
 ### [M3-29] Stage 8 security inspection
 Class: SPEC-COMPLETE
 Stage: 9
-Depends on: M3-03, M3-05, M3-07, M3-08, M3-12, M3-16, M3-17, M3-18, M3-21, M3-22, M3-25, M3-26, M3-27, M3-28, M0-11
+Depends on: M3-03, M3-05, M3-07, M3-08, M3-12, M3-16, M3-17, M3-21, M3-22, M3-25, M3-26, M3-27, M3-28, M0-11
 ADRs: ADR-016
 Threats mitigated: T-101
 Likely files: docs/security/stage-08-review.md, docs/threat-model.md (control → test links)
@@ -1721,6 +1738,7 @@ Acceptance criteria:
 Required tests:
 - none named (manual run)
 Out of scope: close-out automation (by hand in P1).
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ### [M3-31] Kill check
 Class: SPEC-COMPLETE
@@ -1730,20 +1748,34 @@ ADRs: ADR-018
 Threats mitigated: none
 Likely files: docs/metrics-baseline.md, Export metrics output, docs/handoff/stage-09.md
 Acceptance criteria:
-- AC-KC-01
-- AC-KC-02
+- AC-KC-01 (chat ends at "filled prompt on the clipboard and the target chat open" on both sides)
+- AC-KC-02 (active time per step, median per surface)
 - AC-KC-03
-- AC-KC-04
+- AC-KC-04 (chat baseline: at least 10 by-hand chat steps between M0 and the kill check, M0-19)
 - AC-KC-05
 - EX-M3-08
 - Given TradeLog Stages 1–2 run through Foreman, when Export metrics is compared with `docs/metrics-baseline.md` per surface, then the result and every proxy-event explanation are recorded in the Stage 9 packet; if any criterion fails, no M4 ticket starts and a Change Request is drafted
 Required tests:
 - none named
 Out of scope: none.
+Manual: yes (Billy runs it on his Mac; the result is a report or a recorded run, not an automated test)
 
 ---
 
 ## M4 · Complete v1 (Stages 11–12)
+
+### [M3-18] Probe-folder trust at first run (moved from M3)
+Class: HARD
+Stage: 12
+Depends on: M3-10, M2-16
+ADRs: ADR-017
+Threats mitigated: T-037
+Likely files: src-tauri/src/doctor.rs (`probe_folder_open`), src/routes/first-run/+page.svelte
+Acceptance criteria:
+- AC-F019-08
+Required tests:
+- probe::runs_only_in_probe_dir (trust-tab case)
+Out of scope: contract probes (M4-12). Moved from M3 in the Stage 4.7 fix pass: probe-folder trust is first needed by P2's contract probes, so it ships with them (AC-F019-08 is M4).
 
 ### [M4-01] Diagnostic logging and crash reports
 Class: HARD
@@ -1779,11 +1811,11 @@ Stage: 11
 Depends on: M4-02, M3-26
 ADRs: ADR-018
 Threats mitigated: none
-Likely files: src/routes/projects/[projectId]/runs/+page.svelte, src/routes/settings/metrics/+page.svelte, src-tauri/src/ipc/commands/packets.rs (`runs_search`), crates/foreman-core/benches/run_index.rs (mockup: docs/design/mockups/run-log.html)
+Likely files: src/routes/projects/[projectId]/runs/+page.svelte (run list and the metrics strip), src-tauri/src/ipc/commands/packets.rs (`runs_search`, `metrics_view`), src-tauri/src/ipc/commands/launch.rs (`chain_resume_prepare` for Resume), crates/foreman-core/benches/run_index.rs (mockup: docs/design/mockups/run-log.html)
 Acceptance criteria:
 - AC-F026-07
 - AC-F026-08
-- AC-F026-09
+- AC-F026-09 (the metrics strip on the Run log screen, from `metrics_view`, not a Settings page)
 Required tests:
 - none named (component tests; criterion bench over 100,000 entries)
 Out of scope: none.
@@ -1994,9 +2026,10 @@ Threats mitigated: T-067
 Likely files: src/routes/projects/[projectId]/stages/[stage]/gate/+page.svelte, src/lib/components/InspectionRow.svelte, src-tauri/src/ipc/commands/decisions.rs (`item_kind_confirm`) (mockup: docs/design/mockups/gate.html)
 Acceptance criteria:
 - AC-F015-06
-- AC-F001-17
+- AC-F001-17 (int: the kind is confirmed in a scripted native dialog, Cancel leaves attest disabled; comp: the old and new bullet text shown as context)
 Required tests:
 - template::swapped_bullets_reconfirm (through IPC)
+- ipc::security_confirmations_are_native (`item_kind_confirm`)
 Out of scope: sign dialog (M4-19).
 
 ### [M4-18] Lessons capture
@@ -2045,7 +2078,7 @@ Likely files: src-tauri/src/ipc/commands/signing.rs (`sign_apply`), crates/forem
 Acceptance criteria:
 - AC-F014-04
 - AC-F014-05
-- AC-F014-06
+- AC-F014-06 (including the `index.lock` retry, `indexRefreshPending` and its banner)
 - AC-F014-07
 - AC-F014-08
 - AC-F014-10
@@ -2054,6 +2087,7 @@ Acceptance criteria:
 Required tests:
 - sign::refuses_changed_file, sign::pathspec_only, sign::readback_detects_mismatch, sign::untracked_new_packet
 - sign::concurrent_ref_move_fails, ipc::security_confirmations_are_native (`sign_apply`)
+- sign::index_locked_refresh_retried
 - packet::outside_signature_needs_confirmation (P2: shown as unverified)
 Out of scope: other-branch signing (M4-21).
 
@@ -2072,6 +2106,7 @@ Acceptance criteria:
 - AC-F014-16
 Required tests:
 - sign::other_branch_leaves_worktree_head_and_index, git::repo_gpg_program_never_runs, git::timeout (signing case)
+- decisions::other_branch_sign_no_false_drift (`committedOnOtherBranches`, ADR-022)
 Out of scope: none.
 
 ### [M4-22] Tamper detection and restore
@@ -2093,12 +2128,12 @@ Stage: 12
 Depends on: M4-09, M3-15, M3-24
 ADRs: ADR-008
 Threats mitigated: T-031
-Likely files: src-tauri/src/ipc/commands/packets.rs, src/lib/components/PacketView.svelte (mockup: docs/design/mockups/packet.html)
+Likely files: src-tauri/src/ipc/commands/packets.rs (`packet_repair_prepare`), src-tauri/src/ipc/commands/chat.rs (`paste_back_preview { source: "sensor" }`), src/lib/components/PacketView.svelte (mockup: docs/design/mockups/packet.html)
 Acceptance criteria:
-- AC-F013-11
+- AC-F013-11 (Repair is `packet_repair_prepare`, then `rearm_start` with its native idle dialog)
 - AC-F013-12
 - AC-F013-13
-- AC-F013-14
+- AC-F013-14 (Capture from session is `paste_back_preview { source: "sensor" }`, then `paste_back_apply`)
 Required tests:
 - rearm::only_from_user_action (Repair starts only from a click), pasteback::lists_targets_before_write (capture path)
 Out of scope: none.
@@ -2123,12 +2158,12 @@ Stage: 12
 Depends on: M4-22, M4-10, M3-07
 ADRs: ADR-014
 Threats mitigated: T-098
-Likely files: src/routes/+page.svelte, src/lib/stores/today.svelte.ts, src-tauri/src/os.rs (inbox notification templates, Dock badge) (mockup: docs/design/mockups/today.html)
+Likely files: src/routes/+page.svelte, src/lib/stores/today.svelte.ts, src-tauri/src/os.rs (inbox notification templates, Dock badge), src-tauri/src/ipc/commands/projects.rs (`project_pin_set`) (mockup: docs/design/mockups/today.html)
 Acceptance criteria:
 - AC-F017-07
 - AC-F017-08
 - AC-F017-09
-- AC-F017-10
+- AC-F017-10 (pins set with `project_pin_set`; ⌘1–⌘9 open the pinned slots)
 Required tests:
 - notify::body_template_snapshot (inbox kinds)
 Out of scope: none.
@@ -2161,22 +2196,22 @@ Required tests:
 Out of scope: the assembler (M4-28).
 
 ### [M4-28] Build-package assembler and root `CLAUDE.md`
-Class: NEEDS-DESIGN
+Class: HARD
 Stage: 12
 Depends on: M4-27, M3-24
 ADRs: ADR-011, ADR-014
 Threats mitigated: T-003, T-051, T-052, T-090
-Likely files: crates/foreman-core/src/assembler.rs, src-tauri/src/ipc/commands/assembler.rs (`assembler_view`, `assembler_paste_preview`, `assembler_paste_apply`), src/lib/components/Assembler.svelte, crates/foreman-core/tests/assembler.rs
+Likely files: crates/foreman-core/src/assembler.rs, crates/foreman-core/src/rules/evidence.rs (DR-063), src-tauri/src/ipc/commands/assembler.rs (`assembler_view`, `assembler_paste_preview`, `assembler_paste_apply`), src/lib/components/Assembler.svelte, crates/foreman-core/tests/assembler.rs (component: docs/design/components.md "Build-package assembler"; mockup: docs/design/mockups/assembler.html)
 Acceptance criteria:
 - AC-F023-03
 - AC-F023-04
-- AC-F023-05
-- AC-F023-06
-- AC-F021-06
-- Missing design (resolve before building): there is no mockup in `docs/design/mockups/` and no entry in `docs/design/components.md` for the assembler panel (REPO FILES row layout and states, the late-conditions form, the root `CLAUDE.md` confirmation), and the evidence rules that prefill late conditions are specified for one case only (`docs/migrations/` → `has_database = yes`); the rule for each other late condition needs writing into `docs/domain-rules.md`
+- AC-F023-05 (rows Foreman may write; a refused row doesn't block)
+- AC-F023-06 (proposals from path evidence per DR-063; no evidence → `undecided`, never `no`; each proposal takes effect only when Billy confirms it)
+- AC-F021-06 (int: the root `CLAUDE.md` write waits for the native confirmation, Cancel writes nothing; comp: the panel shows the diff as context)
 Required tests:
 - assembler::rejects_policy_violations, ipc::security_confirmations_are_native (root `CLAUDE.md` write)
-Out of scope: none.
+- rules::late_condition_evidence
+Out of scope: none. (Was NEEDS-DESIGN; the Stage 4.7 fix pass added the component entry, the mockup and DR-063's evidence rules.)
 
 ### [M4-29] Desktop handoff
 Class: HARD
@@ -2279,7 +2314,7 @@ Acceptance criteria:
 - EX-M4-01
 - EX-M4-04
 - EX-M4-05
-- EX-M4-06
+- Given Foreman's own Stages 11 and 12, then they close out by hand (attest, lessons, APPROVED BY, commit), as Stages 5–10 did; running Foreman's own build inside Foreman is v1.1 (adoption)
 Required tests:
 - none named (forced-failure checks per runner; per-screen state review)
 Out of scope: none.
@@ -2336,10 +2371,10 @@ Stage: 13
 Depends on: M5-03
 ADRs: ADR-020
 Threats mitigated: none
-Likely files: src/lib/components/Stamp.svelte, src/lib/styles/motion.css
+Likely files: src/lib/components/Stamp.svelte, src/lib/styles/motion.css, src/lib/styles/tokens.css (`prefers-contrast: more` set), docs/design/contrast-check.py (7:1 pairs), src/lib/os-display.ts (media queries reported through `settings_update.osDisplay`), src-tauri/src/window.rs (vibrancy off)
 Acceptance criteria:
 - AC-F030-09
-- AC-XC-23
+- AC-XC-23 (Reduce Transparency and Increase Contrast detected with `prefers-reduced-transparency` and `prefers-contrast: more` in the webview and reported to Rust, which turns window effects off; the high-contrast tokens reach ≥ 7:1 for every pair)
 Required tests:
 - none named (component test; manual pass)
 Out of scope: none.
@@ -2503,7 +2538,7 @@ No tickets. Listed so the coverage check can account for them.
 | — | Adopt an existing project | — |
 ## Coverage
 
-Generated by a stdlib Python check run at Stage 4.6 (kept outside the repo) from this file, `docs/scope.md`, `docs/requirements.md`, `docs/threat-model.md`, `docs/domain-rules.md` and `docs/adr/README.md`. The script also checks the ticket format (all nine fields in order, one class, stage 5–17) and that every dependency appears earlier in the file.
+Generated by a stdlib Python check (kept outside the repo; re-run in the Stage 4.7 fix pass) from this file, `docs/scope.md`, `docs/requirements.md`, `docs/threat-model.md`, `docs/domain-rules.md` and `docs/adr/README.md`. The script also checks the ticket format (all nine fields in order, one class, stage 5–17) and that every dependency appears earlier in the file.
 
 **Tickets by milestone and class**
 
@@ -2512,23 +2547,23 @@ Generated by a stdlib Python check run at Stage 4.6 (kept outside the repo) from
 | M0 | 12 | 1 | 6 | 0 | 19 |
 | M1 | 30 | 3 | 0 | 0 | 33 |
 | M2 | 17 | 11 | 0 | 0 | 28 |
-| M3 | 26 | 5 | 0 | 0 | 31 |
-| M4 | 23 | 11 | 0 | 1 | 35 |
+| M3 | 25 | 5 | 0 | 0 | 30 |
+| M4 | 25 | 11 | 0 | 0 | 36 |
 | M5 | 0 | 14 | 0 | 0 | 14 |
-| **All** | 108 | 45 | 6 | 1 | **160** |
+| **All** | 109 | 45 | 6 | 0 | **160** |
 
 **Coverage**
 
 | Item | In source | Covered by a ticket | Orphans |
 |---|---|---|---|
 | Acceptance criteria (`AC-…`, scope.md) | 380 | 380 | none |
-| Exit criteria (`EX-…`, scope.md) | 34 | 34 | none |
-| Named tests (requirements, threat model, domain rules), v1 | 269 | 269 | none |
+| Exit criteria (`EX-…`, scope.md) | 33 | 33 | none |
+| Named tests (requirements, threat model, domain rules), v1 | 273 | 273 | none |
 | Named tests deferred to v1.1 | 3 | listed under "Deferred to v1.1" | none |
 | ADRs | 24 | 24 | none |
 | Threats T-001…T-107 | 107 | 106 (T-107 is v1.1) | none |
 
-Format and ordering problems: none. IDs cited that don't exist in the sources: none.
+Format and ordering problems: none. IDs cited that don't exist in the sources: none. With the Stage 4.7 changes to `docs/requirements.md` (made on `stage/03-permits` and merged here) the same check counts 276 named v1 tests, all covered.
 
 Not counted as tests: module and API names the documents mention in backticks (`template::grammar`, `app::rearm`, `app::watch`, `git::run`, `launch::prepare`, `doctor::capture_login_path`, `core::sanitize`, `std::fs`, `std::process::Command::new`, `portable_pty::CommandBuilder::new`).
 
@@ -2546,4 +2581,4 @@ The longest dependency chain (unit weight per ticket), in five legs:
 4. **Runners to the kill check:** M3-02 → M3-05 → M3-10 → M3-13 → M3-15 → M3-16 → M3-29 → M3-30 → **M3-31 (kill check)**. 32 tickets end to end.
 5. **After the kill check:** M4-15 → M4-18 → M4-19 → M4-20 → M4-22 → M4-25 → M4-35, then M5-01 → … → M5-14 (53 tickets end to end).
 
-By count, 111 of 160 tickets (69%) come before the kill check. Ticket count over-weights M0 and M1, whose tickets are small infrastructure pieces; the Master Spec §9 estimate (kill check after about half the v1 effort) is in weeks, not tickets.
+By count, 110 of 160 tickets (69%) come before the kill check (M3-18 moved to M4 in the Stage 4.7 fix pass). At 1–4 hours each that is about 110–440 hours of Billy's time before the kill check, and 160–640 hours for v1. The Master Spec §9 estimate is restated in those terms (no "about half" claim).

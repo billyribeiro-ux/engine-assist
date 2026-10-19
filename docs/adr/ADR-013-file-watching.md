@@ -27,7 +27,12 @@ Checked 2026-10-19:
 
 - **`notify` 8.2.0** (FSEvents backend) and **`notify-debouncer-full` 0.7.0** with a 250 ms timeout, in `foreman-app::watch`. One debouncer per open project root (recursive) and one for `app-data/events/` (P2).
 - **Events are hints, never truth.** For each debounced path, the watcher:
-  1. drops it unless it matches an interest set computed from the applicable path (`docs/handoff/stage-NN*.md`, declared `out` paths, `.foreman/*.json`, `docs/lessons.md`);
+  1. drops it unless its repo-relative path (after NFC, compared exactly, case-sensitive) matches the interest set (SR-31, DR-162), anchored regexes over the whole path:
+     - `^docs/handoff/stage-[0-9]{2}\.md$` and `^docs/handoff/stage-[0-9]{2}-attachments\.md$` (so `stage-02.md.orig` or `stage-02.md~` is ignored);
+     - `^docs/lessons\.md$`;
+     - `^\.foreman/(project|overlay|blueprint\.lock)\.json$`;
+     - each applicable step's declared `out` path, matched as an exact string (no globbing);
+     - in app data (P2): `^events/[0-9a-f-]{36}/[0-9]{20}-[0-9]+-[A-Za-z]{1,40}\.json$`;
   2. drops ignored and secret patterns (shared with `pathpolicy::check_read`);
   3. re-reads the file through `store::Root::read` (`O_NOFOLLOW` walk; a symlinked target is refused and reported, never followed);
   4. compares its `ReadStamp` with the last known one and acts only on a real content change.

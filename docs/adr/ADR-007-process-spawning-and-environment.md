@@ -52,13 +52,14 @@ Source checks, 2026-10-19:
    - `CLAUDE_CODE_OAUTH_TOKEN` and `CLAUDE_CONFIG_DIR` if present in Foreman's environment;
    - Billy's pass-through list.
 
-   The always-removed families (`ANTHROPIC_*`, `CLAUDE_CODE_USE_*`, `AWS_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `AZURE_*`, `DYLD_*`, `NODE_OPTIONS`, `BASH_ENV`, `ENV`, `GIT_*`) beat the pass-through. git gets its own fixed environment (ADR-012).
+   The always-removed list (SR-05, a superset of SR-07's blocked `env` patterns) beats the pass-through: `ANTHROPIC_*`, `CLAUDE_CODE_*` (except `CLAUDE_CODE_OAUTH_TOKEN` taken from Foreman's own environment), `AWS_*`, `GOOGLE_*`, `GCLOUD_*`, `CLOUDSDK_*`, `AZURE_*`, `*_PROXY`/`*_proxy`, `NODE_EXTRA_CA_CERTS`, `NODE_TLS_REJECT_UNAUTHORIZED`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `DYLD_*`, `NODE_OPTIONS`, `BASH_ENV`, `ENV`, `GIT_*` (test `env::removed_list_covers_blocked_patterns`). git gets its own fixed environment (ADR-012).
+   **Working directory.** A step's `claude` session runs in the step's cwd; `git::run` runs with `-C <root>`. Every other child (`claude -v`, `claude auth status` outside a launch, toolchain probes, the login-shell capture, `open`) runs with its cwd set to app data, so no repo file (for example a `packageManager` field triggering Corepack) can influence it (SR-01, `spawn::helper_cwd_is_app_data`).
 5. **PATH** (r5 §2.4 plus SR-05 sanitizing): `/etc/paths`, `/etc/paths.d/*`, `/opt/homebrew/bin`, `/opt/homebrew/sbin`, `~/.cargo/bin`, the pnpm home, then the captured login PATH. Every entry must be absolute, existing, not inside a registered project, and not world-writable. Empty, `.` and relative entries are dropped. S-12 decides whether login-PATH capture is mandatory at first run.
 6. **Child lifecycle** (SR-57):
    - Foreman calls `rustix::process::umask(0o022)` once at startup; children inherit it.
    - **PTY children:** portable-pty gives `setsid`, a controlling TTY, and closes fds above 2.
    - **Non-PTY children** (git, `claude -v`, `auth status`, probes, `open`): `tokio::process::Command` with `env_clear()`, `process_group(0)`, `stdin(Stdio::null())`, `kill_on_drop(true)`, piped stdout/stderr, a timeout (git 60 s, `-v`/`auth status` 10 s, probes 20 s) and capped output.
-     - **SR-57 says `setsid`, but stable std has no safe `setsid`, and `pre_exec` would need `unsafe`, which is forbidden.** `process_group(0)` gives each child its own process group (signals and kill-on-drop are group-scoped). A Finder-launched Foreman has no controlling terminal to detach from, so `setsid`'s remaining effect is moot. **Flagged for Stage 4.7 to confirm this reading of SR-57**; if not accepted, non-PTY children move to portable-pty's spawner as well.
+     - **Non-PTY children get `process_group(0)`, not `setsid`** (accepted in the Stage 4.7 review; SR-57 amended to say so). Stable std has no safe `setsid`, and `pre_exec` would need `unsafe`, which is forbidden. `process_group(0)` gives each child its own process group (signals and kill-on-drop are group-scoped). A Finder-launched Foreman has no controlling terminal to detach from, so `setsid`'s remaining effect is moot. If a later need appears, non-PTY children can move to portable-pty's spawner.
      - Inherited fds: Rust std and rustix open every fd with `O_CLOEXEC`. Fds opened by system frameworks are not guaranteed CLOEXEC. **`pty::no_inherited_fds` and `spawn::no_inherited_fds`** (the fake child lists `/dev/fd`) are the tests. If a leak shows up in M2, the fallback is spawning non-PTY children through portable-pty's `CommandBuilder` (which closes fds above 2), reading its merged output.
    - On quit, after the quit guard, children get SIGHUP (portable-pty `ChildKiller::kill` for PTYs; `kill_process_group(SIGHUP)` for the rest).
    - After a crash, `running` records become `interrupted` on the next start and are never relaunched automatically.
@@ -70,7 +71,7 @@ Source checks, 2026-10-19:
    - `auto`/`dontAsk` interactively;
    - the first launch after a Claude Code version change ("Claude Code updated X → Y").
 
-   The run record is written before spawn.
+   The run record is written before spawn. The confirmation itself is a native dialog raised by Rust when `launch_start` runs (SR-24a); the preview shows the reasons only as context.
 8. **The single shell** (SR-02): `doctor::capture_login_path` runs `$SHELL -l -c 'printf %s "$PATH"'` only from an explicit click. `$SHELL` must appear in `/etc/shells`. The output is shown, and stored only on confirmation.
 
 ## Alternatives considered

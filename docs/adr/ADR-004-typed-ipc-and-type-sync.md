@@ -56,7 +56,7 @@ Registry and source checks, 2026-10-19:
 ## Revisit when
 
 - specta/tauri-specta 2.0 ships a stable release, and its Tauri compatibility tracks Tauri minors within a week.
-- The command count passes about 80 and the hand-written contract becomes a burden.
+- The command count passes about 120 and the hand-written contract becomes a burden. (Re-baselined in the Stage 4.7 fix pass: the contract already lists 91 commands in `docs/contracts/ipc.md`, so the original 80 trigger had fired before code existed.)
 
 ## Exit path
 

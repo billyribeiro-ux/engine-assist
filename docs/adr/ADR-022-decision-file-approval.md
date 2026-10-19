@@ -23,13 +23,16 @@ Proposed
    - Otherwise `core::decisions::classify_outside_change(approved, on_disk)`:
      - **variables only** → auto-accept; update the approved copy and hash; toast "Variables reloaded";
      - **decision fields** → `PendingOutsideChange { file, diff (redacted per SR-55), detectedAt }` in `progress.json`; Today shows it; the effective config stays the approved copy.
-3. **Accept** sets the approved copy to the on-disk content (re-read and hash-checked at accept time; if it changed again, the review refreshes).
+3. **Accept** (confirmed in a native dialog raised by Rust, SR-24a; the webview's button only requests it) sets the approved copy to the on-disk content (re-read and hash-checked at accept time; if it changed again, the review refreshes).
 4. **Reject** writes the approved content back with `store.write` against the on-disk `ReadStamp` (ADR-010). A newer edit meanwhile → conflict, and the review repeats. Nothing is overwritten blindly.
 5. **Foreman's own changes:** a write goes to the repo file and the approved copy together (the copy first, then the repo CAS write; on a repo conflict the copy is rolled back).
    - Before Stage 5 is signed: committed at once by `git::run` plumbing (ADR-012).
    - From Stage 5 on: the change is held as pending in `progress.json` and written into the repo only inside the next signing commit (R-10). Until then the approved copy is ahead of the repo file, and the drift check treats the repo file as matching the **last committed** approved hash, so it doesn't flag Foreman's own pending change.
+   - **Signing on another branch** (SR-43) commits the pending change on that branch only; the checked-out branch's file is untouched. `approvals/<id>.json` therefore keeps the committed hash **per branch**: `committedSha256` for the branch the change was committed on in the working tree, and `committedOnOtherBranches[<ref>]` for each other branch signed onto. The drift check uses the entry for the branch HEAD names (`symbolic-ref -q HEAD`), so checking out the signed branch (or merging it) doesn't show Foreman's own change as an outside edit. Test: `decisions::other_branch_sign_no_false_drift`.
 6. **Lock:** `check_lock` verifies the lock against `templates/<sha256>.md` and, when the blueprint repo is available, against `cat-file blob <commit>:<path>` (SR-41). A mismatch → read-only.
 7. Every launch's run settings deny Read/Edit of `//<repo>/.foreman/**` (ADR-021) as defense in depth; this doesn't bind Bash.
+
+8. **Milestones:** the approved-copy store, classification and own-change commits in M1 (Stage 6); the review UI (`pending_changes_list`, `pending_change_accept` with its native dialog, `pending_change_reject`) in M2; live detection by the watcher in M3; per-branch committed hashes with signing in M4.
 
 ## Alternatives considered
 
