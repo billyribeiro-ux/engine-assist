@@ -1,6 +1,6 @@
 # Metrics baseline: running the blueprint by hand
 
-This is the "by hand" side of Foreman's kill criterion (`spec/MASTER-SPEC.md` §9). Starting with Foreman's own Stage 5 on your Mac, log every step you run **without** Foreman. At the end of Foreman's phase 1, the same measures from Foreman's run log are compared against this file.
+This is the "by hand" side of Foreman's kill criterion (`docs/MASTER-SPEC.md` §9). Starting with Foreman's own Stage 5 on your Mac, log every step you run **without** Foreman. At the end of Foreman's phase 1, the same measures from Foreman's run log are compared against this file.
 
 ## How to log a step
 

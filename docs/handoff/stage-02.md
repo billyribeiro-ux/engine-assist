@@ -110,11 +110,12 @@ SUBSTITUTIONS:
 
 OPEN ITEMS: none
 
-NEXT: Stage 3 · Permits & Zoning · Claude chat · Opus 5.5 · adaptive
-  (3.1 business model: not applicable; 3.2 security, privacy and
-  compliance requirements: core, legal part not applicable)
+NEXT: Stage 3 · Permits & Zoning · Claude Code CLI · Opus 5.5 · high ·
+  Plan, then Accept edits · agents: security-reviewer
+  (per docs/spec-input/03-build-prompts.md: business model and legal
+  parts not applicable; security and privacy requirements are core)
 
-FILES: spec/MASTER-SPEC.md, spec/council/r1-engineering.md,
+FILES: docs/MASTER-SPEC.md (with design Appendix A), spec/council/r1-engineering.md,
   spec/council/r1-workflow.md, spec/council/r2-proposals.md,
   spec/council/r3-synthesis.md, spec/council/r4-redteam.md,
   spec/council/r5-resolution.md, spec/council/r6-feature-specs.md,
@@ -124,14 +125,14 @@ FILES: spec/MASTER-SPEC.md, spec/council/r1-engineering.md,
 
 INSPECTION (2.6):
   - Feature matrix covers every serious alternative, with sources:
-    attested, MASTER-SPEC §2 (no market; alternatives are by hand,
+    attested, docs/MASTER-SPEC.md §2 (no market; alternatives are by hand,
     Claude Desktop / Claude Code, prompt managers)
   - Every v1 feature beats a named alternative or is table stakes:
-    attested, MASTER-SPEC §4 and r6 "Beats" lines
+    attested, docs/MASTER-SPEC.md §4 and r6 "Beats" lines
   - Every fatal or serious red-team objection resolved in writing:
     attested, r5-resolution §1 (R-01 to R-14, all accepted) and an
     independent freeze review
   - Evidence-first stack recommendation for every layer plus the
     recorded final choice: attested, r7-stack PART 1–3 and DRI section
-  - Open questions: zero; Status: FROZEN v1.0: attested, MASTER-SPEC
-    §15 and header
+  - Open questions: zero; Status: FROZEN v1.0: attested,
+    docs/MASTER-SPEC.md §15 and header
