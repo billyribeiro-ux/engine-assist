@@ -1,6 +1,7 @@
 === HANDOFF PACKET · Stage 2 → Stage 3 ===
 PROJECT: Foreman
-APPROVED BY: <blank>
+APPROVED BY: Billy Ribeiro on 2026-10-19
+SIGNED VIA: Claude Code, on Billy's explicit instruction and permission in chat (2026-10-19 19:02-19:04 ET)
 
 POSITIONING: Foreman is the site office for building software with
   Claude: it holds the blueprint, knows where every project stands, and
