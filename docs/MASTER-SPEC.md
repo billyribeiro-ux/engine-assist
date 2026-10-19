@@ -139,10 +139,12 @@ claude --session-id <uuid>                       # chain start only
 
 - argv array, no shell, absolute allowlisted path to `claude`.
 - Child environment: explicit allowlist; `ANTHROPIC_*`, `CLAUDE_CODE_USE_*`, AWS, GCP, Azure variables always removed; `CLAUDE_CODE_OAUTH_TOKEN` and `CLAUDE_CONFIG_DIR` passed when present; PATH from `/etc/paths`, `/etc/paths.d`, Homebrew, cargo and pnpm homes, and the captured login PATH.
-- Run settings: sensor hooks in exec form (P2), `disableAllHooks: false`, `permissions.deny: ["Read(./.foreman/**)"]`.
+- Run settings (SR-09): `disableAllHooks: false`, `permissions.disableBypassPermissionsMode: "disable"`, deny rules with absolute paths for the repo's `.foreman/` and for app data, and (P2) sensor hooks in exec form.
+- Everything sent toward a Claude session is stripped of control and escape sequences (SR-28); terminal links and webview navigation go through Rust (SR-29).
+- Confirmations before a launch (SR-19): overlay-added step, mode or model different from the template, first launch in a project, `auto`/`dontAsk`, and the first launch after Claude Code's version changed.
 - Never `--bare`, `bypassPermissions`, `--dangerously-skip-permissions`, or `--allow-dangerously-skip-permissions`.
 
-**Preflight** (`prepare_launch`): version vs the computed floor (2.1.293 with the current kit); contract probes on version change (P2); a config fingerprint over user settings, managed settings, every `CLAUDE.md` from the cwd to the repo root, `CLAUDE.local.md`, `.claude/settings*.json`, `.mcp.json`, `.claude/agents/**`, `.claude/skills/**`, `.claude/commands/**` and `.claude/rules/**`, with auth-changing keys blocked wherever they appear; `claude auth status` in the step cwd (`claude.ai` or `oauth_token`), cached against the fingerprint; transcript exists for continuing steps; inputs exist; run inputs filled; prompt doesn't start with `-`, `/` or `!`.
+**Preflight** (`prepare_launch`; the full rules are SR-06 to SR-08 in `docs/requirements.md`): version vs the computed floor (2.1.293 with the current kit); contract probes on version change (P2); a config fingerprint over user settings, managed settings, every `CLAUDE.md` from the cwd to the repo root, `CLAUDE.local.md`, `.claude/settings*.json`, `.mcp.json`, `.claude/agents/**`, `.claude/skills/**`, `.claude/commands/**` and `.claude/rules/**`, with auth-changing keys blocked wherever they appear; `claude auth status` in the step cwd (`claude.ai` or `oauth_token`), cached against the fingerprint; transcript exists for continuing steps; inputs exist; run inputs filled; prompt doesn't start with `-`, `/` or `!`.
 
 **Re-arm** (always started by Billy's click, never by an event): idle check (P1: Billy confirms; P2: sensor, including background work) → Ctrl-C, then `/exit` → wait for exit → relaunch with a divider that notes "permission grants reset". Never SIGTERM a non-idle session without confirmation. After a fork, the new chain's UUID comes from S-8's result (r5b M13).
 
@@ -275,6 +277,8 @@ Full list with measurement methods: `spec/council/r8-nfr.md` (NFR-01 to NFR-48).
 | Quality | TS strict (+ `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), zero warnings; clippy pedantic on the core crate; no `unwrap` outside tests; `unsafe` forbidden |
 
 ## 12. Security and privacy requirements (input to Stage 3)
+
+**Superseded by `docs/requirements.md`** (Stage 3, after its security review), which has the complete list (SR-01 to SR-64, PR-01 to PR-08, AR-01) and a mapping from the IDs below. Where they differ, `docs/requirements.md` wins.
 
 | ID | Requirement |
 |---|---|
