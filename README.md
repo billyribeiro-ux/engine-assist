@@ -4,12 +4,15 @@
 
 ## Status
 
-Pre-Construction. Stage 1 (the App Brief) is written and waiting for sign-off.
+Pre-Construction. Stage 2 (the Master Spec) is frozen pending sign-off; Stages 3 and 4 are drafted on their own branches.
 
 | Stage | Status |
 |---|---|
-| 1 · Meet the Architect | Brief written: `docs/spec-input/00-app-brief.md`, awaiting sign-off |
-| 2–18 | Not started |
+| 1 · Meet the Architect | Signed (`docs/handoff/stage-01.md`); Billy to re-sign in standard form |
+| 2 · Design Studio | `docs/MASTER-SPEC.md` FROZEN v1.0 on sign; packet `docs/handoff/stage-02.md` awaiting signature (PR from `stage/02-design-studio`) |
+| 3 · Permits | Drafted on `stage/03-permits` |
+| 4 · Construction Drawings | Drafted on `stage/04-drawings` |
+| 5–18 | Not started; Stage 5 runs on your Mac |
 
 ## Where things are
 
@@ -21,6 +24,10 @@ Pre-Construction. Stage 1 (the App Brief) is written and waiting for sign-off.
 | `docs/templates/` | Handoff packet, Change Request, and postmortem templates |
 | `.claude/agents/` | The eight global agents (Explore, test-runner, implementer, code-reviewer, debugger, design-reviewer, security-reviewer, sre-reviewer) |
 | `spec/.claude/agents/` | The Stage 2 design council agents |
+| `spec/council/` | Every council round (r1–r8, r5b) |
+| `spec/blueprint-v2.2/PROPOSAL.md` | Blueprint changes Foreman v1 needs, for you to apply in claude-blueprint |
+| `docs/MASTER-SPEC.md` | The frozen product spec |
+| `docs/metrics-baseline.md` | Your by-hand timing log for the kill criterion |
 
 ## How to run it
 
