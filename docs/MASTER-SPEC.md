@@ -230,12 +230,12 @@ After TradeLog Stages 1–2: if Foreman's median on either measure isn't lower t
 
 ## 10. Stack (final)
 
-Evidence and alternatives: `spec/council/r7-stack.md`. Billy's input: "no preference" between the two frontend options; the evidence-backed recommendation is adopted (r5 §5). Billy can override at the Stage 2 sign.
+Evidence and alternatives: `spec/council/r7-stack.md`. Frontend: **Billy's decision is SvelteKit 3**; the council's alternative (plain Svelte 5 + Vite) is recorded in r7.
 
 | Layer | Choice | Reason |
 |---|---|---|
 | Desktop shell | Tauri 2.12.4 | Small bundle; only Rust spawns or touches files; native window effects built in. Electron needs an 8-week upgrade cycle and an app-applied security checklist; SwiftUI + SwiftTerm loses on solo build speed and is the fallback if S-0 fails fundamentally. |
-| Frontend | Svelte 5.57.2 + Vite 8.3.4 + in-house typed hash router | An SPA uses none of SvelteKit's server features; 2.6× smaller measured; no inline script, so the CSP is literal. |
+| Frontend | SvelteKit 3.1.0 (SPA: adapter-static 4.0.0, `fallback: 'index.html'`, `ssr = false`) + Svelte 5.57.2 + Vite 8.3.4; `vite.config.ts` holds the SvelteKit config (`svelte.config.js` isn't supported in v3); `#lib` imports; tsconfig extends `$app/tsconfig` | Billy's stack across all his projects: file-based routes and layouts, one mental model. Verified to build and type-check clean (r1 §A4). SvelteKit's one inline bootstrap script is hash-pinned by Tauri at compile time; never `'unsafe-inline'`. |
 | Language | TypeScript 6.0.3 strict · Rust stable ≥ 1.90 (pinned in `rust-toolchain.toml`) | TS 7 breaks `svelte-check` and `typescript-eslint` today; Tauri crates need Rust ≥ 1.90. |
 | Package manager / runtime | pnpm 12.14.0 · Node ≥ 22.17 | Strict, reproducible. |
 | Terminal | @xterm/xterm 6.0.0 (+ fit, webgl, unicode11, search, web-links addons) | The standard; screen-reader mode. |
@@ -301,7 +301,7 @@ Stage 3.2 turns these into the full SR/PR list in `docs/requirements.md`.
 
 **Non-goals (v1):** cloud sync · other users or teams · payments · Windows or Linux · Intel Macs · App Store or notarized distribution · calling the Claude API or using API keys · editing code inside Foreman · replacing Claude Code's UI · editing the blueprint (Foreman proposes; Billy applies) · Fable in Foreman's own build.
 
-**Rejected:** see `r6-feature-specs.md` §6 (YAML source, inference as a source, positional IDs, headless Gate A in v1, user-level hooks, typed TUI keystrokes, `--bg` substrate, Agent SDK/API, browser automation of claude.ai, pty/shell/fs plugins, SvelteKit 3 SPA, Electron, a v1 dashboard).
+**Rejected:** see `r6-feature-specs.md` §6 (YAML source, inference as a source, positional IDs, headless Gate A in v1, user-level hooks, typed TUI keystrokes, `--bg` substrate, Agent SDK/API, browser automation of claude.ai, pty/shell/fs plugins, plain Svelte 5 + Vite with a hand-rolled router, Electron, a v1 dashboard).
 
 ## 14. Design direction
 

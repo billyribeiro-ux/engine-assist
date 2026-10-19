@@ -345,6 +345,7 @@ The one real fork in the road is **SvelteKit 3 vs plain Svelte 5 + Vite**. Every
 
 The recommendation is in PART 3 above: Tauri 2.12.4, plus Svelte 5 + Vite 8 with an in-house router (SvelteKit 3 SPA is an acceptable alternative), TypeScript 6.0.3, Rust stable, pnpm 12.14.0 and the pinned versions listed. Blueprint Prompt 2.4 says to record the final choice and the reason here. Overriding the recommendation is fine; the written reason is what the ADRs build on.
 
-**Recorded 2026-10-19.** Billy was asked to choose the frontend (SvelteKit 3 SPA or Svelte 5 + Vite) and answered "no preference". His standing instruction is to make the evidence-backed call rather than ask. **Final choice: the PART 3 recommendation as written, including Svelte 5 + Vite 8 + an in-house typed hash router.** Reason: Foreman is an SPA inside Tauri and uses none of SvelteKit's server features; plain Vite measured 2.6× smaller, has no inline script (so the CSP is literally `script-src 'self'`), has fewer config surfaces, and doesn't depend on an 18-day-old major. See `r5-resolution.md` §5.
+**Final choice (Billy, 2026-10-19): SvelteKit 3 SPA** — `@sveltejs/kit` 3.1.0 + `@sveltejs/adapter-static` 4.0.0 with the r1 §A4 config, on Svelte 5.57.2 and Vite 8.3.4. Reason: one stack, file routing and layouts, and shared conventions across all his projects; the size and CSP differences are small at this app's scale, and the inline bootstrap script is hash-pinned by Tauri. Every other layer is the PART 3 recommendation.
 
-Billy can still override this when he signs the Stage 2 packet; if he does, the reason is added here.
+*Superseded note:* an earlier entry recorded the plain Svelte 5 + Vite recommendation after a "no preference" answer; Billy corrected that.
+

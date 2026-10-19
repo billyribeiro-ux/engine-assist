@@ -57,8 +57,9 @@ DIFFERENTIATORS:
 
 STACK (FINAL):
   Shell: Tauri 2.12.4
-  Frontend: Svelte 5.57.2 + Vite 8.3.4 + in-house typed hash router
-    (Billy: "no preference"; evidence-backed recommendation adopted)
+  Frontend: SvelteKit 3.1.0 SPA (adapter-static 4.0.0, fallback
+    index.html, ssr = false, #lib) + Svelte 5.57.2 + Vite 8.3.4
+    (Billy's decision; config verified in r1 §A4)
   Language: TypeScript 6.0.3 strict · Rust stable >= 1.90
   Package manager / runtime: pnpm 12.14.0 · Node >= 22.17
   Terminal: @xterm/xterm 6.0.0 · PTY: portable-pty 0.9.0 (own wrapper)
