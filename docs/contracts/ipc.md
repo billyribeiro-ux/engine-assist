@@ -26,6 +26,7 @@ Library facts this contract relies on were checked on 2026-10-19 in the publishe
 | IPC-R8 | Every command is listed in `ipc::COMMANDS`, passed to `AppManifest::commands` in `build.rs`, registered in `generate_handler!`, and granted to the `main-window` capability only (SR-23). | `capabilities::every_command_declared_and_granted` |
 | IPC-R9 | Mutating commands on a project opened read-only (lock mismatch, invalid or newer-schema decision file, missing blueprint) return `ReadOnly` with the reason, except `pending_change_*`, `blueprint_repin`, `project_remove`, `progress_rebuild_*` and `file_open`/`file_reveal`. | `ipc::read_only_refuses_mutation` |
 | IPC-R10 | A command that writes a file goes through `store::Root::write` (ADR-010). A compare-and-swap failure returns `Conflict` naming the file and, for multi-file applies, the list of files already written (§3.5.3 of the design doc). | `pasteback::conflict_reports_written_targets` |
+| IPC-R11 | **Approvals are native, never IPC fields** (SR-24a). No request struct has a field that means approved, confirmed, consented, acknowledged or "idle confirmed". A command that needs Billy's confirmation raises a native macOS dialog from Rust (`tauri-plugin-dialog`, called only in `app::os`) and acts on its answer; declining returns `Cancelled`. The webview may show context (diffs, reasons, the preview) but its own buttons only *request* the action. Native dialogs: config acknowledgement (SR-06), launch and re-arm confirmations (SR-19, SR-13 idle assertion), Terminate, accepting an outside change (SR-40), writing root `CLAUDE.md` (SR-30), confirming a signature written outside Foreman (SR-47), signing (SR-42), terminal links (SR-29), security-relevant settings (pass-through list, tool paths, allowlisted key hashes, project `env` approval, login PATH), item-kind re-confirmation, project removal, Clear run history and the quit guard. | `ipc::security_confirmations_are_native` (a static check over `src/lib/ipc/bindings/*Req.ts`: no field named `confirm*`, `ack*`, `consent*`, `approved*`, `*Confirmed`; plus one integration test per dialog that a scripted "Cancel" leaves state unchanged), `settings::security_fields_require_native_confirm` |
 
 Mutation column legend used below: **no** = reads only; **mem** = in-memory state only (plan or preview IDs); **app** = app-data files; **repo** = project repo files; **clip** = writes the clipboard; **spawn** = starts a process; **git** = makes a git commit.
 
@@ -106,7 +107,7 @@ enum DocNode { Heading { level: u8, spans: Vec<TextSpan> }, Paragraph { spans: V
                List { ordered: bool, items: Vec<Vec<DocNode>> }, Quote { children: Vec<DocNode> },
                CodeBlock { info: String, text: String }, Rule }
 
-// Resolved prompt, one segment per resolver decision (domain-rules DR-060 ff.)
+// Resolved prompt, one segment per resolver decision (domain-rules DR-080 ff.)
 enum PromptSegment { Text { spans: Vec<TextSpan> },
                      Resolved { token: String, class: TokenClass, text: String, note: Option<String> },
                      Unresolved { token: String, class: TokenClass, input: Option<String> },   // attention pill
@@ -225,9 +226,9 @@ TS    { expectRev: number; patch: { driName: string | null;
         envPassthrough: string[] | null; globalVariables: Record<string, string> | null;
         resetTool: "claude" | "git" | null; clearLoginPath: boolean | null; removeAllowlistEntry: string | null } }
 Res   SettingsView
-Err   Stale · Conflict · Io
+Err   Stale · Cancelled · Conflict · Io
 ```
-F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32.
+F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". A patch that sets `env_passthrough`, `reset_tool` or `remove_allowlist_entry` is applied only after a native confirmation listing the change (SR-24a); declining returns `Cancelled` and nothing in the patch is saved. `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32.
 
 **`settings_pick_tool`** · P1 · M2 · **app**
 ```text
@@ -236,7 +237,7 @@ TS    { tool: "claude" | "git" }
 Res   ToolPaths
 Err   Cancelled · ToolMissing (picked file not executable, relative, inside a project, symlink into a project) · Io
 ```
-F-029 · AC-F029-01, AC-F008-03 · SR-01, SR-24. Rust opens the file dialog; the path never comes from the webview.
+F-029 · AC-F029-01, AC-F008-03 · SR-01, SR-24, SR-24a (native file dialog, then a native confirmation showing the resolved path and `--version` output). Rust opens the file dialog; the path never comes from the webview.
 
 **`today_get`** · P1 (Next step rows) + P2 (inbox) · M2/M4 · **no**
 ```text
@@ -259,14 +260,7 @@ Err   Io
 ```
 F-017, F-008 · AC-F017-02, -06, AC-F028-01 · SR-19. Runs the same `launch::prepare` as `launch_prepare` with `entry = doNext`; the UI then calls `launch_start` / `rearm_start` (CLI) or `chat_copy_and_open` (chat) on the same keystroke. Nothing launches inside `do_next`.
 
-**`app_quit_confirm`** · P1 · M3 · sends SIGHUP to every child after confirmation, then exits
-```text
-Rust  AppQuitConfirmReq { confirm: bool }
-TS    { confirm: boolean }
-Res   ()
-Err   NotAllowed ("confirm-required")
-```
-F-009 · AC-F009-09 · SR-57. Rust intercepts `RunEvent::ExitRequested` while runs are live, prevents the exit and emits `run:status` with `quitGuard: true`; the webview shows "3 sessions are running; they end when Foreman quits; you can resume each later" and calls this command. (Not in the design doc's command table.)
+**Quit guard** (no command). Rust intercepts `RunEvent::ExitRequested` while runs are live and shows a native dialog, "3 sessions are running; they end when Foreman quits; you can resume each later"; on confirm every child gets SIGHUP and the app exits (F-009 · AC-F009-09 · SR-24a, SR-57).
 
 ### 4.2 First run and Doctor
 
@@ -276,9 +270,9 @@ Rust  BlueprintPickRepoReq { mode: PickMode }        // "autoDetect" (fixed cand
 TS    { mode: "autoDetect" | "choose" }
 Res   BlueprintRepoInfo { display_path: String, commit: String, version: String, grammar_version: u32,
                           dirty: bool, health: TemplateHealthSummary }
-Err   Cancelled · NotFound (no candidate) · ToolMissing (git) · Io
+Err   Cancelled · NotFound (no candidate) · NotAllowed ("not-repo-root": `rev-parse --show-toplevel` ≠ the folder) · ToolMissing (git) · Io
 ```
-F-019, F-001 · AC-F019-01, -03, AC-F001-18 · SR-31a (only `~/claude-blueprint`, `~/Developer/claude-blueprint`), SR-44.
+F-019, F-001 · AC-F019-01, -03, AC-F001-18 · SR-31a (only `~/claude-blueprint`, `~/Developer/claude-blueprint`), SR-44, SR-45. `dirty` compares `hash-object --no-filters` of the blueprint file with the blob at HEAD (`rev-parse HEAD:<path>`); `git status` is never run.
 
 **`template_health`** · P1 (summary) + P2 (screen) · M2/M4 · **no**
 ```text
@@ -302,10 +296,10 @@ F-019 · AC-F019-04…07, -09…-11, -14 · SR-01, SR-08, SR-17. Emits `doctor:s
 
 **`doctor_capture_login_path`** · P2 (M2 if S-12 fails) · M4 · **spawn** (the single consented shell), **mem**
 ```text
-Rust  DoctorCaptureLoginPathReq { consent: bool }      // must be true
-TS    { consent: boolean }
+Rust  DoctorCaptureLoginPathReq {}                      // Rust asks for consent in a native dialog first
+TS    Record<symbol, never>
 Res   LoginPathPreview { preview_id: PreviewId, shell: String, entries: Vec<PathEntryCheck> }
-Err   NotAllowed ($SHELL not in /etc/shells, or consent false) · ToolFailed
+Err   NotAllowed ($SHELL not in /etc/shells) · Cancelled · ToolFailed
 ```
 F-019 · AC-F019-12, -13 · SR-02.
 
@@ -314,9 +308,9 @@ F-019 · AC-F019-12, -13 · SR-02.
 Rust  DoctorLoginPathApplyReq { preview_id: PreviewId }
 TS    { previewId: string }
 Res   SettingsView
-Err   Expired · Conflict
+Err   Expired · Cancelled (native dialog listing the entries) · Conflict
 ```
-F-019 · AC-F019-12 · SR-02, SR-05 (entries sanitized again when PATH is built).
+F-019 · AC-F019-12 · SR-02, SR-05, SR-24a (entries sanitized again when PATH is built).
 
 **`probe_folder_open`** · P1 · M3 · **spawn** (interactive `claude` in a PTY tab, cwd `<app-data>/probe/`, no prompt)
 ```text
@@ -368,9 +362,9 @@ TS    { pickId: string; name: string; slug: string; variables: Record<string, st
 Res   SetupPreview { preview_id: PreviewId, writes: Vec<PlannedWrite>, git_init: bool, pin: PinPreview,
                      path: ApplicablePathSummary }
       PlannedWrite { path: RepoPath, action: "create" | "leaveAlone" | "refuse", reason: Option<String> }
-Err   Expired (pick) · NotAllowed (pin refused: dirty blueprint file, AC-F002-02) · ToolMissing (git) · PolicyViolation
+Err   Expired (pick) · NotAllowed (pin refused: blueprint file differs from HEAD, AC-F002-02, shown as both hashes instead of `git status` output) · ToolMissing (git) · PolicyViolation
 ```
-F-018, F-002, F-004 · AC-F018-01, -02, -04, -08, AC-F002-01, -02 · SR-30, SR-34. Variable keys must be blueprint variable names (`^[A-Z][A-Z0-9_]*$`); `slug` must match `^[a-z0-9-]{1,40}$` (it becomes part of `--name`, DR-091).
+F-018, F-002, F-004 · AC-F018-01, -02, -04, -08, AC-F002-01, -02 · SR-30, SR-34, SR-44. A folder inside an enclosing repo but without its own (`rev-parse --show-toplevel` ≠ the folder) gets `gitInit: true`; Foreman never acts on the enclosing repo. Variable keys must be blueprint variable names (`^[A-Z][A-Z0-9_]*$`); `slug` must match `^[a-z0-9-]{1,40}$` (it becomes part of `--name`, DR-121).
 
 **`setup_apply`** · P1 · M2 · **repo** (`.foreman/*`, `docs/…`, `spec/`, `git init`), **app**
 ```text
@@ -433,10 +427,10 @@ F-002 · AC-F002-02, -03 · SR-41, SR-44.
 
 **`project_remove`** · P1 (registry) + P2 (full deletion UI) · M4 · **app** (deletes `projects/<id>/`, `approvals/<id>*`, its fingerprint snapshots)
 ```text
-Rust  ProjectRemoveReq { project_id: ProjectId, confirm: bool }
-TS    { projectId: string; confirm: boolean }
+Rust  ProjectRemoveReq { project_id: ProjectId }        // native confirmation names what is deleted
+TS    { projectId: string }
 Res   Vec<ProjectSummary>
-Err   NotAllowed (confirm false; a run of this project is live) · Io
+Err   Cancelled · NotAllowed ("runs-live") · Io
 ```
 F-029, F-020 · AC-F029-06 · PR-05, SR-55. Never touches the repo.
 
@@ -488,7 +482,7 @@ TS    { projectId: string; step: string }
 Res   StepView
 Err   NotAllowed (CLI prompt steps finish by exit, not by mark; `wait` before its date) · ReadOnly
 ```
-F-007 · AC-F007-04, -08 · DR-040.
+F-007 · AC-F007-04, -08 · DR-066.
 
 **`step_skip`** · P1 · M2 · **repo** (`overlay.json`, a decision file: commit by plumbing before Stage 5, pending after), **git**
 ```text
@@ -524,7 +518,7 @@ TS    { projectId: string; step: string; until: string }
 Res   StepView
 Err   NotAllowed (not a wait step; date not after today)
 ```
-F-007 · AC-F007-05, -09 · SR-56. The grammar has no duration key, so Billy enters the date (domain-rules DR-041).
+F-007 · AC-F007-05, -09 · SR-56. The grammar has no duration key, so Billy enters the date (domain-rules DR-067).
 
 **`clipboard_copy`** · P1 · M2 · **clip**, **app** (run log `copyPromptOnCli`, step state `copied` for followups)
 ```text
@@ -591,14 +585,14 @@ Res   PrepareOutcome = Ready(LaunchPreview) | Blocked { blockers: Vec<Blocker>, 
       RearmNeed = IdleConfirmation { chain: ChainId } | SensorBusy { tasks: u32 } | Exited { chain: ChainId }
 Err   NotFound · ReadOnly · Io
 ```
-`progress: Channel<LaunchProgress>` · F-008, F-010, F-017 · AC-F008-01…-21, -24, AC-F010-01, -02, -03, -09, -10, AC-F017-02 · SR-01, SR-03…SR-09, SR-17, SR-19, SR-24, SR-28. The order of checks is fixed (ADR-021, DR-093). The UI never sends argv.
+`progress: Channel<LaunchProgress>` · F-008, F-010, F-017 · AC-F008-01…-21, -24, AC-F010-01, -02, -03, -09, -10, AC-F017-02 · SR-01, SR-03…SR-09, SR-17, SR-19, SR-24, SR-28. The order of checks is fixed (ADR-021, DR-120). The UI never sends argv.
 
 **`launch_start`** · P1 · M2 (fake binary) / M3 (PTY tab) · **app** (`runs/<runId>/settings.json`, `run.json` before spawn), **spawn** (PTY)
 ```text
-Rust  LaunchStartReq { plan_id: PlanId, ack: Vec<ConfirmReason> }   // must equal the plan's `confirm` exactly
-TS    { planId: string; ack: ConfirmReason[] }
+Rust  LaunchStartReq { plan_id: PlanId }      // if the plan has `confirm` reasons, Rust shows them in a native dialog
+TS    { planId: string }
 Res   RunStarted { run_id: RunId, chain: ChainId, tab_name: String }
-Err   Expired · Stale (revision or fingerprint changed: fresh preview in detail) · NotAllowed ("ack-mismatch", "needs-rearm") · ToolFailed · Io
+Err   Expired · Stale (revision or fingerprint changed: fresh preview in detail) · Cancelled · NotAllowed ("needs-rearm") · ToolFailed · Io
 ```
 `output: Channel<tauri::ipc::Response>` · F-008, F-009, F-026 · AC-F008-14…-16, -19, -20, -25, AC-F009-01, AC-F026-01, -03 · SR-01…SR-05, SR-09, SR-19, SR-52, SR-57. Emits `run:status`.
 
@@ -607,27 +601,27 @@ Err   Expired · Stale (revision or fingerprint changed: fresh preview in detail
 Rust  ConfigAckReq { project_id: ProjectId, cwd: CwdKind, fingerprint: Sha256 }
 TS    { projectId: string; cwd: CwdKind; fingerprint: string }
 Res   ()                                       // TS: null
-Err   Stale (fingerprint moved since the banner was shown) · Io
+Err   Cancelled · Stale (fingerprint moved since the banner was shown) · Io
 ```
-F-008 · AC-F008-04, -23 · SR-06, SR-55.
+F-008 · AC-F008-04, -23 · SR-06, SR-24a, SR-55. Rust shows the native acknowledgement (the changed sources by name); the webview's banner only shows the redacted diff.
 
 **`auth_key_allowlist_add`** · P1 · M3 · **app** (`settings.json`)
 ```text
 Rust  AuthKeyAllowlistAddReq { hit: HitId }      // hit from Blocker::AuthKeyBlocked; Rust holds file/key/value hash
 TS    { hit: string }
 Res   SettingsView
-Err   Expired · NotAllowed ("not-user-settings")
+Err   Expired · Cancelled · NotAllowed ("not-user-settings")
 ```
-F-008, F-029 · AC-F008-22 · SR-07.
+F-008, F-029 · AC-F008-22 · SR-07, SR-24a (native dialog names the file and key).
 
 **`project_env_approve`** · P1 · M3, **only on the S-7′ fail branch** · **app** (`approvals/<id>.json`)
 ```text
 Rust  ProjectEnvApproveReq { project_id: ProjectId, cwd: CwdKind, sha256: Sha256 }
 TS    { projectId: string; cwd: CwdKind; sha256: string }
 Res   ()
-Err   Stale · Unsupported (S-7′ passed)
+Err   Cancelled · Stale · Unsupported (S-7′ passed)
 ```
-F-008 · AC-F008-07 · SR-06, SR-07.
+F-008 · AC-F008-07 · SR-06, SR-07, SR-24a.
 
 ### 4.7 Terminal
 
@@ -687,21 +681,21 @@ F-009 · AC-F009-04 · SR-18.
 
 **`pty_terminate`** · P1 · M3 · signals (SIGTERM to the process group, SIGKILL after 5 s)
 ```text
-Rust  PtyTerminateReq { run_id: RunId, confirm: bool }       // false → NotAllowed
-TS    { runId: string; confirm: boolean }
+Rust  PtyTerminateReq { run_id: RunId }       // native confirmation (always in P1; when not idle in P2)
+TS    { runId: string }
 Res   ()
-Err   NotAllowed ("confirm-required") · NotFound
+Err   Cancelled · NotFound
 ```
 F-009, F-010 · AC-F009-04, -09, AC-F010-05 · SR-13.
 
 **`rearm_start`** · P1 · M3 · process input (`\x03`, `/exit\r`), **spawn** (relaunch), **app**
 ```text
-Rust  RearmStartReq { plan_id: PlanId, ack: Vec<ConfirmReason>, idle_confirmed: bool }
-TS    { planId: string; ack: ConfirmReason[]; idleConfirmed: boolean }
+Rust  RearmStartReq { plan_id: PlanId }    // P1: native "Claude is idle and nothing is running in the background" dialog
+TS    { planId: string }
 Res   RearmOutcome = Relaunched(RunStarted) | EndYourself { chain: ChainId }    // "Claude didn't exit…"
-Err   Expired · Stale · NotAllowed ("idle-not-confirmed" in P1 when the process is live; "no-rearm-needed")
+Err   Expired · Stale · Cancelled · NotAllowed ("no-rearm-needed", P2: "background-tasks-running" until Billy picks End anyway in the native dialog)
 ```
-`output: Channel<tauri::ipc::Response>`, `progress: Channel<LaunchProgress>` — the one command with two Channels; IPC-R1 allows one Channel **per role**. F-010 · AC-F010-03…-06, -10, -11, -13, -14, AC-F013-11 · SR-13, SR-14, SR-18. After the old process exits, Rust prepares again; if the new argv or prompt hash differs from the confirmed plan, it stops with `Stale` and the new preview (DR-084). (ADR-008 names the argument `stepId`; this contract takes the prepared `planId` so a re-arm always goes through the same preview and confirmation.)
+`output: Channel<tauri::ipc::Response>`, `progress: Channel<LaunchProgress>` — the one command with two Channels; IPC-R1 allows one Channel **per role**. F-010 · AC-F010-03…-06, -10, -11, -13, -14, AC-F013-11 · SR-13, SR-14, SR-18. After the old process exits, Rust prepares again; if the new argv or prompt hash differs from the confirmed plan, it stops with `Stale` and the new preview (DR-116). (ADR-008 names the argument `stepId`; this contract takes the prepared `planId` so a re-arm always goes through the same preview and confirmation.)
 
 **`rearm_continue`** · P1 · M3 · **spawn**
 ```text
@@ -768,9 +762,9 @@ F-022 · AC-F022-01, -02 · SR-40, SR-55.
 Rust  PendingChangeAcceptReq { project_id: ProjectId, change: ChangeId, seen_sha256: Sha256 }
 TS    { projectId: string; change: string; seenSha256: string }
 Res   ProjectView
-Err   Stale (file changed again: new diff in detail) · NotFound
+Err   Cancelled · Stale (file changed again: new diff in detail) · NotFound
 ```
-F-022 · AC-F022-02, -05 · SR-40, SR-42.
+F-022 · AC-F022-02, -05 · SR-24a, SR-40, SR-42. Native dialog: "Accept this change to <file>? It changes: <decision keys>".
 
 **`pending_change_reject`** · P1 · M2 · **repo** (approved content written back by CAS)
 ```text
@@ -786,9 +780,9 @@ F-022 · AC-F022-02, -05 · SR-33, SR-40.
 Rust  ItemKindConfirmReq { project_id: ProjectId, item: ItemId, text_sha256: Sha256 }
 TS    { projectId: string; item: string; textSha256: string }
 Res   GateView
-Err   Stale (bullet changed again) · NotFound
+Err   Cancelled · Stale (bullet changed again) · NotFound
 ```
-F-001, F-015 · AC-F001-16, -17 · SR-40.
+F-001, F-015 · AC-F001-16, -17 · SR-24a, SR-40.
 
 **`progress_rebuild_preview`** · P1 · M3 · **mem**
 ```text
@@ -830,6 +824,15 @@ Err   Stale · Conflict
 ```
 F-013 · AC-F013-08 · SR-33.
 
+**`packet_signature_confirm`** · P1 · M3 · **app** (`approvals/<id>.json` `outsideSignatures`)
+```text
+Rust  PacketSignatureConfirmReq { project_id: ProjectId, stage: Stage, seen_sha256: Sha256 }
+TS    { projectId: string; stage: number; seenSha256: string }
+Res   PacketView
+Err   Cancelled · Stale (packet changed) · NotAllowed ("not-signed-form", "undecided-early-condition" for Stage 2)
+```
+F-013, F-004 · AC-F013-09, AC-F004-12 · SR-24a, SR-47. A packet whose `APPROVED BY` is `<name> on <date>` but wasn't written by Foreman's signing counts as signed only after this native confirmation ("Did you sign Stage N yourself? Claude writing a name never signs a packet."); the confirmation records the packet hash, so any later change voids it (DR-135). Not in the design doc's table.
+
 **`metrics_export`** · P1 · M3 · writes to a path chosen in the Rust save dialog
 ```text
 Rust  MetricsExportReq {}
@@ -841,10 +844,10 @@ F-026 · AC-F026-04…-06 · SR-52.
 
 **`runs_clear`** · P2 (Settings) · M4 · **app** (deletes `runs/`, `events/`)
 ```text
-Rust  RunsClearReq { confirm: bool }
-TS    { confirm: boolean }
+Rust  RunsClearReq {}
+TS    Record<symbol, never>
 Res   ()
-Err   NotAllowed ("confirm-required", "runs-live")
+Err   Cancelled · NotAllowed ("runs-live")
 ```
 F-026, F-029 · AC-F026-10 · PR-05, SR-53.
 
@@ -923,11 +926,11 @@ F-014 · AC-F014-01…-03, AC-F004-13 · SR-42, SR-47.
 
 **`sign_apply`** · M4 · **repo**, **git** (plumbing commit + read-back)
 ```text
-Rust  SignApplyReq { preview_id: PreviewId, conditions_confirmed: bool, chain_busy_confirmed: bool }
-TS    { previewId: string; conditionsConfirmed: boolean; chainBusyConfirmed: boolean }
+Rust  SignApplyReq { preview_id: PreviewId }   // native dialog: name, date, "Signing stage-05.md @ a3f9c1", conditions, chain state
+TS    { previewId: string }
 Res   SignResult = Signed { commit: String, stage: Stage } | CommitPending { stderr_tail: String }
                  | ReadBackMismatch { diffs: Vec<Diff> }
-Err   Expired · Stale ("packet changed since you reviewed it") · Conflict · ToolFailed
+Err   Expired · Cancelled · Stale ("packet changed since you reviewed it") · Conflict · ToolFailed
 ```
 `progress: Channel<SignProgress>` · F-014, F-016 · AC-F014-04…-14, AC-F013-15 · SR-42…SR-47, SR-53 (sensor events of the stage deleted).
 
@@ -999,10 +1002,10 @@ F-023 · AC-F023-03, -04, AC-F021-06 · SR-30, SR-35, SR-56.
 
 **`assembler_paste_apply`** · M4 · **repo**
 ```text
-Rust  AssemblerPasteApplyReq { preview_id: PreviewId, claude_md_confirmed: bool }   // root CLAUDE.md only
-TS    { previewId: string; claudeMdConfirmed: boolean }
+Rust  AssemblerPasteApplyReq { preview_id: PreviewId }   // root CLAUDE.md: native "Claude Code loads this file in every session"
+TS    { previewId: string }
 Res   Assembler
-Err   Expired · Conflict · NotAllowed ("claude-md-needs-confirmation")
+Err   Expired · Cancelled · Conflict
 ```
 F-023, F-021 · AC-F021-06 · SR-30 (`WritePurpose::AssemblerClaudeMd`).
 
@@ -1059,7 +1062,7 @@ F-027 · AC-F027-01…-03 · NFR-14.
 
 | Group | Commands | Count |
 |---|---|---|
-| App | `app_bootstrap`, `settings_get`, `settings_update`, `settings_pick_tool`, `today_get`, `do_next`, `app_quit_confirm` | 7 |
+| App | `app_bootstrap`, `settings_get`, `settings_update`, `settings_pick_tool`, `today_get`, `do_next` | 6 |
 | First run / Doctor | `blueprint_pick_repo`, `template_health`, `doctor_run`, `doctor_capture_login_path`, `doctor_login_path_apply`, `probe_folder_open`, `probe_run` | 7 |
 | Projects | `projects_list`, `setup_pick_folder`, `setup_preview`, `setup_apply`, `project_open`, `project_url_set`, `condition_set`, `variable_set`, `blueprint_repin`, `project_remove` | 10 |
 | Steps | `step_view`, `run_input_set`, `optional_part_set`, `run_override_set`, `step_mark_done`, `step_skip`, `action_preview`, `action_apply`, `wait_start`, `clipboard_copy` | 10 |
@@ -1068,21 +1071,21 @@ F-027 · AC-F027-01…-03 · NFR-14.
 | Terminal | `pty_attach`, `pty_write`, `pty_paste`, `pty_resize`, `pty_flow`, `pty_interrupt`, `pty_terminate`, `rearm_start`, `rearm_continue`, `terminal_link_open` | 10 |
 | Files | `file_open`, `file_reveal`, `terminal_open_here` | 3 |
 | Decisions / recovery | `pending_changes_list`, `pending_change_accept`, `pending_change_reject`, `item_kind_confirm`, `progress_rebuild_preview`, `progress_rebuild_apply` | 6 |
-| Packets / run log | `packet_view`, `packet_normalize_apply`, `metrics_export`, `runs_clear`, `runs_search` | 5 |
+| Packets / run log | `packet_view`, `packet_normalize_apply`, `packet_signature_confirm`, `metrics_export`, `runs_clear`, `runs_search` | 6 |
 | Gates (P2) | `gate_view`, `gate_item_attest`, `gate_import_results`, `gate_import_confirm`, `gate_fix_start` | 5 |
 | Signing (P2) | `sign_preview`, `sign_apply`, `sign_retry_commit`, `tamper_restore` | 4 |
 | Lessons, manifest, assembler (P2) | `lessons_status`, `manifest_view`, `manifest_mark`, `assembler_view`, `assembler_paste_preview`, `assembler_paste_apply` | 6 |
 | Desktop, overlay, run sheet (P2) | `desktop_open`, `desktop_handoff`, `add_step`, `add_item`, `run_sheet_export` | 5 |
 | **Total** | P1 (incl. P1 + P2 commands): 60 · P2-only: 27 | **87** |
 
-Commands this contract adds to the design doc's §3.4 table, each needed by an acceptance criterion: `settings_pick_tool`, `app_quit_confirm`, `doctor_login_path_apply`, `probe_run`, `setup_pick_folder`, `project_url_set`, `blueprint_repin`, `run_override_set`, `action_preview`/`action_apply`, `wait_start`, `clipboard_copy` (replaces `fix_request_copy`), `auth_key_allowlist_add`, `project_env_approve`, `rearm_continue`, `terminal_open_here`, `item_kind_confirm`, `progress_rebuild_preview`/`_apply`, `packet_normalize_apply`. The design doc's wildcard groups (`gate_*`, `lessons_*`, `manifest_*`, `assembler_*`) are expanded in §4.11–§4.14.
+Commands this contract adds to the design doc's §3.4 table, each needed by an acceptance criterion: `settings_pick_tool`, `packet_signature_confirm`, `doctor_login_path_apply`, `probe_run`, `setup_pick_folder`, `project_url_set`, `blueprint_repin`, `run_override_set`, `action_preview`/`action_apply`, `wait_start`, `clipboard_copy` (replaces `fix_request_copy`), `auth_key_allowlist_add`, `project_env_approve`, `rearm_continue`, `terminal_open_here`, `item_kind_confirm`, `progress_rebuild_preview`/`_apply`, `packet_normalize_apply`. The design doc's wildcard groups (`gate_*`, `lessons_*`, `manifest_*`, `assembler_*`) are expanded in §4.11–§4.14.
 
 ## 5. Channels
 
 | Channel type | Wire | Created by | Payload | Rules |
 |---|---|---|---|---|
 | **PTY output** `Channel<tauri::ipc::Response>` | `InvokeResponseBody::Raw` → `ArrayBuffer` | `launch_start`, `rearm_start`, `rearm_continue`, `pty_attach`, `probe_folder_open` | Raw PTY bytes, chunks ≤ 64 KB (`Response::new(Vec<u8>)`) | Never JSON (a `Channel<Vec<u8>>` would send a number array). The webview writes with `term.write(new Uint8Array(buf), cb)` and calls `pty_flow(paused=true)` above 1 MB pending (NFR-08). Ordered per channel. One channel per run; a re-arm's relaunch gets a new run and a new channel; the old buffer is archived client-side. Tests: `pty::channel_sends_raw_bytes`, `pty::burst_1mb_backpressure`. |
-| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found }` · `Contract { outcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code }` · `Spawning` · `Done` | Phases arrive in DR-093's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
+| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found }` · `Contract { outcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code }` · `Spawning` · `Done` | Phases arrive in DR-120's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
 | **Sign progress** `Channel<SignProgress>` (P2) | JSON | `sign_apply`, `sign_retry_commit` | `ReRead` · `Write { path }` · `HashObject { path }` · `WriteTree` · `CommitTree { signed: bool }` · `UpdateRef` · `RefreshIndex` · `ReadBack { path, ok }` · `Done { commit }` | One message per plumbing step (ADR-012). Test: `sign::progress_matches_plumbing_order`. |
 
 Channels need no capability permission (SR-22). The TS client wraps each in `#lib/ipc/tauri.ts`; components receive callbacks, never `Channel` objects.
@@ -1095,10 +1098,10 @@ Events carry identifiers and a revision, never content (design doc §3.3). A new
 |---|---|---|---|---|---|
 | `project:changed` | `{ projectId: string; rev: number }` | Any project state change: step state, chain, condition, overlay, wait elapsed, stage signed | commands, `app::watch` (decision files, `out` paths), timers | F-017, F-030 · AC-F022-04, AC-F007-09 | SR-18 |
 | `projects:changed` | `{ rev: number }` | Registry change (setup, remove) | commands | F-018 | — |
-| `packet:changed` | `{ projectId: string; stage: number; rev: number }` | A packet file (`docs/handoff/stage-NN*.md`) changed on disk and was re-read and re-validated | `app::watch`, re-stat on focus/open/launch | F-013 · AC-F013-06, -07, -10 | SR-31, SR-18 |
+| `packet:changed` | `{ projectId: string; stage: number; rev: number }` | A packet file (exactly `docs/handoff/stage-\d{2}\.md` or `stage-\d{2}-attachments\.md`; lookalike names are ignored, SR-31) changed on disk and was re-read and re-validated | `app::watch`, re-stat on focus/open/launch | F-013 · AC-F013-06, -07, -10 | SR-31, SR-18 |
 | `decision:pending` | `{ projectId: string; count: number }` | An outside change to a decision file was classified as pending | `app::watch`, open, launch, sign | F-022 · AC-F022-04 | SR-40 |
 | `tamper:detected` (P2) | `{ projectId: string; stage: number; rev: number }` | A signed packet differs from its committed blob | `app::watch` | F-014 · AC-F014-15 | SR-46 |
-| `run:status` | `{ runId: string; status: RunStatus; rev: number; quitGuard: boolean }` | Run state transitions (spawned, exited, errored, interrupted; P2 sensor idle/blocked); quit requested with live runs | `sys::pty` exit, `app::sensor_ingest` (P2), exit handler | F-009, F-011 · AC-F009-02, -03, AC-F011-05 | SR-18 |
+| `run:status` | `{ runId: string; status: RunStatus; rev: number }` | Run state transitions (spawned, exited, errored, interrupted; P2 sensor idle/blocked) | `sys::pty` exit, `app::sensor_ingest` (P2), exit handler | F-009, F-011 · AC-F009-02, -03, AC-F011-05 | SR-18 |
 | `config:changed` | `{ projectId: string; cwd: CwdKind }` | A fingerprinted file changed while a run in that cwd is live (warning only) | `app::watch` | F-008 · ADR-021 §7 | SR-06, SR-18 |
 | `doctor:status` | `{ level: DoctorLevel }` | Doctor finished | `doctor_run`, startup | F-019 · AC-F019-07 | — |
 | `settings:changed` | `{ rev: number }` | `settings.json` changed on disk (reloaded) or through a command | `app::watch` (app data), commands | F-029 · AC-F029-03 | SR-33 |
@@ -1136,6 +1139,7 @@ Rules: `events::payload_snapshot` (insta, every event), `events::no_content_fiel
 3. **State is in memory and deterministic**: a fixed clock (`2026-10-19T09:00:00Z`), UUIDs from a seeded counter, revisions increment exactly as Rust's do. Mutating commands change the in-memory state and emit the same events (`project:changed`, …) with the next `rev`.
 4. **Scenarios** are selected by `VITE_MOCK_SCENARIO` or `mock.setScenario()`: `happy`, `firstRun`, `blockedVersion`, `blockedAuth`, `configChanged`, `conflict`, `readOnly`, `brokenChain`, `outsideChange`, `tamper` (P2). Each error scenario returns the same `IpcError` code and detail Rust would.
 5. **PTY**: the mock delivers a scripted byte stream (the fake-claude transcript fixture) as `ArrayBuffer` chunks through the same callback interface as the real Channel, honours `pty_flow`, echoes `pty_write` input, and responds to `\x03` and `/exit\r` like fake-claude.
-6. **Security behaviors are mirrored**, not skipped: unknown fields → `Invalid`; `pty_write` to a non-live run → `NotAllowed`; one-time preview and plan IDs expire; clipboard reads return the fixture clipboard (≤ 1 MB, text only).
-7. The mock is a product artifact: a command change without a mock change fails `tsc`; a fixture change without the Rust round-trip passing fails CI.
-8. The mock is never bundled in the release build: `#lib/ipc/index.ts` picks it only when `import.meta.env.VITE_IPC === 'mock'`, and a build check greps the release bundle for the mock module's marker string (`ipc::mock_not_in_release`).
+6. **Native dialogs are scripted**: every command that raises a native confirmation in Rust (IPC-R11) takes its answer from the scenario (`mock.setDialogAnswer('cancel' | 'ok')`), so component tests cover both outcomes without any webview "approve" path.
+7. **Security behaviors are mirrored**, not skipped: unknown fields → `Invalid`; `pty_write` to a non-live run → `NotAllowed`; one-time preview and plan IDs expire; clipboard reads return the fixture clipboard (≤ 1 MB, text only).
+8. The mock is a product artifact: a command change without a mock change fails `tsc`; a fixture change without the Rust round-trip passing fails CI.
+9. The mock is never bundled in the release build: `#lib/ipc/index.ts` picks it only when `import.meta.env.VITE_IPC === 'mock'`, and a build check greps the release bundle for the mock module's marker string (`ipc::mock_not_in_release`).
