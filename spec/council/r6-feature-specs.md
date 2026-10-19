@@ -519,7 +519,7 @@ This file is the build specification for every v1 feature, after the red team an
 | The Agent SDK or the API | The brief: Max plan only, never an API key. |
 | Browser automation of claude.ai | Brittle, outbound integration, against SR-08 (r2 P-11). |
 | `tauri-plugin-pty`, `tauri-plugin-shell`, `tauri-plugin-fs` | The webview could choose programs or paths (r1). |
-| SvelteKit 3 SPA | No server features used; larger bundle; inline bootstrap script; brand-new major (r7, r5 §5). Acceptable alternative if Billy overrides. |
+| Plain Svelte 5 + Vite with an in-house router | Smaller bundle and no inline script (r7), but Billy chose SvelteKit 3 for one stack and file routing across his projects. |
 | Electron; SwiftUI + SwiftTerm | r7 PART 1. SwiftUI + SwiftTerm stays the fallback if S-0 fails fundamentally. |
 | A separate dashboard in v1 | Today covers the job; the metrics view is F-108 (v1.1). |
 
@@ -527,7 +527,7 @@ This file is the build specification for every v1 feature, after the red team an
 
 Billy may want to revisit these at the Stage 2 sign; each has a default that ships if he doesn't.
 
-1. **Frontend:** Svelte 5 + Vite + in-house router (Billy: no preference; r7 recommendation).
+1. **Frontend:** SvelteKit 3 SPA (Billy's decision).
 2. **Repo hooks never run on Foreman's git calls**, signing included (r5b minor 11).
 3. **Signing on the current branch** is the default (r5b M11); another branch is an option.
 4. **Kill check** after TradeLog Stages 1–2 at the end of P1 (about 8–14 weeks); gates and signing by hand until P2.

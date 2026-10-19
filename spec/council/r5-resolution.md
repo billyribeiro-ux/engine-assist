@@ -132,7 +132,7 @@ None of these can run in this cloud session (they need a logged-in `claude` on B
 
 ## 5. Stack: the DRI decision
 
-Billy was asked to choose between SvelteKit 3 SPA and plain Svelte 5 + Vite (r7 PART 2) and answered **no preference**. His standing instruction is that the evidence-backed call should be made rather than asked. The chair therefore adopts the r7 recommendation:
+**Superseded 2026-10-19: Billy's decision is SvelteKit 3 (SPA).** The chair had recorded the r7 recommendation below after a "no preference" answer; Billy corrected it. Kept for the record:
 
 **Frontend: Svelte 5.57.2 + Vite 8.3.4 + an in-house typed hash router.** Reasons: an SPA in Tauri uses none of SvelteKit's server features; the measured bundle is 2.6× smaller; there's no inline script, so the CSP is literally `script-src 'self'`; there are fewer config surfaces; and there's no dependency on an 18-day-old major whose Tauri guide is stale. What's given up (file routing, layouts, `load`) barely matters for six screens fed by Tauri commands.
 
