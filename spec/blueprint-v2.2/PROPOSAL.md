@@ -1,0 +1,339 @@
+# Blueprint v2.2 · Change proposal
+
+Status: **PROPOSED**, waiting for Billy's approval
+Applies to: `claude-build-blueprint.md` v2.1 (the copy in `docs/spec-input/` is the baseline used here)
+Source: Stage 2 council for Foreman (`spec/council/r2-proposals.md` §5, decided in `r3-synthesis.md` §4)
+
+Foreman never edits the blueprint. Billy applies these changes in the claude-blueprint repo, renders the PDF, and bumps `CHANGELOG.md`. Foreman's golden fixture then pins the v2.2 file.
+
+Every change below makes the blueprint more precise. None changes the order of stages, a gate, or a model or effort choice. The rendered PDF looks the same except for the wording edits in B-2 to B-6 and B-8, because `fm:` annotations are HTML comments.
+
+| ID | Change | Needed for |
+|---|---|---|
+| B-1 | `fm:` annotations on Stages 0–5, the Stage Gate, F.2, and Council setup | Foreman v1 |
+| B-2 | Claude Code steps write packets to files | Foreman v1 |
+| B-3 | Gate B writes the packet and doesn't commit | Foreman v1 |
+| B-4 | Strict ticket format in 4.6 | Foreman v1 (parsed in v1.1) |
+| B-5 | 1.4 is core; the press release and FAQ are an optional part | Foreman v1 |
+| B-6a | One `APPROVED BY: <blank>` form in every packet | Foreman v1 |
+| B-6b | `FILE: <path>` header for multi-file chat replies | Foreman v1.1 |
+| B-7 | New prompt 18.3b: CR delta | Foreman v1.1 |
+| B-8 | The spec folder lives inside the project repo as `spec/`; the repo is created at the end of Stage 1 | Foreman v1 |
+
+---
+
+## B-1 · `fm:` annotations
+
+### Grammar
+
+Two directives, each a block-level HTML comment on its own lines.
+
+`fm:step` goes directly under a RUN WITH blockquote, with no blank line between them:
+
+```text
+<!-- fm:step id=<id> [kind=prompt|followup|action|manual|wait|repeatable]
+     [tag=core|conditional|optional] [when=<expr>]
+     [surface=chat|cli|desktop] [cwd=project|spec|blueprint|worktree]
+     [session=new|continue|fresh] [chain=<stepId>]
+     [start=<model>@<effort>/<mode>] [switch=<trigger>:<model>@<effort>/<mode>]*
+     [alt=<rule>:<model>@<effort>]* [in=<name>:<type>[:remember]]*
+     [out=<path>[,<path>…]] [appends=<path>] [requires=<path>[,<path>…]] -->
+```
+
+`fm:verify` goes directly under an INSPECTION blockquote, one entry per item, in order:
+
+```text
+<!-- fm:verify 1=auto:cmd=<verify-id> 2=attest 3=time:7d>attest … -->
+```
+
+Rules:
+
+- Values contain no spaces. Lists are comma-separated. Paths are relative to the step's `cwd`.
+- `when` is an expression over condition IDs, using `!`, `&`, `|`, and parentheses (for example `when=has_payments&!internal_only`).
+- `<mode>` is one of `plan`, `default`, `acceptEdits`, `auto`, `dontAsk`. Chat steps omit the mode.
+- `fm:verify` kinds: `auto` (a verify command Foreman runs, named in `.foreman/project.json`), `attest` (Billy confirms), `time:<n>d` (a waiting period, then `>attest` or `>auto`). An item without an entry is `attest`.
+- An unknown directive or key is an error. When an annotation and the prose disagree (for example, the prose says "same session" and the annotation says `session=fresh`), Foreman reports the line number and refuses to load the template.
+- Reserved for v1.1, parsed but not applied: `<!-- fm:if <expr> -->` … `<!-- fm:end -->` around a conditional part of a prompt.
+
+### What to annotate
+
+Annotate only where Foreman can't infer the value from the prose. Inference already covers: `same session` / `same chat` (continue), `fresh session` / `new conversation` (fresh), `in [app]-spec/`, `X first, then Y`, `Shift+Tab → Y`, `/model` and `/effort` lines, `— or` alternatives, and `Save the result to <path>`.
+
+Required for v1:
+
+| Location | What the annotations add |
+|---|---|
+| Stage 0 (0.1, 0.2) | IDs; 0.2 `in=paste numbers` isn't needed (0.2 takes no input); tag `optional` for Stage 0 as a whole (an idea can arrive already chosen) |
+| Stage 1 (1.1 to 1.4) | `in=X:text` on 1.1, `in=changes:text` on 1.2, `in=paste_numbers:text` on 1.4; the 7-day wait as `kind=wait` after 1.3; tags (B-5) |
+| Stage 2 (2.1 to 2.6, Council setup) | `out=` for 2.1 and every council round; Council setup as `kind=action`; the manual "record your final choice" in 2.4 as `kind=manual`; 2.6 `out=MASTER-SPEC.md` plus the packet path (B-2) |
+| Stage 3 (3.1, 3.2) | `in=jurisdictions:text:remember`; tags (3.1 `conditional`, `when=has_payments`) |
+| Stage 4 (4.1 to 4.8) | `session=fresh` is already in the prose; `out=` per document; 4.7 `kind=prompt` with an independent-review note; late conditions asked at the 4.8 sign |
+| Stage 5 (5.1 to 5.5, gate) | `start`/`switch` for the opusplan → Opus → Sonnet sequence; `fm:verify` on the gate |
+| Stage Gate (A, B, C) | `kind=prompt`, `chain` for B and C; A's headless eligibility comes from `fm:verify` on each stage's inspection list |
+| F.2 | `kind=prompt`, `session=continue`, `appends=docs/lessons.md` |
+
+The remaining stages (6–18) load on inference alone; Foreman's Template health screen lists their gaps. Annotating them is a later v2.x change.
+
+### Worked examples
+
+Stage 2.2, the council (annotation under the existing RUN WITH):
+
+```markdown
+> **RUN WITH** · Claude Code CLI in `spec/` · Chair: **Fable 5.1** · effort **high** (Max plan) — or **Opus 5.5** · effort **xhigh** (Pro plan / to save usage) · **Plan** mode first, then **Accept edits** · agents: all six council agents
+<!-- fm:step id=2.2 tag=core cwd=spec session=new
+     out=council/r1-market.md,council/r1-users.md,council/r2-features.md,council/r2-growth.md,council/r2-feasibility.md,council/r3-synthesis.md,council/r4-redteam.md,council/r5-resolution.md -->
+```
+
+The Stage 5 gate:
+
+```markdown
+> **INSPECTION: pass before Stage 6**
+>
+> - A fresh clone, then `install` and `dev`, works with zero manual steps
+> - CI is green, and an intentional type error, a planted fake secret, and a known-vulnerable dependency each fail it (prove the gates work, then revert)
+> - Staging deploys automatically, and a rollback has actually been run once
+> - The ADR reality check has no CONTRADICTED left open
+<!-- fm:verify 1=auto:cmd=fresh-clone 2=attest 3=attest 4=auto:cmd=adr-check -->
+```
+
+Item 2 stays `attest` because proving that CI fails needs pushes and reverts, which a read-only headless inspection must not do.
+
+The full annotated text for Stages 0–5 is produced by a Foreman Stage 6 ticket, because only Foreman's parser can prove each annotation loads cleanly. This proposal fixes the grammar and the coverage list.
+
+---
+
+## B-2 · Claude Code steps write packets to files
+
+**Why:** A packet that exists only in terminal output can be lost, and Foreman can't watch for it. Every Claude Code step that ends a stage writes its packet to `docs/handoff/stage-NN.md`.
+
+**2.6, old:**
+
+```text
+Then output the MASTER SPEC PACKET in one code block:
+```
+
+**2.6, new:**
+
+```text
+Then write the MASTER SPEC PACKET to ../docs/handoff/stage-02.md,
+exactly in this format (do not commit it; I sign and commit it):
+```
+
+**2.6 packet `FILES:` line, old:** `FILES: MASTER-SPEC.md, council/r1…r8, 02-teardown.md`
+**new:** `FILES: spec/MASTER-SPEC.md, spec/council/r1…r8, spec/02-teardown.md`
+
+**2.6 trailing line, old:** `Upload \`MASTER-SPEC.md\` and the packet to the \`[APP_NAME]\` claude.ai Project.`
+**new:** `Upload \`spec/MASTER-SPEC.md\` and \`docs/handoff/stage-02.md\` to the \`[APP_NAME]\` claude.ai Project.`
+
+**Relay section, "Chat stages (0–4)" bullet, old:**
+
+```text
+- **Chat stages (0–4):** the packet comes out as a fenced block. Paste it into the next prompt, and also save it to the claude.ai Project's knowledge.
+```
+
+**new:**
+
+```text
+- **Chat stages (0, 1, 3, 4):** the packet comes out as a fenced block. Save it to `docs/handoff/stage-NN.md` in the project repo and to the claude.ai Project's knowledge, then paste it into the next prompt.
+- **Stage 2** runs in Claude Code and writes its packet straight to `docs/handoff/stage-02.md`.
+```
+
+---
+
+## B-3 · Gate B doesn't commit
+
+**Why:** Gate B committed the packet, and then the signature needed a second commit. A broad commit at Gate B can also sweep in unrelated changes. The signing commit should be the only commit of a packet, and it should include only the packet.
+
+**Gate prompt B, old (last line of the prompt):**
+
+```text
+Commit it with the message "handoff: stage [N]".
+```
+
+**new:**
+
+```text
+Do not commit it. I review it, sign it, and commit it myself.
+```
+
+**After Gate C, old:**
+
+```text
+You read it, add your name and date under APPROVED BY, and commit. **Then** the next stage starts.
+```
+
+**new:**
+
+```text
+You read it, fill in APPROVED BY with your name and the date, and commit only that file:
+`git commit -m "handoff: stage NN" -- docs/handoff/stage-NN.md docs/lessons.md`. **Then** the next stage starts.
+```
+
+---
+
+## B-4 · Strict ticket format in 4.6
+
+**Why:** A pipe-separated line is hard to parse when titles or criteria contain `|`. One heading per ticket with one labeled field per line is easy for people and parsers.
+
+**4.6, old (from "For each ticket:" to the end of the field list):**
+
+```text
+Break every milestone into tickets sized for one Claude Code session
+(1-4 hours of human work). For each ticket:
+ID [M#-NN] | Title | Class: SPEC-COMPLETE / NEEDS-DESIGN / HARD /
+MECHANICAL | Stage (6-13) | Depends on | ADRs | Threats mitigated |
+Likely files | Acceptance criteria (Given/When/Then) | Required tests
+(named) | Out of scope
+```
+
+**new:**
+
+```text
+Break every milestone into tickets sized for one Claude Code session
+(1-4 hours of human work). Write each ticket in exactly this format,
+one field per line, in this order, with nothing between tickets but a
+blank line:
+
+### [M#-NN] <Title>
+Class: SPEC-COMPLETE | NEEDS-DESIGN | HARD | MECHANICAL
+Stage: <6-13>
+Depends on: <ticket IDs, comma-separated, or none>
+ADRs: <ADR IDs, or none>
+Threats mitigated: <threat IDs, or none>
+Likely files: <paths, comma-separated>
+Acceptance criteria:
+- Given <…> When <…> Then <…>
+Required tests:
+- <test name>
+Out of scope: <one line, or none>
+```
+
+(The class line lists the allowed values; each ticket uses exactly one.)
+
+---
+
+## B-5 · 1.4 is core; its press release and FAQ are an optional part
+
+**Why:** The App Brief packet is a core handoff, so 1.4 can never be skipped. The press release and FAQ are valuable but not required; skipping them shouldn't skip the packet.
+
+**1.4 prompt, old (first paragraph after the validation sentence):**
+
+```text
+Otherwise, write a press release
+for launch day as if the product already exists (Amazon "working
+backwards" style): headline, the problem, the solution, a customer
+quote, and how to get started. Add an FAQ of the 8 hardest questions a
+customer and an investor would ask, with answers.
+```
+
+**new:**
+
+```text
+Otherwise, [optional: write a press release for launch day as if the
+product already exists (Amazon "working backwards" style): headline,
+the problem, the solution, a customer quote, and how to get started.
+Add an FAQ of the 8 hardest questions a customer and an investor would
+ask, with answers.]
+```
+
+Plus the annotation `<!-- fm:step id=1.4 tag=core -->` under its RUN WITH. In the packet, `PRESS RELEASE + FAQ: <attached below the packet>` becomes `PRESS RELEASE + FAQ: <attached below the packet, or "skipped: <reason>">`.
+
+---
+
+## B-6 · Packet normalization
+
+### B-6a · One APPROVED BY form
+
+Every packet format already uses `APPROVED BY: <blank>` except Gate B.
+
+**Gate prompt B, old:** `APPROVED BY: <leave blank for me to sign>`
+**new:** `APPROVED BY: <blank>`
+
+The relay example at the top keeps `[you, the DRI] on [date]`, because it shows a signed packet. Add one line under it:
+
+```text
+Every packet is written with `APPROVED BY: <blank>`. Only you fill it in, as `<name> on <YYYY-MM-DD>`.
+```
+
+### B-6b · `FILE:` headers (v1.1)
+
+Add to the relay section:
+
+```text
+When a chat reply contains more than one file, start each file with a line `FILE: <path>` and nothing else on that line.
+```
+
+---
+
+## B-7 · New prompt 18.3b: CR delta (v1.1)
+
+Add after 18.3:
+
+````markdown
+### Prompt 18.3b: Apply an approved Change Request to a document
+
+> **RUN WITH** · CLI, fresh session · **Opus 5.5** · effort **high** · **Plan** mode, then **Accept edits**
+
+```text
+Read the approved Change Request docs/change-requests/CR-[NNN].md and
+the document it amends: [path]. Produce the amended document with the
+smallest change that satisfies the CR. Mark the document's revision
+(Rev [n], CR-[NNN], <date>) in its header and list every changed
+section. Do not change anything the CR doesn't require. Show me the
+diff before writing.
+```
+````
+
+---
+
+## B-8 · The spec folder lives in the project repo
+
+**Why:** One repo per project, from the start. The spec work in Stage 2 then has a stable location, the packets in Stages 1–4 have a place to live (B-2), and Foreman needs only two working directories per project: the repo root and `spec/`.
+
+**1.4 handoff, old:**
+
+```text
+> **HANDOFF** → the App Brief + press release and FAQ. Save them to Project knowledge and copy them into a new folder `[app]-spec/01-app-brief.md`.
+```
+
+**new:**
+
+```text
+> **HANDOFF** → the App Brief + press release and FAQ. Create the project repo now (private, with `main` protected later in Stage 5). Save the packet as `docs/handoff/stage-01.md`, copy the brief and press release to `spec/01-app-brief.md`, and save both to Project knowledge.
+```
+
+**Every other `[app]-spec/` reference becomes `spec/`:**
+
+| Line in v2.1 | Old | New |
+|---|---|---|
+| 2.1 | ``Save the result to `[app]-spec/02-teardown.md`.`` | ``Save the result to `spec/02-teardown.md`.`` |
+| Council setup heading | ``agents in `[app]-spec/.claude/agents/` `` | ``agents in `spec/.claude/agents/` `` |
+| 2.2 RUN WITH | ``Claude Code CLI in `[app]-spec/` `` | ``Claude Code CLI in `spec/` `` |
+
+**4.8 handoff, old:**
+
+```text
+> **HANDOFF** → the Build Package. Create the repo with exactly those files, then save the packet itself as `docs/handoff/stage-04.md`.
+```
+
+**new:**
+
+```text
+> **HANDOFF** → the Build Package. Add exactly those files to the project repo (it has existed since Stage 1), then save the packet itself as `docs/handoff/stage-04.md`.
+```
+
+**4.8 packet `REPO FILES` list:** `docs/MASTER-SPEC.md` stays (copied from `spec/MASTER-SPEC.md` at the Stage 4 sign, so `spec/` holds the working history and `docs/` holds the frozen build input).
+
+---
+
+## CHANGELOG entry
+
+```markdown
+## 2.2 · <date>
+- Foreman support: `fm:` annotations on Stages 0–5, the Stage Gate, F.2, and Council setup (HTML comments; the PDF is unchanged).
+- Every packet is a file in `docs/handoff/`, including Stage 2's. Gate B no longer commits; the signing commit is the only one.
+- 4.6 tickets use one heading per ticket with labeled fields.
+- 1.4 is core; its press release and FAQ are optional.
+- One `APPROVED BY: <blank>` form everywhere.
+- The project repo is created at the end of Stage 1 and holds the spec work in `spec/`.
+```
