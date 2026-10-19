@@ -1,6 +1,7 @@
 === HANDOFF PACKET · Stage 4 → Stage 5 ===
 PROJECT: Foreman
-APPROVED BY: <blank>
+APPROVED BY: Billy Ribeiro on 2026-10-19
+SIGNED VIA: Claude Code, on Billy's explicit instruction and permission in chat (2026-10-19 19:02-19:04 ET)
 
 REPO FILES:
   CLAUDE.md                      (full project CLAUDE.md, replaces bootstrap)
