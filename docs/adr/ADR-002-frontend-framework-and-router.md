@@ -31,7 +31,7 @@ Use **SvelteKit 3.1.0 in SPA mode**, configured exactly as verified in r1 §A4 (
 - `tsconfig.json` extends `$app/tsconfig` and lists `include`/`exclude`.
 - `tauri.conf.json` `build`: `frontendDist: "../build"`, `devUrl: "http://localhost:5173"`, `beforeDevCommand: "pnpm dev"`, `beforeBuildCommand: "pnpm build"`.
 - **Routing:** SvelteKit file-based routes (pathname), `goto` and `$app/state`; no in-house router. Tauri's asset resolver falls back to `index.html` for unknown paths (verified in `tauri-2.12.4/src/manager/mod.rs`), so a reload on `/projects/x/stages/3` works.
-- **CSP:** SvelteKit's SPA fallback page has one inline bootstrap `<script>` (r1 E6). Tauri hashes it into `script-src` at compile time; `'unsafe-inline'` is never used (ADR-014).
+- **CSP:** SvelteKit's SPA fallback page has one inline bootstrap `<script>` (r1 E6). Tauri hashes it into `script-src` at compile time, and adds nonces for `<style>` tags already in the HTML (SR-20). `'unsafe-inline'` is never used for scripts, and SvelteKit's own `kit.csp` stays unset (ADR-014).
 - **State:** Svelte 5 runes in `.svelte.ts` modules mirroring Rust (ADR-004). SvelteKit `load` functions call only the `IpcClient`, never `fetch`.
 - **Rendering of repo content:** no `{@html}` (ESLint rule). Markdown goes through `#lib/render` to a fixed element set (SR-26).
 
@@ -58,7 +58,7 @@ Registry check, 2026-10-19:
 ## Verification
 
 - `pnpm verify`: `svelte-check --fail-on-warnings`, ESLint (no `{@html}`, no server files, `@tauri-apps/api` imported only in `#lib/ipc`), Vitest.
-- Playwright: an injected inline `<script>` doesn't run; navigation and a reload on a deep route render the same screen.
+- WDIO smoke on the built app (SR-20): the served CSP header contains the bootstrap hash, and an injected inline `<script>` raises `securitypolicyviolation` and doesn't run. Playwright: navigation and a reload on a deep route render the same screen.
 - S-0: CSP check with bits-ui, Svelte transitions, xterm and the SvelteKit bootstrap; DevTools shows no CSP violations and no `version.json` requests.
 - NFR-01 startup mark.
 

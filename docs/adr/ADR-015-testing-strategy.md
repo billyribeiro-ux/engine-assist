@@ -40,7 +40,14 @@ Six layers, cheapest first. Each SR and NFR test lives at the lowest layer that 
   - writes transcript files.
 - **Spikes** with a real `claude` (S-0, S-1′, S-3, S-7′, S-8, S-12, S-23) run on Billy's Mac in M0 and produce `docs/spikes/S-*.md`.
 - The `e2e` feature is never in release builds. CI check `release::no_webdriver` greps the release binary's linked crates (`cargo tree -e normal --no-default-features --features …`) and fails if `tauri-plugin-wdio-webdriver` or `axum` appears.
-- CI also runs: `pnpm verify` (svelte-check `--fail-on-warnings`, eslint, prettier `--check`, vitest), `cargo fmt --check`, clippy, `cargo deny`, `cargo audit`, `pnpm audit`, CodeQL (or Semgrep), secret scanning, SBOM, and the bindings drift check (SR-63). The Stage 5 gate proves that a planted type error, a planted secret and a vulnerable dependency each fail CI.
+- CI also runs (SR-63, SR-61):
+  - `pnpm verify` (svelte-check `--fail-on-warnings`, eslint, prettier `--check`, vitest);
+  - `cargo fmt --check`, clippy with `disallowed-methods`, `cargo deny`, `cargo audit`;
+  - `pnpm audit` and `pnpm-policy` (ADR-024);
+  - Semgrep (Rust and TypeScript rule packs), a gitleaks secret scan, and CycloneDX SBOMs for cargo and pnpm;
+  - `actions-pinned`, and the bindings drift check.
+
+  The SR-20 CSP proof (injected inline script raises `securitypolicyviolation`) runs in layer 5 against the built app, because the CSP header is injected by Tauri, not by the Vite preview. The Stage 5 gate proves that a planted type error, a planted secret and a vulnerable dependency each fail CI.
 
 ## Alternatives considered
 

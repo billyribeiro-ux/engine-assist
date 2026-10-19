@@ -31,6 +31,7 @@ Checked 2026-10-19:
   2. drops ignored and secret patterns (shared with `pathpolicy::check_read`);
   3. re-reads the file through `store::Root::read` (`O_NOFOLLOW` walk; a symlinked target is refused and reported, never followed);
   4. compares its `ReadStamp` with the last known one and acts only on a real content change.
+- **Watch roots** (SR-31): notify's FSEvents backend resolves the watch root itself, so configuration can't stop it following a symlinked root. Before watching, and on every event, the watch root and its ancestors up to the project root are `lstat`-checked; a symlink stops the watcher for that root, with a Doctor warning. Each event path is resolved again through `store` before it's read, and hard-linked or non-regular files are refused.
 - **Missed events are tolerated by design.** On project open, window focus, and before every launch or sign, Foreman re-stats its interest set (cheap: about 30 paths). FSEvents coalescing or overflow therefore can't hide a change for longer than the next interaction (NFR-13).
 - If the watcher fails to start (for example, a volume without FSEvents), Doctor shows "file watching unavailable: packets appear when you focus Foreman", and the re-stat path carries on.
 - The watcher **never triggers an action** (SR-18). It updates state and emits `packet:changed`, `decision:pending` or `project:changed`.
@@ -50,7 +51,7 @@ Checked 2026-10-19:
 
 ## Verification
 
-- `watcher::packet_visible_within_1s` (fake writer, p95 over 100 writes, NFR-06), `watcher::atomic_save_detected` (rename-over), `watcher::no_symlink_follow`, `watcher::ignores_tmp_and_secrets`, `watcher::events_never_act` (dependency test), `watcher::refocus_rescan_catches_missed_event` (watcher disabled).
+- `watcher::packet_visible_within_1s` (fake writer, p95 over 100 writes, NFR-06), `watcher::atomic_save_detected` (rename-over), `watcher::no_symlink_follow`, `watcher::symlinked_root_refused`, `watcher::ignores_tmp_and_secrets`, `watcher::events_never_act` (dependency test), `watcher::refocus_rescan_catches_missed_event` (watcher disabled).
 
 ## Revisit when
 

@@ -15,7 +15,7 @@ Foreman spawns:
 - `/usr/bin/open` (SR-25a forms);
 - the toolchain probes `node`, `pnpm` and `cargo` with `--version`.
 
-Revised `docs/requirements.md`, Stage 7 (M2):
+Revised `docs/requirements.md`, Stage 7 (M2). The `spawn` module and allowlist exist from M1 already, because `git::run` (SR-44) uses them there (`docs/scope.md` §5):
 
 - **SR-01:** allowlist of re-checked absolute paths.
 - **SR-02:** one `spawn` module; argv only; the single consented login-PATH shell, with `$SHELL` in `/etc/shells`.
