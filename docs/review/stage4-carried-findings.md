@@ -36,3 +36,9 @@ The review checks that the threat model's §7 and the ADRs reflect these.
 8. ADR-012 says the stage record holds its own commit OID, which is impossible because the record is inside that commit. ADR-012 also still lists Status and Diff operations. Proposal B-3 commits `docs/lessons.md`; F-014's path list doesn't include it.
 9. The design doc's command table is missing about 20 commands that the acceptance criteria need. `probe_folder_open` is P2 in the design but M3 in scope.
 10. `[BUDGET_TIME]`'s example value is a placeholder, so the harness fixture needs a real value. Item IDs must be unique across the whole template, because the lock keys items by ID alone.
+
+## From 4.6, tickets
+
+11. There are 160 tickets. By ticket count, 69% of the work comes before the kill check, while the Master Spec estimates about half by weeks. The review should check whether phase 1 can be cut further, or whether the estimate should be restated.
+12. M4-28 (the build-package assembler) is NEEDS-DESIGN. It has no mockup or component entry for its panel, and the rules for prefilling late conditions from evidence cover only one case.
+13. ADR-012 still lists Status and DiffNoExt; they need to be removed (see item 8).
