@@ -1,0 +1,52 @@
+<!-- title: Foreman mockup: Pending outside change -->
+<style>
+.oc-meta { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 6px var(--space-4); font-size: var(--text-12); margin-top: var(--space-5); max-width: 760px; }
+.oc-meta dt { color: var(--ink-muted); }
+.filehead { display: flex; align-items: baseline; gap: var(--space-4); margin: var(--space-6) 0 var(--space-3); }
+.filehead h2 { font-size: var(--text-13); font-weight: var(--weight-semibold); font-family: var(--font-mono); }
+.effect { margin-top: var(--space-3); display: grid; gap: 6px; font-size: var(--text-12); max-width: 760px; }
+.effect li { display: flex; gap: 8px; align-items: flex-start; }
+.decide { position: sticky; bottom: 0; display: flex; gap: var(--space-3); align-items: center; padding: var(--space-4) var(--space-7); border-top: var(--hairline) solid var(--rule); background: var(--sheet); }
+.decide .spacer { flex: 1; }
+.diff { max-width: 860px; }
+.toast { bottom: 76px; }
+</style>
+<div class="app">
+  {{sidebar:tradelog-s2}}
+  <div class="window">
+    {{titlebar:TradeLog|Pending outside change|}}
+    {{strip:s2}}
+    <div class="body no-inspector">
+      <main class="main" id="main" aria-labelledby="oc-title" style="display:grid;grid-template-rows:minmax(0,1fr) auto">
+        <div class="page" style="max-width:none">
+          <h1 class="page-title" id="oc-title">Review a change to TradeLog's decision files</h1>
+          <p class="page-sub">Something other than Foreman edited two files that decide how this project runs. Foreman keeps using the approved versions until you accept.</p>
+          <dl class="oc-meta">
+            <dt>Changed</dt><dd>Today at 14:02, while <code>fm-tradelog-s02-2-3</code> was running in <code>spec/</code></dd>
+            <dt>Git</dt><dd>Uncommitted; no commit touches these files since your last approval</dd>
+            <dt>Approved version</dt><dd>sha256 9c41…e07a, approved 12 Oct</dd>
+          </dl>
+
+          <div class="filehead"><h2>.foreman/overlay.json</h2><span class="pill attention">{{g:warn:attention}}Has no effect</span></div>
+<pre class="diff" aria-label="Diff of overlay.json"><span class="hunk">@@ skips @@</span><span class="ctx">   "skips": [</span><span class="add">+    { "step": "2.5", "reason": "NFRs are covered in r6-feature-specs.md" }</span><span class="ctx">   ],</span></pre>
+          <ul class="effect"><li>{{g:lock}}<span>2.5 Non-functional requirements is core. Accepting records the skip, but Foreman ignores it and flags it: core steps can't be skipped.</span></li></ul>
+
+          <div class="filehead"><h2>.foreman/project.json</h2><span class="pill attention">{{g:warn:attention}}Changes the path</span></div>
+<pre class="diff" aria-label="Diff of project.json"><span class="hunk">@@ conditions @@</span><span class="del">-    "payments": "undecided",</span><span class="add">+    "payments": "no",</span><span class="ctx">     "multi_user": "yes",</span><span class="hunk">@@ variables @@</span><span class="del">-    "QUALITY_BAR": "Principal-engineer strict",</span><span class="add">+    "QUALITY_BAR": "Production-ready",</span></pre>
+          <ul class="effect">
+            <li>{{g:info:muted}}<span>payments: no makes Stage 10, Electrical, not applicable and 3.1 pricing not applicable. Foreman adds the audit line "changed outside Foreman, accepted by you".</span></li>
+            <li>{{g:check:pass}}<span>QUALITY_BAR is a variable, not a decision. It already reloaded; prompts that use it show the new value.</span></li>
+          </ul>
+        </div>
+        <div class="decide">
+          <span class="reason">Reject restores the approved versions with an atomic write. Accept asks you once more in a macOS dialog, then makes them the new approved versions.</span>
+          <span class="spacer"></span>
+          <button class="btn">{{i:restore}}Reject and restore</button>
+          <button class="btn primary">{{i:check}}Accept changes</button>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+<div class="toast" role="status" aria-live="polite">{{i:check}}<span>Variables reloaded: QUALITY_BAR changed in project.json.</span></div>
+{{legend:}}

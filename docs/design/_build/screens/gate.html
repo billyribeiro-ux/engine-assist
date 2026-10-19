@@ -1,0 +1,162 @@
+<!-- title: Foreman mockup: Close out a stage -->
+<style>
+.sequence { display: flex; align-items: center; gap: 0; margin: var(--space-4) 0 var(--space-2); flex-wrap: wrap; }
+.sequence li { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-12); color: var(--ink-muted); }
+.sequence li + li::before { content: ""; width: 28px; height: 1px; background: var(--rule); margin: 0 10px; }
+.sequence li.done { color: var(--ink); }
+.sequence li.now { color: var(--fail); font-weight: var(--weight-semibold); }
+.gate-top { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; margin-top: var(--space-4); }
+.items { margin-top: var(--space-5); border-top: var(--hairline) solid var(--rule); }
+.item { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: var(--space-4); padding: var(--space-4) var(--space-3) var(--space-4) 0; border-bottom: var(--hairline) solid var(--rule); }
+.item.is-selected { background: var(--sheet-raised); }
+.stampmark { justify-self: center; display: grid; justify-items: center; gap: 2px; font-family: var(--font-drafting); font-weight: var(--drafting-weight); font-stretch: var(--drafting-stretch); font-size: var(--text-12); letter-spacing: .04em; padding: 3px 8px; border: 1.5px solid currentColor; border-radius: 3px; transform: rotate(-4deg); align-self: start; margin-top: 2px; }
+.stampmark.fail { color: var(--fail); }
+.stampmark.pass { color: var(--pass); }
+.stampmark.wait { color: var(--ink-muted); border-style: dashed; transform: none; }
+.item-title { font-weight: var(--weight-medium); }
+.item-how { font-size: var(--text-12); color: var(--ink-muted); margin-top: 2px; }
+.evidence { margin-top: var(--space-3); font-size: var(--text-12); padding: var(--space-3) var(--space-4); background: var(--well); border-left: 2px solid var(--fail); }
+.evidence.proposed { border-left-color: var(--pass); }
+.attest { margin-top: var(--space-3); display: grid; gap: var(--space-3); max-width: 640px; }
+.attest .seg { justify-self: start; }
+.item .actions { margin-top: var(--space-3); }
+details.passed > summary { list-style: none; display: flex; gap: 8px; align-items: center; padding: var(--space-3) 0; color: var(--ink-muted); font-size: var(--text-12); border-bottom: var(--hairline) solid var(--rule); }
+details.passed > summary::-webkit-details-marker { display: none; }
+.closeout { margin-top: var(--space-6); display: grid; gap: var(--space-3); }
+.closeout-row { display: grid; grid-template-columns: 20px 150px minmax(0, 1fr); gap: var(--space-3); align-items: center; font-size: var(--text-13); padding: 6px 0; border-bottom: var(--hairline) solid var(--rule); }
+.sign-row { display: flex; gap: var(--space-4); align-items: center; margin-top: var(--space-4); }
+.sign-layer, .signed-layer { display: none; }
+.sign-layer:target { display: block; }
+body:has(#signed:target) .signed-layer { display: block; }
+.sheet-5 .mark-stamp { display: none; }
+body:has(#signed:target) .sheet-5 .mark-inspect { display: none; }
+body:has(#signed:target) .sheet-5 .mark-stamp { display: block; }
+.diffbox { margin: 0; white-space: pre-wrap; }
+.radio-list { display: grid; gap: 6px; }
+.radio { display: flex; gap: 8px; align-items: center; font-size: var(--text-13); }
+.radio .r { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--control-edge); display: grid; place-items: center; background: var(--sheet); }
+.radio .r.on::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-ink); }
+.radio .r.on { border-color: var(--accent-ink); }
+.dialog .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.hashline { font-size: var(--text-12); color: var(--ink-muted); }
+</style>
+<div class="app">
+  {{sidebar:tradelog-s5}}
+  <div class="window">
+    {{titlebar:TradeLog|Stage 5 close-out, branch stage/05-site-prep|insp}}
+    {{strip:s5,signing}}
+    <div class="body">
+      <main class="main" id="main" aria-labelledby="gate-title">
+        <div class="page" style="max-width:none">
+          <h1 class="page-title" id="gate-title">Close out Site Prep &amp; Excavation</h1>
+          <ol class="sequence" aria-label="Close-out sequence">
+            <li class="done">{{g:check:pass}}Gate A inspection</li>
+            <li class="now" aria-current="step">{{g:cross:fail}}Results: 1 failed</li>
+            <li>{{g:ring}}Gate B packet</li>
+            <li>{{g:ring}}Gate C lessons</li>
+            <li>{{g:lock}}Sign</li>
+          </ol>
+          <div class="gate-top">
+            <button class="btn">{{i:terminal}}Run Gate A in terminal</button>
+            <button class="btn">{{i:import}}Import results</button>
+            <span class="reason">Imported from fm-tradelog-s05-5-gate-a at 14:12. Confirm or change each result.</span>
+          </div>
+
+          <div class="items" role="list" aria-label="Inspection items, failed first">
+            <div class="item is-selected" role="listitem" aria-current="true">
+              <span class="stampmark fail" role="img" aria-label="Failed">{{g:cross:fail}}FAIL</span>
+              <div>
+                <div class="item-title">CI is green, and an intentional type error, a planted fake secret, and a known-vulnerable dependency each fail it</div>
+                <p class="item-how">Attest. Prove each gate fails, then revert.</p>
+                <div class="evidence">The planted secret in <code>apps/api/.env.example</code> passed CI: the gitleaks job is skipped for pull requests (<code>.github/workflows/ci.yml:41</code>, <code>if: github.event_name == 'push'</code>). Type error and vulnerable dependency failed as expected.</div>
+                <div class="actions"><button class="btn primary">{{i:wrench}}Fix this</button><span class="reason">Opens a new CLI chain: Opus 5.5, high, Plan, with this item and its evidence</span></div>
+              </div>
+            </div>
+            <div class="item" role="listitem">
+              <span class="stampmark wait" role="img" aria-label="Waiting for you">Waiting</span>
+              <div>
+                <div class="item-title">Staging deploys automatically, and a rollback has actually been run once</div>
+                <div class="evidence proposed">Import proposes PASS: deploy run #48 green on main; rollback to v0.1.2 at 14:20 in the deploy log.</div>
+                <div class="attest" role="group" aria-label="Attest staging">
+                  <div class="seg" role="radiogroup" aria-label="Result"><button role="radio" aria-checked="true">Done</button><button role="radio" aria-checked="false">Not applicable</button></div>
+                  <div class="field"><label for="n-staging">How you checked</label><textarea class="textarea" id="n-staging" rows="2">Rolled staging back from v0.1.3 to v0.1.2 with `pnpm deploy:rollback`; steps in docs/runbook-deploy.md §4.</textarea><span class="counter">104 characters. A note needs at least 15 and can't repeat another item's.</span></div>
+                  <div class="actions"><button class="btn">{{i:check}}Confirm Done</button></div>
+                </div>
+              </div>
+            </div>
+            <div class="item" role="listitem">
+              <span class="stampmark wait" role="img" aria-label="Waiting for you">Waiting</span>
+              <div>
+                <div class="item-title">The ADR reality check has no CONTRADICTED left open</div>
+                <div class="evidence proposed">Import proposes PASS: 9 VALID, 1 NEEDS AMENDMENT (ADR-004, amended 18 Oct).</div>
+                <div class="attest" role="group" aria-label="Attest ADR check">
+                  <div class="seg" role="radiogroup" aria-label="Result"><button role="radio" aria-checked="true">Done</button><button role="radio" aria-checked="false">Not applicable</button></div>
+                  <div class="field"><label for="n-adr">How you checked</label><input class="input" id="n-adr" value="Looks fine" aria-invalid="true" aria-describedby="n-adr-err"><p class="err" id="n-adr-err">{{g:cross:fail}}<span>Write at least 15 characters on how you checked, for example which ADRs you read.</span></p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <details class="passed"><summary>{{i:chev}}1 passed: a fresh clone, then install and dev, works with zero manual steps</summary></details>
+
+          <div class="closeout" aria-label="After the inspection">
+            <div class="closeout-row">{{g:lock}}<span>Gate B packet</span><span class="muted">Runs after every item passes. Writes docs/handoff/stage-05.md.</span></div>
+            <div class="closeout-row">{{g:lock}}<span>Gate C lessons</span><span class="muted">Continues the gate session. Needs an entry headed "Stage 5" in docs/lessons.md.</span></div>
+          </div>
+          <div class="sign-row">
+            <a class="btn primary lg" role="button" aria-disabled="true" aria-describedby="sign-why" href="#sign" style="background:var(--primary-disabled-bg);border-color:var(--primary-disabled-bg);color:var(--primary-disabled-ink)">{{i:pen}}Sign packet</a>
+            <span class="reason" id="sign-why">Sign is locked: 1 item failed and 2 wait for your note. Then Gate B and Gate C.</span>
+          </div>
+        </div>
+      </main>
+      <aside class="inspector" aria-label="Inspector: evidence">
+        <div class="insp-tabs" role="tablist" aria-label="Inspector views"><button role="tab" aria-selected="false">Packet</button><button role="tab" aria-selected="true">Gate</button><button role="tab" aria-selected="false">Lessons</button></div>
+        <div class="insp-body" role="tabpanel">
+          <div><h2 class="insp-title">Evidence for CI gates</h2><p class="insp-sub">From the Gate A session's last message</p></div>
+          <dl class="kv">
+            <dt>Session</dt><dd><code>fm-tradelog-s05-5-gate-a</code></dd>
+            <dt>Model</dt><dd>Opus 5.5, high, Plan</dd>
+            <dt>Agents</dt><dd>test-runner, security-reviewer</dd>
+          </dl>
+          <div>
+            <h3 class="insp-title" style="font-size:var(--text-12)">Artifacts</h3>
+            <ul class="insp-list">
+              <li>{{g:file}}<span><code>.github/workflows/ci.yml:41</code><span class="kind"><button class="btn ghost" style="height:20px;padding:0 4px">{{i:copy}}Copy path</button></span></span></li>
+              <li>{{g:terminal}}<span><code>gh run view 11872 --log-failed</code><span class="kind"><button class="btn ghost" style="height:20px;padding:0 4px">{{i:copy}}Copy command</button></span></span></li>
+            </ul>
+          </div>
+          <p class="insp-sub">Second failure of this item. On a third, Foreman offers the F.4 prompt.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div class="sign-layer" id="sign">
+  <div class="scrim"></div>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="sign-title" aria-describedby="sign-desc">
+    <div class="dialog-head"><h2 class="dialog-title" id="sign-title">Sign the Stage 5 packet</h2>
+      <p class="hashline" id="sign-desc">Signing <code>docs/handoff/stage-05.md</code> @ a3f9c1. Foreman re-reads the file first and refuses if it changed.</p></div>
+    <div class="dialog-body">
+      <div class="two">
+        <div class="field"><label for="s-name">Name</label><input class="input" id="s-name" value="Billy Ribeiro"></div>
+        <div class="field"><label for="s-date">Date</label><input class="input" id="s-date" value="2026-10-19"></div>
+      </div>
+      <div class="field" role="radiogroup" aria-labelledby="branch-l"><span class="field-label" id="branch-l">Branch</span>
+        <div class="radio-list">
+          <span class="radio" role="radio" aria-checked="true" tabindex="0"><span class="r on"></span>Current branch, <code>stage/05-site-prep</code></span>
+          <span class="radio" role="radio" aria-checked="false" tabindex="-1"><span class="r"></span>Sign on another branch (leaves your working tree untouched)</span>
+        </div></div>
+      <div class="field"><span class="field-label">Fields Foreman will add</span>
+<pre class="diff diffbox" aria-label="Diff of the fields Foreman will add"><span class="hunk">@@ docs/handoff/stage-05.md @@</span><span class="del">-APPROVED BY: &lt;leave blank for me to sign&gt;</span><span class="add">+APPROVED BY: Billy Ribeiro on 2026-10-19</span><span class="add">+SKIPPED: none in this stage</span><span class="add">+SUBSTITUTIONS: 5.4 Sonnet 5.5 low → Sonnet 5.5 medium (your override, 17 Oct)</span><span class="add">+ATTESTED:</span><span class="add">+  fresh-clone: Fresh clone on a clean user account, pnpm install &amp;&amp; pnpm dev</span><span class="add">+  ci-gates: Secret, type error and CVE each failed CI (runs 11880–11882)</span><span class="add">+  staging: Rolled staging back from v0.1.3 to v0.1.2 with pnpm deploy:rollback</span><span class="add">+  adr-check: Read all 10 ADRs against the scaffold; ADR-004 amended</span></pre></div>
+      <div class="field"><span class="field-label">Commits only these paths, with repo hooks off, then reads each one back</span>
+        <ul class="writes"><li><span class="what">Packet</span><code>docs/handoff/stage-05.md</code></li><li><span class="what">Record</span><code>.foreman/stages/stage-05.json</code></li><li><span class="what">Decisions</span><span><code>.foreman/overlay.json</code> <span class="muted">(1 pending change)</span></span></li></ul></div>
+    </div>
+    <div class="dialog-foot"><span class="hashline">Commit message: handoff: stage 05 · Sign packet asks you once more in a macOS dialog</span><span class="spacer"></span><a class="btn" href="#">Cancel</a><a class="btn primary is-focus" href="#signed">{{i:pen}}Sign packet</a></div>
+  </div>
+</div>
+
+<span id="signed"></span>
+<div class="signed-layer">
+  <div class="toast" role="status" aria-live="polite">{{i:stamp}}<span>Packet signed. Committed <code>4e1b2c7</code> on stage/05-site-prep and read back 3 files.</span></div>
+</div>
+{{legend:All <span class="p2tag">P2</span>; see #sign, #signed}}

@@ -1,0 +1,27 @@
+<aside class="inspector p2" aria-label="Inspector">
+  <div class="insp-tabs" role="tablist" aria-label="Inspector views">
+    <button role="tab" aria-selected="false" id="t-packet">Packet</button>
+    <button role="tab" aria-selected="true" id="t-gate" aria-controls="p-gate">Gate</button>
+    <button role="tab" aria-selected="false" id="t-lessons">Lessons</button>
+    <span style="margin-left:auto">{{p2}}</span>
+  </div>
+  <div class="insp-body" role="tabpanel" id="p-gate" aria-labelledby="t-gate">
+    <div>
+      <h2 class="insp-title">Stage 2 inspection</h2>
+      <p class="insp-sub">You attest each item after 2.6 writes the packet. Each needs a note, or a reason it doesn't apply.</p>
+    </div>
+    <ol class="insp-list">
+      <li>{{g:hatch}}<span>The feature matrix covers every serious competitor, with sources<span class="kind">Not applicable: 2.1 didn't run (commercial = no)</span></span></li>
+      <li>{{g:ring}}<span>Every v1 feature beats a named competitor's version or is table stakes<span class="kind">Attest, waits for 2.6</span></span></li>
+      <li>{{g:ring}}<span>Every fatal or serious red-team objection is resolved in writing<span class="kind">Attest, waits for 2.6</span></span></li>
+      <li>{{g:ring}}<span>The stack recommendation exists for every layer, plus your recorded final choice<span class="kind">Attest, waits for 2.4</span></span></li>
+      <li>{{g:ring}}<span>Open questions: zero. Status: FROZEN v1.0<span class="kind">Attest, waits for 2.6</span></span></li>
+    </ol>
+    <div class="actions"><button class="btn" disabled aria-describedby="why-close">Close out Stage 2<kbd>⌘⇧G</kbd></button></div>
+    <p class="reason" id="why-close">Available after 2.6 writes docs/handoff/stage-02.md.</p>
+    <div class="empty" aria-label="Lessons">
+      <strong>No lessons for Stage 2 yet</strong>
+      <span>F.2 writes them to docs/lessons.md in the council session after you attest the items.</span>
+    </div>
+  </div>
+</aside>

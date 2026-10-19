@@ -1,0 +1,110 @@
+<!-- title: Foreman mockup: Chat step -->
+<div class="app">
+  {{sidebar:tradelog-s1}}
+  <div class="window">
+    {{titlebar:TradeLog|~/Code/tradelog, branch main|drawer insp}}
+    {{strip:s1}}
+    <div class="body">
+      <main class="main" id="main" aria-labelledby="stage-title">
+        <div class="stage-head">
+          <div>
+            <h1 class="stage-title" id="stage-title">Meet the Architect</h1>
+            <p class="stage-sub">Interview, brainstorm, and write the App Brief in one claude.ai chat.</p>
+          </div>
+          <div class="title-block p2" role="group" aria-label="Title block">
+            <div class="tb-sheet"><span class="tb-label">Sheet</span><span class="tb-value">1<span class="of"> of 19</span></span></div>
+            <div><span class="tb-label">Project</span><span class="tb-value">TradeLog</span></div>
+            <div><span class="tb-label">Revision</span><span class="tb-value">Blueprint 2.2, a3f9c1</span></div>
+            <div><span class="tb-label">DRI</span><span class="tb-value">Billy Ribeiro</span></div>
+            <div><span class="tb-label">Status</span><span class="tb-value">In progress, 2 of 4</span></div>
+          </div>
+        </div>
+        <ol class="steps" aria-label="Steps in Stage 1">
+          <li class="step is-done">
+            <span class="callout" aria-hidden="true">1.1</span>
+            <div class="step-head"><h2 class="step-title">The architect interview</h2><span class="step-state pass">{{g:check:pass}}Done, chat linked</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+          </li>
+          <li class="step is-done">
+            <span class="callout" aria-hidden="true">1.2</span>
+            <div class="step-head"><h2 class="step-title">Brainstorm and converge</h2><span class="step-state pass">{{g:check:pass}}Done</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+          </li>
+          <li class="step is-na">
+            <span class="callout" aria-hidden="true">1.3</span>
+            <div class="step-head"><h2 class="step-title">Demand validation kit</h2>
+              <p class="na-reason">Not applicable: there's no demand to test for a free tool <span class="muted">(commercial = no)</span></p>
+              <span class="step-state">{{g:hatch}}Not applicable</span></div>
+          </li>
+          <li class="step is-selected" aria-current="step">
+            <span class="callout" aria-hidden="true">1.4</span>
+            <div class="step-head"><h2 class="step-title"><button aria-expanded="true">The App Brief</button></h2>
+              <span class="step-state attention">{{g:paste:attention}}Copied 6 min ago, waiting for the packet</span><span class="lock" title="Core: protects production quality. Change it in the blueprint with a Change Request.">{{g:lock}}<span class="vh">Core step</span></span></div>
+            {{spec:Chat, same chat as 1.1|Opus 5.5|adaptive|—|writes the Stage 1 packet}}
+            <div class="step-body">
+              <div class="chips" role="group" aria-label="Chat setup: check each before you send">
+                <span class="chip on strong"><span class="box on" aria-hidden="true"><svg viewBox="0 0 16 16"><use href="#i-check"/></svg></span>Same chat as 1.1</span>
+                <span class="chip on"><span class="box on" aria-hidden="true"><svg viewBox="0 0 16 16"><use href="#i-check"/></svg></span>Opus 5.5</span>
+                <span class="chip"><span class="box" aria-hidden="true"></span>Adaptive effort</span>
+                <span class="chips-note">Reminders only; Foreman can't set these in claude.ai.</span>
+              </div>
+              <div class="run-inputs">
+                <div class="field">
+                  <label for="in-numbers">Validation results <span class="muted">(run input for [paste numbers])</span></label>
+                  <textarea class="textarea" id="in-numbers" rows="2">No paid test (1.3 didn't apply). Poll in the trading room, 14 Oct: 41 of 60 members would log trades weekly if import were automatic.</textarea>
+                </div>
+                <label class="toggle"><span class="switch" role="switch" aria-checked="true" tabindex="0" aria-label="Include the optional part: press release and FAQ"></span>Include optional part: launch-day press release and FAQ</label>
+              </div>
+              <div class="actions">
+                <button class="btn primary">{{i:external}}Copy and open<kbd>⌘↵</kbd></button>
+                <button class="btn">{{i:copy}}Copy prompt</button>
+                <button class="btn ghost">{{i:link}}claude.ai/chat/7c1e…f04</button>
+              </div>
+              <div class="pasteback found" role="region" aria-labelledby="pb-h" aria-live="polite">
+                <div class="step-head" style="gap:8px"><h3 id="pb-h" class="insp-title">{{g:check:pass}} Packet found on the clipboard: Stage 1 → Stage 2</h3><kbd style="margin-left:auto">Paste back ⌘⇧V</kbd></div>
+                <ul class="writes">
+                  <li><span class="what">Create</span><code>docs/handoff/stage-01.md</code></li>
+                  <li><span class="what">Create</span><span><code>docs/handoff/stage-01-attachments.md</code> <span class="muted">press release and FAQ, 64 lines found after the packet</span></span></li>
+                  <li><span class="what">Create</span><code>spec/01-app-brief.md</code></li>
+                  <li><span class="what">Normalized</span><span>APPROVED BY <code>&lt;blank&gt;</code> becomes unsigned; 3 curly quotes straightened</span></li>
+                </ul>
+                <div class="actions"><button class="btn primary">Write 3 files</button><button class="btn ghost">Cancel</button></div>
+              </div>
+              <div class="prompt-wrap">
+                <div class="prompt-cap"><span>Resolved prompt</span><span class="remap">The optional part is outlined</span></div>
+<pre class="prompt is-clipped" aria-label="Resolved prompt for 1.4">Here are the validation results: <span class="tok" title="Run input">No paid test (1.3 didn't apply). Poll in the trading room…</span>
+If they missed the threshold, tell me plainly and stop. Otherwise,
+<span class="part-optional">write a press release for launch day as if the product already exists
+(Amazon "working backwards" style): headline, the problem, the solution,
+a customer quote, and how to get started. Add an FAQ of the 8 hardest
+questions a customer and an investor would ask, with answers.</span></pre>
+              </div>
+            </div>
+          </li>
+          <li class="step is-quiet">
+            <span class="callout" aria-hidden="true">F.2</span>
+            <div class="step-head"><h2 class="step-title">Lessons capture</h2><span class="step-state">{{g:ring}}After the inspection items</span><span class="lock" title="Core">{{g:lock}}<span class="vh">Core step</span></span></div>
+            {{spec:Chat, same chat as 1.1|Opus 5.5|adaptive|—|appends docs/lessons.md}}
+          </li>
+        </ol>
+      </main>
+      <aside class="inspector p2" aria-label="Inspector">
+        <div class="insp-tabs" role="tablist" aria-label="Inspector views">
+          <button role="tab" aria-selected="true">Packet</button><button role="tab" aria-selected="false">Gate</button><button role="tab" aria-selected="false">Lessons</button><span style="margin-left:auto">{{p2}}</span>
+        </div>
+        <div class="insp-body" role="tabpanel">
+          <div class="empty">
+            <strong>No Stage 1 packet yet</strong>
+            <span>Send 1.4 in the chat, say "approved", copy the packet Claude prints, then press ⌘⇧V on 1.4. Foreman validates it before writing anything.</span>
+          </div>
+          <div>
+            <h2 class="insp-title">Knowledge for this chat</h2>
+            <p class="insp-sub">Nothing to upload yet. Signed packets appear here for the claude.ai Project.</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <section class="drawer collapsed" aria-label="Terminal drawer">
+      <div class="drawer-bar"><span class="muted" style="font-size:var(--text-12)">Terminal: no sessions in TradeLog. Chat steps run in claude.ai.</span><span class="spacer"></span><kbd>⌃`</kbd></div>
+    </section>
+  </div>
+</div>
+{{legend:}}

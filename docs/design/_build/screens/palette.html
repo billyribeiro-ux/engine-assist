@@ -1,0 +1,32 @@
+<!-- title: Foreman mockup: Command palette -->
+<div class="app" aria-hidden="true" inert>
+  {{sidebar:tradelog-s2}}
+  <div class="window">
+    {{titlebar:TradeLog|~/Code/tradelog, branch stage/02-design|drawer insp}}
+    {{strip:s2}}
+    <div class="body">
+      {{include:ws-main}}
+      {{include:ws-inspector}}
+    </div>
+    {{include:ws-drawer}}
+  </div>
+</div>
+<div class="scrim"></div>
+<div class="palette" role="dialog" aria-modal="true" aria-label="Commands">
+  <div class="palette-input">{{i:search}}<label class="vh" for="pal-q">Search projects, stages, steps and actions</label>
+    <input id="pal-q" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-activedescendant="pal-1" value="stack" autocomplete="off"><kbd>esc</kbd></div>
+  <div id="pal-list" role="listbox" aria-label="Results">
+    <div class="palette-group" role="group" aria-labelledby="pg-steps"><div class="group-label" id="pg-steps">Steps</div>
+      <div class="palette-item" role="option" id="pal-1" aria-selected="true">{{i:terminal}}<span>2.4 Stack decision, evidence first <span class="sub">TradeLog, Stage 2, waits for 2.3</span></span><kbd>↵ open</kbd></div>
+      <div class="palette-item" role="option" id="pal-2" aria-selected="false">{{i:terminal}}<span>2.4 Stack decision, evidence first <span class="sub">Foreman, Stage 2, done</span></span><span></span></div>
+      <div class="palette-item" role="option" id="pal-3" aria-selected="false">{{i:chat}}<span>4.2 Design doc and ADRs <span class="sub">Foreman, Stage 4, uses the stack table</span></span><span></span></div>
+    </div>
+    <div class="palette-group" role="group" aria-labelledby="pg-act"><div class="group-label" id="pg-act">Actions</div>
+      <div class="palette-item" role="option" id="pal-4" aria-selected="false">{{i:copy}}<span>Copy prompt for 2.4</span><kbd>⌘⇧C</kbd></div>
+      <div class="palette-item" role="option" id="pal-5" aria-selected="false">{{i:file}}<span>Open council/r7-stack.md <span class="sub">not written yet</span></span><span></span></div>
+      <div class="palette-item" role="option" id="pal-6" aria-selected="false">{{i:play}}<span>Do next <span class="sub">Foreman, 4.5 Design system, copy and open</span></span><kbd>⌘⇧↵</kbd></div>
+    </div>
+  </div>
+  <div class="palette-foot"><span>↑↓ move</span><span>↵ open</span><span>⌘↵ run</span><span>⌘G jump to a stage</span></div>
+</div>
+{{legend:All <span class="p2tag">P2</span>}}

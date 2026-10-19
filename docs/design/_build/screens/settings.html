@@ -1,0 +1,55 @@
+<!-- title: Foreman mockup: Settings -->
+<style>
+.settings { display: grid; grid-template-columns: 180px minmax(0, 680px); gap: var(--space-7); padding: var(--space-6) var(--space-7) var(--space-8); }
+.snav { display: grid; gap: 2px; align-content: start; position: sticky; top: var(--space-6); }
+.snav a { padding: 5px var(--space-3); border-radius: var(--radius-control); color: var(--ink); font-size: var(--text-13); text-decoration: none; }
+.snav a[aria-current] { background: var(--selected); color: var(--accent-ink); font-weight: var(--weight-medium); }
+.sgroup { margin-top: var(--space-6); display: grid; gap: var(--space-4); }
+.sgroup:first-of-type { margin-top: var(--space-4); }
+.sgroup > h2 { font-size: var(--text-15); font-weight: var(--weight-semibold); padding-bottom: var(--space-3); border-bottom: var(--hairline) solid var(--rule); display: flex; align-items: center; gap: var(--space-3); }
+.srow { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.srow > label, .srow > .field-label { padding-top: 5px; font-size: var(--text-13); font-weight: var(--weight-medium); }
+.taglist { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: var(--text-12); padding: 1px 4px 1px 7px; border: 1px solid var(--control-edge); border-radius: var(--radius-pill); }
+.tag button { border: 0; background: transparent; color: var(--ink-muted); padding: 0 2px; }
+</style>
+<div class="app">
+  {{sidebar:settings}}
+  <div class="window no-strip">
+    {{titlebar:Settings||}}
+    <main class="main" id="main" aria-labelledby="set-title">
+      <div class="settings">
+        <nav class="snav" aria-label="Settings sections">
+          <a href="#general" aria-current="true">General</a><a href="#paths">Paths</a><a href="#vars">Variable defaults</a><a href="#terminal">Terminal</a><a href="#env">Environment</a><a href="#data">Data</a>
+        </nav>
+        <form aria-labelledby="set-title">
+          <h1 class="page-title" id="set-title">Settings</h1>
+          <section class="sgroup" id="general" aria-labelledby="g-h"><h2 id="g-h">General</h2>
+            <div class="srow"><label for="s-dri">Name for signatures</label><input class="input" id="s-dri" value="Billy Ribeiro"></div>
+            <div class="srow"><span class="field-label" id="theme-l">Theme {{p2}}</span><div class="seg" role="radiogroup" aria-labelledby="theme-l"><button type="button" role="radio" aria-checked="true">System</button><button type="button" role="radio" aria-checked="false">Night</button><button type="button" role="radio" aria-checked="false">Vellum</button></div></div>
+          </section>
+          <section class="sgroup" id="paths" aria-labelledby="p-h"><h2 id="p-h">Paths</h2>
+            <div class="srow"><label for="s-bp">Blueprint repo {{p2}}</label><div class="input-row"><input class="input mono" id="s-bp" value="~/claude-blueprint"><button class="btn" type="button">Choose…</button></div></div>
+            <div class="srow"><label for="s-claude">claude</label><div class="field"><input class="input mono" id="s-claude" value="bin/claude" aria-invalid="true" aria-describedby="s-claude-err"><p class="err" id="s-claude-err">{{g:cross:fail}}<span>bin/claude is a relative path. Use an absolute path, for example /opt/homebrew/bin/claude. The last valid path stays in use.</span></p></div></div>
+            <div class="srow"><label for="s-git">git</label><div class="field"><input class="input mono" id="s-git" value="/usr/bin/git"><p class="hint">{{g:check:pass}} Found, version 2.51.0</p></div></div>
+          </section>
+          <section class="sgroup" id="terminal" aria-labelledby="t-h"><h2 id="t-h">Terminal {{p2}}</h2>
+            <div class="srow"><label for="s-font">Font size</label><input class="input" id="s-font" value="12" style="width:80px"></div>
+            <div class="srow"><label for="s-sb">Scrollback per tab</label><div class="field"><input class="input" id="s-sb" value="10,000 lines" style="width:160px"><p class="hint">Older lines are archived with the run; the last 2,000 are kept for 90 days.</p></div></div>
+          </section>
+          <section class="sgroup" id="env" aria-labelledby="e-h"><h2 id="e-h">Environment {{p2}}</h2>
+            <div class="srow"><span class="field-label">Pass through to Claude</span><div class="field">
+              <div class="taglist"><span class="tag">HTTPS_PROXY<button type="button" aria-label="Remove HTTPS_PROXY">×</button></span><span class="tag">NODE_EXTRA_CA_CERTS<button type="button" aria-label="Remove NODE_EXTRA_CA_CERTS">×</button></span></div>
+              <div class="input-row" style="margin-top:6px"><label class="vh" for="s-addenv">Add a variable</label><input class="input mono" id="s-addenv" value="ANTHROPIC_API_KEY" aria-invalid="true" aria-describedby="s-env-err"><button class="btn" type="button" disabled>Add</button></div>
+              <p class="err" id="s-env-err">{{g:cross:fail}}<span>ANTHROPIC_API_KEY can't be passed through. Foreman always removes provider keys so billing stays on your plan.</span></p></div></div>
+            <div class="srow"><span class="field-label">Login shell PATH</span><div class="field"><p class="hint">Captured 12 Oct: /opt/homebrew/bin:/Users/billy/.cargo/bin:/Users/billy/Library/pnpm:…</p><div class="actions"><button class="btn" type="button">Capture again</button><button class="btn ghost" type="button">Clear</button></div></div></div>
+          </section>
+          <section class="sgroup" id="data" aria-labelledby="d-h"><h2 id="d-h">Data {{p2}}</h2>
+            <div class="srow"><span class="field-label">Run history</span><div class="field"><p class="hint">212 runs, 38 MB in app data. Clearing keeps stage records in your repos.</p><div class="actions"><button class="btn danger" type="button">Clear run history…</button></div></div></div>
+          </section>
+        </form>
+      </div>
+    </main>
+  </div>
+</div>
+{{legend:}}

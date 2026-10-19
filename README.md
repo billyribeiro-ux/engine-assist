@@ -4,15 +4,15 @@
 
 ## Status
 
-Pre-Construction. Stage 2 (the Master Spec) is frozen pending sign-off; Stages 3 and 4 are drafted on their own branches.
+Pre-Construction is complete and awaiting signatures: Stages 1 (re-sign), 2, 3 and 4, in that order. Stage 5 onward runs on your Mac.
 
 | Stage | Status |
 |---|---|
 | 1 · Meet the Architect | Signed (`docs/handoff/stage-01.md`); Billy to re-sign in standard form |
 | 2 · Design Studio | `docs/MASTER-SPEC.md` FROZEN v1.0 on sign; packet `docs/handoff/stage-02.md` awaiting signature (PR from `stage/02-design-studio`) |
 | 3 · Permits | Drafted on `stage/03-permits` |
-| 4 · Construction Drawings | Drafted on `stage/04-drawings` |
-| 5–18 | Not started; Stage 5 runs on your Mac |
+| 4 · Construction Drawings | Build package complete on `stage/04-drawings`; packet `docs/handoff/stage-04.md` awaiting signature |
+| 5–18 | Not started; run on your Mac with `docs/build-prompts.md` |
 
 ## Where things are
 
