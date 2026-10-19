@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+build/
+.vite/
+
+# Rust / Tauri
+target/
+src-tauri/gen/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Claude Code local-only files
+.claude/settings.local.json
+.claude/worktrees/
+
+# Logs
+*.log
