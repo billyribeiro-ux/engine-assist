@@ -2,6 +2,11 @@
 
 This is the "by hand" side of Foreman's kill criterion (`docs/MASTER-SPEC.md` §9). Starting with Foreman's own Stage 5 on your Mac, log every step you run **without** Foreman. At the end of Foreman's phase 1, the same measures from Foreman's run log are compared against this file.
 
+Both sides use the same two measures (Master Spec §9), compared per surface (chat, CLI):
+
+1. **Time to start a step:** from the moment you begin looking for the next step to the prompt being sent.
+2. **Active time per stage:** from the first step started to the packet signed, excluding waits (Claude working, the 7-day test).
+
 ## How to log a step
 
 - **Decided at:** the moment you decide to run the step (you open the blueprint or the prompts file to find it).
@@ -18,14 +23,21 @@ Use a stopwatch or your clock; whole seconds are enough.
 |---|---|---|---|---|---|---|---|---|
 | | | | | | | | | |
 
+## Stage log
+
+| Date | Project | Stage | Surface(s) | First step started | Packet signed | Waits excluded (min) | Active minutes |
+|---|---|---|---|---|---|---|---|
+| | | | | | | | |
+
 ## Summary (fill in at the end of Foreman's phase 1)
 
-| Measure | By hand (this file) | Foreman (run log) |
-|---|---|---|
-| Steps logged | | |
-| Median seconds to start | | |
-| p90 seconds to start | | |
-| Manual edits per step | | |
-| Mistakes per stage | | |
+| Measure | Surface | By hand (this file) | Foreman (Export metrics) |
+|---|---|---|---|
+| Steps logged | chat · CLI | | |
+| Median seconds to start | chat · CLI | | |
+| p95 seconds to start | chat · CLI | | |
+| Median active minutes per stage | chat · CLI | | |
+| Manual edits per step | all | | |
+| Mistakes per stage | all | | |
 
-**Kill check:** if Foreman's median seconds-to-start isn't lower than the by-hand median, or Foreman needed a manual prompt edit the by-hand run didn't, stop and simplify.
+**Kill check:** if Foreman's median on either measure isn't lower than the by-hand median for the same surface, or any Foreman step needed a manual prompt edit, stop and simplify. Start with Foreman's own Stage 5 (CLI); log the first chat steps you run by hand in any project for the chat baseline.

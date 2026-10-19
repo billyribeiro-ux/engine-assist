@@ -37,7 +37,7 @@ FIX (applied): open (proposal for blueprint v2.2 retro)
 STATUS: open
 
 ## L-003 · Stage 2 · 2026-10-19 · The first build order put the kill check at 84% of the build
-WHAT HAPPENED: Round 2's build order placed the kill criterion after 16 of 18 v1 proposals; the red team computed 84% of the sized work (R-04). The plan was rebuilt around a thin end-to-end phase with the kill check at about 6–8 weeks, plus a by-hand baseline.
+WHAT HAPPENED: Round 2's build order placed the kill criterion after 16 of 18 v1 proposals; the red team computed 84% of the sized work (R-04). The plan was rebuilt around a thin end-to-end phase (re-estimated by the freeze review to put the kill check at about 8–14 weeks, after roughly half of the v1 work), plus a by-hand baseline.
 CAUGHT BY: inspection (Stage 2 council, red-team)
 SHOULD HAVE BEEN CAUGHT BY: Round 3 (chair synthesis)
 ROOT CAUSE: prompt
@@ -64,5 +64,15 @@ ROOT CAUSE: external change
 COST: residual risk carried into Stage 5 (bounded by the decision rules)
 FIX (proposed): blueprint 2.6, item 7, add: "A spike that can't run before the freeze isn't an open question if the spec defines what ships for each outcome."
 FIX (applied): project only
+STATUS: applied
+
+## L-006 · Stage 2 · 2026-10-19 · The chair's resolution didn't fully reach the frozen documents
+WHAT HAPPENED: After Round 5, an independent freeze review found 3 blockers, 17 major and 20 minor issues: phase 1 still held about 21 weeks of work while promising a kill check at 6–8 weeks; Stage 2's own close-out (no Gate C) was undefined; one unhardened `claude -p` call remained; `auto` gate items had no source in v1; and the Brief's v1 cuts weren't listed for approval. All were fixed (r5b).
+CAUGHT BY: design-reviewer
+SHOULD HAVE BEEN CAUGHT BY: the chair, while compiling the Master Spec (2.6)
+ROOT CAUSE: missing gate
+COST: one review round and a broad edit pass across six files before the freeze
+FIX (proposed): blueprint 2.6, before "Then output the MASTER SPEC PACKET", add: "Have an independent reviewer who wrote none of the council files check that every red-team resolution is reflected in MASTER-SPEC.md, that phases and estimates add up from the feature sizes, and that every change from the App Brief is listed for my approval. Fix every BLOCKER and MAJOR before the packet."
+FIX (applied): project only (r5b)
 STATUS: applied
 

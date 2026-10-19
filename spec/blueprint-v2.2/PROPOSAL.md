@@ -1,6 +1,6 @@
 # Blueprint v2.2 · Change proposal
 
-Status: **PROPOSED**, waiting for Billy's approval
+Status: **PROPOSED**. Signing the Foreman Stage 2 packet approves applying it (its BLUEPRINT DEPENDENCY line). Rejecting any item at that sign needs a note, and the chair revises the affected Foreman features before Stage 4.
 Applies to: `claude-build-blueprint.md` v2.1 (the copy in `docs/spec-input/` is the baseline used here)
 Source: Stage 2 council for Foreman (`spec/council/r2-proposals.md` §5, decided in `r3-synthesis.md` §4)
 
@@ -42,7 +42,7 @@ Two more directives, each a block-level HTML comment on its own lines.
 <!-- fm:step id=<id> [kind=prompt|followup|action|manual|wait|repeatable]
      [tag=core|conditional|optional] [when=<expr>]
      [surface=chat|cli|desktop] [cwd=project|spec|blueprint|worktree]
-     [session=new|continue|fresh] [chain=<stepId>]
+     [session=new|continue] [chain=<stepId>|@stage]
      [start=<model>@<effort>/<mode>] [switch=<trigger>:<model>@<effort>/<mode>]*
      [alt=<rule>:<model>@<effort>]* [in=<name>:<type>[:remember]]*
      [out=<path>[,<path>…]] [appends=<path>] [requires=<path>[,<path>…]] -->
@@ -51,19 +51,21 @@ Two more directives, each a block-level HTML comment on its own lines.
 `fm:verify` goes directly under an INSPECTION blockquote, one entry per item, in bullet order, each with an explicit item ID:
 
 ```text
-<!-- fm:verify fresh-clone=attest ci-gates=attest staging=attest adr-check=auto:cmd=adr-check -->
+<!-- fm:verify fresh-clone=attest ci-gates=attest staging=attest adr-check=attest -->
 ```
 
 Rules:
 
-- Values contain no spaces. Lists are comma-separated. Paths are relative to the step's `cwd`, repo-relative, with no `..`.
-- `when` is an expression over condition IDs, using `!`, `&`, `|`, and parentheses (for example `when=has_payments&!internal_only`).
+- Values contain no spaces. Lists are comma-separated. **Every path is repo-relative** (never relative to the step's `cwd`), with no `..`; Foreman renders paths relative to the cwd when it puts them into a prompt.
+- `when` is an expression over condition IDs, using `!`, `&`, `|`, and parentheses (for example `when=payments&!public`). Condition IDs: `idea_known`, `commercial`, `payments`, `multi_user`, `public`, `has_ui`, `others_data`, `server`, `has_database`, `has_uploads`, `has_email`, `has_integrations`; any other ID is an error.
 - `<mode>` is one of `plan`, `default`, `acceptEdits`, `auto`, `dontAsk`. Chat steps omit the mode.
-- A `session=continue` step inherits its chain's `cwd`; declaring a different one is an error.
-- `fm:verify` kinds: `auto:cmd=<verify-id>` (Foreman runs that approved command itself and records the exit code; `cmd` is required), `attest` (Billy confirms, or records "not applicable" with a reason), `time:<n>d` (a waiting period, then `>attest` or `>auto:cmd=…`). The number of entries must equal the number of bullets.
+- A `session=continue` step inherits its chain's `cwd`; declaring a different one is an error. `chain=@stage` (used by F.2) means the chain of the stage's packet-producing step.
+- `<mode>` is one of `plan`, `default`, `manual` (alias of `default`), `acceptEdits`, `auto`, `dontAsk`. `bypassPermissions` is always an error.
+- `tag=optional` with `when`: not applicable when false, skippable with a reason when true.
+- `fm:verify` kinds: `attest` (Billy confirms with a note, or records "not applicable" with a reason), `time:<n>d` (a waiting period, then `>attest`). Reserved for Foreman v1.1: `auto:cmd=<verify-id>` (Foreman runs that approved command itself). The number of entries must equal the number of bullets.
 - Item IDs are stable: Foreman stores a normalized hash of each bullet's text in the lock. If a bullet's text changes, Foreman asks to re-confirm its kind. A retro that reorders bullets keeps each ID with its bullet.
 - An unknown directive or key is an error within a grammar version and a warning across versions.
-- Reserved for v1.1, parsed but not applied: `<!-- fm:if <expr> -->` … `<!-- fm:end -->` around a conditional part of a prompt.
+- `<!-- fm:if <expr> -->` … `<!-- fm:end -->` wraps a conditional part of a prompt (block-level, not nested). Foreman removes the part when the expression is false and records it under SKIPPED. An optional part is written inline as `[optional: …]`; Foreman shows it with an Include toggle.
 
 ### What to annotate
 
@@ -75,12 +77,12 @@ Required for v1 (about 40 comment lines):
 |---|---|
 | Stage 0 (0.1, 0.2) | Full `fm:step` on each; tag `optional` with `when=!idea_known` (an idea can arrive already chosen) |
 | Stage 1 (1.1 to 1.4) | `in=X:text` on 1.1, `in=changes:text` on 1.2, `in=paste_numbers:text` on 1.4; the 7-day wait as `kind=wait` after 1.3; tags (B-5) |
-| Stage 2 (2.1 to 2.6, Council setup) | `out=` for 2.1 and every council round; Council setup as `kind=action`; the manual "record your final choice" in 2.4 as `kind=manual`; 2.6 `out=MASTER-SPEC.md` plus the packet path (B-2) |
-| Stage 3 (3.1, 3.2) | `in=jurisdictions:text:remember`; tags (3.1 `conditional`, `when=has_payments`) |
+| Stage 2 (2.1 to 2.6, Council setup) | `out=` for 2.1 and every council round; Council setup as `kind=action`; the manual "record your final choice" in 2.4 as `kind=manual`; 2.6 `out=spec/MASTER-SPEC.md,docs/handoff/stage-02.md` (B-2) |
+| Stage 3 (3.1, 3.2) | `in=jurisdictions:text:remember`; tags (3.1 `conditional`, `when=commercial\|payments`); `fm:if commercial\|others_data\|multi_user` around 3.2's legal part |
 | Stage 4 (4.1 to 4.8) | `session=new` on each; `out=` per document; tags (4.5 `conditional`, `when=has_ui`); late conditions asked at the 4.8 sign |
 | Stage 5 (5.1 to 5.5, gate) | `start`/`switch` for the opusplan → Opus → Sonnet sequence; `fm:verify` on the gate |
 | Stage Gate (A, B, C) | `kind=prompt`, `chain` for B and C; A's headless eligibility comes from `fm:verify` on each stage's inspection list |
-| F.2 | `kind=prompt`, `session=continue`, `appends=docs/lessons.md` |
+| F.2 | `kind=followup`, `session=continue`, `chain=@stage`, `appends=docs/lessons.md` (in chat stages Foreman appends the pasted entries; in Stage 2 Claude writes them) |
 
 The remaining stages (6–18) show as "needs annotation" in Foreman's Template health screen until a later v2.x change annotates them.
 
@@ -92,7 +94,7 @@ Stage 2.2, the council (annotation under the existing RUN WITH):
 > **RUN WITH** · Claude Code CLI in `spec/` · Chair: **Fable 5.1** · effort **high** (Max plan) — or **Opus 5.5** · effort **xhigh** (Pro plan / to save usage) · **Plan** mode first, then **Accept edits** · agents: all six council agents
 <!-- fm:step id=2.2 kind=prompt tag=core surface=cli cwd=spec session=new
      start=fable@high/plan switch=plan-approved:fable@high/acceptEdits alt=pro-plan:opus@xhigh
-     out=council/r1-market.md,council/r1-users.md,council/r2-features.md,council/r2-growth.md,council/r2-feasibility.md,council/r3-synthesis.md,council/r4-redteam.md,council/r5-resolution.md -->
+     out=spec/council/r1-market.md,spec/council/r1-users.md,spec/council/r2-features.md,spec/council/r2-growth.md,spec/council/r2-feasibility.md,spec/council/r3-synthesis.md,spec/council/r4-redteam.md,spec/council/r5-resolution.md -->
 ```
 
 Stage 2.3, a continuing step:
@@ -100,7 +102,7 @@ Stage 2.3, a continuing step:
 ```markdown
 > **RUN WITH** · same session · same chair model · effort unchanged · **Accept edits**
 <!-- fm:step id=2.3 kind=followup tag=core surface=cli session=continue chain=2.2
-     start=fable@high/acceptEdits alt=pro-plan:opus@xhigh out=council/r6-feature-specs.md -->
+     start=fable@high/acceptEdits alt=pro-plan:opus@xhigh out=spec/council/r6-feature-specs.md -->
 ```
 
 The Stage 5 gate:
@@ -185,7 +187,7 @@ You read it, add your name and date under APPROVED BY, and commit. **Then** the 
 
 ```text
 You read it, fill in APPROVED BY with your name and the date, and commit only that file:
-`git commit -m "handoff: stage NN" -- docs/handoff/stage-NN.md docs/lessons.md`. **Then** the next stage starts.
+`git add -- docs/handoff/stage-NN.md docs/lessons.md` then `git commit --only -m "handoff: stage NN" -- docs/handoff/stage-NN.md docs/lessons.md` (plain `git commit -- <paths>` fails for a new, untracked packet). **Then** the next stage starts.
 ```
 
 ---

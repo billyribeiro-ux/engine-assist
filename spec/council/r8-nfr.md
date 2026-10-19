@@ -1,7 +1,7 @@
 # Round 8 · Non-functional requirements (prompt 2.5)
 
 Chair: Opus 5.5 (xhigh) · Date: 2026-10-19
-Inputs: App Brief (`docs/handoff/stage-01.md`), draft spec §9–§10, `r1-engineering.md`, `r1-workflow.md`, `r2-proposals.md`, `r3-synthesis.md`.
+Inputs: App Brief (`docs/handoff/stage-01.md`), draft spec §9–§10, `r1-engineering.md`, `r1-workflow.md`, `r2-proposals.md`, `r3-synthesis.md`; revised after `r4-redteam.md`, `r5-resolution.md` and `r5b-freeze-review.md`.
 
 Prompt 2.5 asks for latency per endpoint class, availability and error budget, backup RPO/RTO, scale at launch and at 100x, security level, accessibility, platform support, retention, privacy, and infrastructure cost per user. Foreman is a local, single-user desktop app with no server, so each item is translated to what it means here. Where a web concept doesn't apply, this file says so and gives the local equivalent.
 
@@ -16,14 +16,14 @@ The success metric that matters most: **starting any step takes under 10 seconds
 | ID | Interaction class | Target (Apple Silicon, M1 or later) | Measured by |
 |---|---|---|---|
 | NFR-01 | Cold start to an interactive Today screen | p95 ≤ 1.5 s | Timestamp from process start to first Today render, in the run log; checked in CI-equivalent local perf test |
-| NFR-02 | Warm switch between projects | p95 ≤ 300 ms for a project with 200 tickets and 19 stages | Rust benchmark (`criterion`) on the load path + frontend mark |
+| NFR-02 | Warm switch between projects | p95 ≤ 300 ms for a project with 19 stages and 200 run records | Rust benchmark (`criterion`) on the load path + frontend mark |
 | NFR-03 | Template load (parse + validate + prose lint of the full blueprint) | p95 ≤ 50 ms; cached by file hash, so most loads are ≤ 5 ms | `criterion` benchmark against the golden blueprint (r1-engineering measured comrak at 1.7 ms for the parse alone) |
 | NFR-04 | Prompt resolution and `prepare_launch` checks | p95 ≤ 50 ms | `criterion` |
 | NFR-05 | Launch: keystroke to the `claude` process spawned in the PTY | p95 ≤ 250 ms (excludes Claude Code's own startup) | Run-log timestamps |
 | NFR-06 | Packet visible in the UI after the file is written | p95 ≤ 1 s (debounce ~250 ms) | Integration test with a fake writer |
 | NFR-07 | UI input latency: any click or key to visual feedback | ≤ 100 ms; no main-thread task over 50 ms during normal use | Playwright trace in the mocked-IPC suite |
 | NFR-08 | Terminal throughput | Renders a 1 MB burst of output without dropping input or freezing the UI for more than 100 ms | PTY integration test with xterm's WebGL renderer |
-| NFR-09 | Time to start a step (the success metric) | Median ≤ 10 s, from app focus or Today open to run start, over a week of real use | Metric panel (P-18) |
+| NFR-09 | Time to start a step (the success metric) | p95 ≤ 10 s, excluding time typing run inputs, from focusing Foreman or pressing Do next to the prompt being sent, over a week of real use | Export metrics (P1) and the metric panel (P2), F-026 |
 
 ## 2. Availability and reliability
 
@@ -34,7 +34,7 @@ There's no service to keep up. Availability means: Foreman never stands between 
 | NFR-10 | **No data loss or corruption, ever.** Every write is atomic (temp file in the same directory, `fsync`, rename, `fsync` of the directory). Tested by killing the process at every write point. | Fault-injection tests in Rust |
 | NFR-11 | **Crash-safe run state.** A run record is written at launch (status `running`) and updated at exit. After a crash or force quit, the next start lists interrupted sessions with one-click Resume. Zero sessions lost. | Integration test: kill Foreman with a live fake-`claude` child; restart; assert the session is listed |
 | NFR-12 | **External edits win.** If a file changed on disk after Foreman read it, Foreman refuses to write and shows the conflict. Foreman never overwrites a newer file. | Property test on the write path with interleaved external edits |
-| NFR-13 | **Degrade, don't block.** If the session sensor, file watcher, Doctor checks, or contract probes fail, the step still runs by hand with one extra confirmation. Foreman's failure never blocks starting a step. | Tests for each fallback path (P-06, P-14) |
+| NFR-13 | **Degrade, don't block.** If the session sensor, file watcher, Doctor checks, or contract probes fail, the step still runs by hand with one extra confirmation. Foreman's failure never blocks starting a step. | Tests for each fallback path (F-011, F-019) |
 | NFR-14 | **Escape hatch.** Every stage can be exported as a Markdown run sheet (resolved prompts and exact commands), so the blueprint can always be run without Foreman. | Golden test of the export |
 | NFR-15 | Stability target: zero crashes per week of daily use after the first month. Any crash produces a local crash report (no upload) and a run-log entry. | Run log + macOS crash reports |
 
@@ -62,7 +62,7 @@ Foreman doesn't run its own backups. Time Machine and git remotes cover it. Requ
 | NFR-24 | Blueprint size | 2,235 lines (v2.1) | 20,000 lines, still meeting NFR-03 |
 | NFR-25 | Disk use by app data | ≤ 50 MB per year of daily use (run log + terminal tail files, 2,000 lines per run, pruned after 90 days) | — |
 
-NFR-23 is UNVERIFIED: r1-engineering flagged it for measurement in the first Stage 6 spike (xterm 6 with the WebGL renderer and three TUIs).
+NFR-23 is UNVERIFIED until spike S-0 in Stage 5.3 (xterm 6 with the WebGL renderer and three real Claude TUIs); its fail branch is in Master Spec §9.
 
 ## 5. Security level
 
@@ -93,7 +93,7 @@ The detailed SR-NN list is written in Stage 3.2 (`docs/requirements.md`).
 | ID | Requirement |
 |---|---|
 | NFR-36 | macOS 27 (Golden Gate, released 2026-09-14) and macOS 26 (Tahoe), Apple Silicon only. Liquid Glass window effects on both, with a Visual Effect material as the fallback. Intel Macs and Windows/Linux are not supported. |
-| NFR-37 | Claude Code CLI ≥ 2.1.285 (the hard floor), plus the per-capability minimums in `r3-synthesis.md` §3.4, checked by Doctor. Logged in with a Claude subscription (`authMethod` `claude.ai` or `oauth_token`). |
+| NFR-37 | Claude Code CLI ≥ 2.1.293, the floor computed from the steps' models and flags and the pinned kit's agent models (R-19), checked by Doctor. Logged in with a Claude subscription (`authMethod` `claude.ai` or `oauth_token`). |
 | NFR-38 | Built and run locally (ad-hoc signed, no notarization), per the App Brief. |
 
 ## 8. Data retention and privacy
@@ -110,7 +110,7 @@ The detailed SR-NN list is written in Stage 3.2 (`docs/requirements.md`).
 | ID | Requirement |
 |---|---|
 | NFR-43 | Infrastructure cost: $0. No servers, no paid services. |
-| NFR-44 | Claude usage: Foreman never starts a Claude run without an explicit action from Billy. Contract probes (`--init-only`, argv parsing) use no tokens. Any `claude -p` call Foreman makes (packet capture in v1, headless Gate A in v1.1) shows its model and effort before running, and its cost from the JSON result is recorded in the run log. |
+| NFR-44 | Claude usage: Foreman never starts a Claude run without an explicit action from Billy. Contract probes (`--init-only`) use no tokens. v1 makes no `claude -p` calls; in v1.1, headless Gate A shows its model and effort before running and records its cost from the JSON result in the run log. |
 
 ## 10. Engineering quality
 
@@ -119,4 +119,4 @@ The detailed SR-NN list is written in Stage 3.2 (`docs/requirements.md`).
 | NFR-45 | TypeScript strict (plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), zero errors and zero warnings in `svelte-check` and ESLint. |
 | NFR-46 | Rust: `clippy -D warnings` (pedantic on the core crate), `rustfmt`, no `unwrap`/`expect` outside tests, `unsafe` forbidden in Foreman's own crates. |
 | NFR-47 | Every rule in the tag/condition engine, packet rules, resolver, and signing has unit tests; the parser has golden tests against the real blueprint and property tests for the annotation grammar. |
-| NFR-48 | The TradeLog acceptance harness (P-03) passes: Stages 1–5 of the TradeLog blueprint run produce zero manual prompt edits and zero unresolved variables. |
+| NFR-48 | The TradeLog acceptance harness (F-003) passes: Stages 1–5 of the TradeLog blueprint run produce zero manual prompt edits and zero unresolved variables. |

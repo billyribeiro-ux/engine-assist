@@ -297,7 +297,7 @@ The one real fork in the road is **SvelteKit 3 vs plain Svelte 5 + Vite**. Every
 
 **If the DRI keeps SvelteKit 3 SPA**, add `@sveltejs/kit` 3.1.0 and `@sveltejs/adapter-static` 4.0.0, and use the r1 §A4 config (`sveltekit({ adapter: adapter({ fallback: 'index.html' }), version: { pollInterval: 0 } })`, `ssr = false`, `#lib`, `$app/tsconfig`).
 
-**Toolchain floors:** Rust ≥ 1.90 · Node ≥ 22.17 · Claude Code ≥ 2.1.285 (≥ 2.1.293 if any step uses Haiku 5.5) (r1 E4).
+**Toolchain floors:** Rust ≥ 1.90 · Node ≥ 22.17 · Claude Code ≥ 2.1.293 (the kit's `Explore` and `test-runner` agents use Haiku 5.5; r4 R-19). Dev-dependency added after the freeze review: criterion 0.8.2 (benchmarks for NFR-02/03/04).
 
 ### Stage 5 spikes that confirm this decision
 

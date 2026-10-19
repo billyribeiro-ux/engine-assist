@@ -3,6 +3,8 @@
 Chair: Opus 5.5 (xhigh) · Date: 2026-10-19
 Input: `r4-redteam.md` (1 fatal, 13 serious, 12 minor), against `r3-synthesis.md`.
 
+**Amended by `r5b-freeze-review.md`:** the phase-1 scope, estimate and kill-check timing (§3), `auto` items (moved to v1.1), the one remaining `claude -p` call (removed), the config fingerprint, path policy, signing defaults and probes. Where they differ, r5b and the frozen Master Spec win.
+
 Rule from prompt 2.2: every fatal and serious objection is answered, by changing the plan or by citing evidence that defeats it. Every minor objection gets a decision too. Nothing is deferred as "open".
 
 **Result: all 26 objections accepted.** None was defeated by counter-evidence. The red team's citations were spot-checked against the CLI reference on 2026-10-19: `--restricted` (v2.1.248+, "loads only managed settings and `--settings`"), `--init-only` ("Run Setup and SessionStart hooks, then exit without starting a conversation"), `--strict-mcp-config`, `--agents` file form with `-p` (v2.1.281+), `--fork-session`, `--setting-sources`, `--desktop --resume <session ID>`, and the sentence "`claude --help` does not list every flag". All confirmed ([cli-reference](https://code.claude.com/docs/en/cli-reference)).

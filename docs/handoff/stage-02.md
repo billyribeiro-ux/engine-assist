@@ -11,39 +11,41 @@ POSITIONING: Foreman is the site office for building software with
   process while leaving Claude Code, Claude chat and the blueprint as
   they are.
 
-V1 FEATURES: (P1 = thin end-to-end, ends at the kill check; P2 = rest of v1)
-  F-001 Template engine: annotations only, prose lint, explicit item IDs (P1+P2)
-  F-002 Blueprint lock (P1)
-  F-003 Template health + TradeLog acceptance harness (P1+P2)
-  F-004 Rule engine: tags, tri-state conditions, applicable path (P1)
-  F-005 Run configs + model policy (P1)
-  F-006 Prompt resolver, five token classes (P1+P2)
-  F-007 Step kinds and states (P1)
-  F-008 Launch pipeline: version, contract, config fingerprint, auth in cwd (P1)
-  F-009 Terminal runner: portable-pty + xterm 6 (P1+P2)
-  F-010 Session chains and re-arm (P1, manual idle confirmation)
-  F-011 Session sensor: per-launch hooks, exec form, tokened events (P2)
-  F-012 Chat bridge: chips, links, paste-back, attachments, ADR split (P1)
-  F-013 Packet engine: watch, validate, repair, capture (P1)
-  F-014 Signing and provenance: hash-bound, pathspec, read-back (P1)
-  F-015 Gates: attest with note or n/a; auto = Foreman runs the command (P1+P2)
-  F-016 Lessons capture (P1)
-  F-017 Today and Do next (P1 Next step; P2 inbox)
-  F-018 Projects and setup (P1 form; P2 wizard)
-  F-019 First run, Doctor, zero-token contract probes (P1+P2)
-  F-020 State, persistence, resilience (P1)
-  F-021 Path policy for every Foreman write (P1)
-  F-022 Outside-change review for decision files (P1)
+V1 FEATURES: (P1 = thin end-to-end, ends at the kill check; P2 = rest of v1;
+  full table with phases: docs/MASTER-SPEC.md §4 and §9)
+  F-001 Template engine: annotations only, prose lint, item IDs + hashes
+  F-002 Blueprint lock (with item hashes)
+  F-003 TradeLog acceptance harness (P1) + Template health screen (P2)
+  F-004 Rule engine: tags, tri-state conditions, applicable path
+  F-005 Run configs + model policy
+  F-006 Prompt resolver: six token classes incl. optional parts; fm:if parts
+  F-007 Step kinds and states
+  F-008 Launch pipeline: version, full config fingerprint, auth in cwd
+  F-009 Terminal runner: portable-pty + xterm 6
+  F-010 Session chains and re-arm (manual idle confirmation in P1)
+  F-011 Session sensor (P2)
+  F-012 Chat bridge: chips, links, paste-back, attachments
+  F-013 Packet engine: watch, validate, normalize (repair, capture in P2)
+  F-014 Signing and provenance (P2; current branch by default)
+  F-015 Gates: attest with note or n/a, time, interactive Gate A import (P2)
+  F-016 Lessons capture: F.2 per stage, Gate C (P2)
+  F-017 Next step + Do next (P1); Today inbox (P2)
+  F-018 Setup form (P1); wizard (P2)
+  F-019 First run, version, auth (P1); Doctor, contract probes (P2)
+  F-020 State, persistence, resilience
+  F-021 Path policy (deny by component at any depth, symlink refusal)
+  F-022 Outside-change review for decision files
   F-023 Knowledge manifest + build-package assembler (P2)
   F-024 Desktop handoff (P2)
   F-025 Add prompt / inspection item, this project only (P2)
-  F-026 Run log (P1) + metric panel (P2)
-  F-027 Run sheet export (P1)
-  F-028 Command palette and keyboard (P1+P2)
-  F-029 Settings (P1)
-  F-030 Sheet strip and stage workspace (P1)
-  v1.1: headless Gate A (hardened), Crew Loop, CR track, full overlay
-  authoring, usage meter, live send, lessons view, metrics dashboard.
+  F-026 Run log + Export metrics (P1); metric panel, run log screen (P2)
+  F-027 Run sheet export (P2)
+  F-028 Core shortcuts (P1); command palette (P2)
+  F-029 Settings (P1 paths and DRI; P2 rest)
+  F-030 Stage workspace (P1); sheet strip, title block, inspector (P2)
+  v1.1: headless Gate A with auto items and verify commands, Crew Loop,
+  CR track, full overlay authoring, usage meter, live send, lessons
+  view, metrics dashboard.
 
 DIFFERENTIATORS:
   - vs running by hand: exact argv per step, re-arm for "same session"
@@ -71,7 +73,7 @@ STACK (FINAL):
 
 NFRs: cold start p95 <= 1.5 s · project switch p95 <= 300 ms · template
   load p95 <= 50 ms · keystroke to spawn p95 <= 250 ms · packet visible
-  p95 <= 1 s · time to start a step median <= 10 s · <= 300 MB with 3
+  p95 <= 1 s · time to start a step p95 <= 10 s (excl. typing inputs) · <= 300 MB with 3
   terminal tabs (verified in S-0) · no data loss, crash-safe run state ·
   ASVS 5.0 L2 (applicable chapters) · WCAG 2.2 AA · macOS 27 and 26 on
   Apple Silicon · no network calls by Foreman · $0 infrastructure.
@@ -108,6 +110,22 @@ SUBSTITUTIONS:
   - The council's spikes need a logged-in Claude Code on Billy's Mac;
     each has a decision rule and runs in Stage 5.3 (MASTER-SPEC §9)
 
+BLUEPRINT DEPENDENCY: Foreman v1 targets blueprint v2.2. Signing this
+  packet approves applying spec/blueprint-v2.2/PROPOSAL.md (B-1 to B-6a,
+  B-8 now; B-6b and B-7 with v1.1) in the claude-blueprint repo. Note any
+  item you reject next to your signature.
+
+CHANGES FROM THE APP BRIEF: docs/MASTER-SPEC.md §17 lists every App
+  Brief item moved to v1.1 or redefined (headless inspection, Crew Loop,
+  add agents / promote to blueprint, CRs, dashboard, the 10-second
+  metric as p95, kill check at about 8-14 weeks, signing by hand in P1).
+  Signing accepts them; note any you reject.
+
+ACTION FOR BILLY BEFORE SIGNING: the Stage 1 packet's APPROVED BY line was
+  filled in by Claude from your chat approval, which breaks the "never
+  sign a packet" rule and isn't in the standard form. Please re-sign
+  docs/handoff/stage-01.md yourself as "Billy Ribeiro on 2026-10-19".
+
 OPEN ITEMS: none
 
 NEXT: Stage 3 · Permits & Zoning · Claude Code CLI · Opus 5.5 · high ·
@@ -118,7 +136,8 @@ NEXT: Stage 3 · Permits & Zoning · Claude Code CLI · Opus 5.5 · high ·
 FILES: docs/MASTER-SPEC.md (with design Appendix A), spec/council/r1-engineering.md,
   spec/council/r1-workflow.md, spec/council/r2-proposals.md,
   spec/council/r3-synthesis.md, spec/council/r4-redteam.md,
-  spec/council/r5-resolution.md, spec/council/r6-feature-specs.md,
+  spec/council/r5-resolution.md, spec/council/r5b-freeze-review.md,
+  spec/council/r6-feature-specs.md,
   spec/council/r7-stack.md, spec/council/r8-nfr.md,
   spec/blueprint-v2.2/PROPOSAL.md (for Billy to apply in the blueprint
   repo), docs/metrics-baseline.md (start logging at Stage 5)
@@ -130,8 +149,9 @@ INSPECTION (2.6):
   - Every v1 feature beats a named alternative or is table stakes:
     attested, docs/MASTER-SPEC.md §4 and r6 "Beats" lines
   - Every fatal or serious red-team objection resolved in writing:
-    attested, r5-resolution §1 (R-01 to R-14, all accepted) and an
-    independent freeze review
+    attested, r5-resolution §1 (R-01 to R-14, all accepted); an
+    independent freeze review (r5b) found 3 blockers, 17 major and 20
+    minor issues, all resolved in r5b and applied to the frozen files
   - Evidence-first stack recommendation for every layer plus the
     recorded final choice: attested, r7-stack PART 1–3 and DRI section
   - Open questions: zero; Status: FROZEN v1.0: attested,
