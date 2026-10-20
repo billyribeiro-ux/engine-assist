@@ -83,7 +83,7 @@ fn step(key: CloseoutKey, label: &str, state: CloseoutState, note: Option<&str>)
 }
 
 /// The close-out sequence for the stage's type (DR-070, AC-F015-01, AC-F012-16).
-fn closeout_steps(c: &Closeout, signed: bool) -> Vec<CloseoutStep> {
+fn closeout_steps(c: &Closeout, signed: bool, pending: bool) -> Vec<CloseoutStep> {
     use CloseoutState as S;
     let idx = |g: CoreGate| gate::SEQUENCE.iter().position(|x| *x == g).unwrap_or(0);
     let at = idx(c.state);
@@ -131,12 +131,21 @@ fn closeout_steps(c: &Closeout, signed: bool) -> Vec<CloseoutStep> {
     } else {
         S::Locked
     };
-    let sign = step(
-        CloseoutKey::Sign,
-        if signed { "Signed" } else { "Sign" },
-        sign_state,
-        None,
-    );
+    let sign = if pending {
+        step(
+            CloseoutKey::Sign,
+            "Signed (commit pending)",
+            S::Failed,
+            Some(PENDING_NOTE),
+        )
+    } else {
+        step(
+            CloseoutKey::Sign,
+            if signed { "Signed" } else { "Sign" },
+            sign_state,
+            None,
+        )
+    };
     let mut v = Vec::new();
     match c.kind {
         StageType::Gated => {
@@ -200,10 +209,19 @@ fn closeout_steps(c: &Closeout, signed: bool) -> Vec<CloseoutStep> {
     v
 }
 
+/// The sign step's note while a signing commit is pending (AC-F014-11, -13).
+pub const PENDING_NOTE: &str =
+    "APPROVED BY is written, but the commit didn't finish. Retry commit.";
+
 /// The `GateView` of a close-out.
 #[must_use]
 pub fn view(p: &Opened, c: &Closeout) -> GateView {
     let signed = p.signed().contains(&c.stage);
+    let pending = p
+        .progress
+        .signing
+        .get(&c.stage.to_string())
+        .is_some_and(|s| s.state == foreman_core::schema::progress::SigningState::CommitPending);
     let statuses: Vec<CoreStatus> = c.items.iter().map(|i| i.status).collect();
     let items = gate::order(&statuses)
         .into_iter()
@@ -226,9 +244,11 @@ pub fn view(p: &Opened, c: &Closeout) -> GateView {
         stage: crate::ipc::types::Stage(c.stage),
         state,
         items,
-        closeout: closeout_steps(c, signed),
+        closeout: closeout_steps(c, signed, pending),
         signable: enabled,
-        why_not: if enabled || signed {
+        why_not: if pending {
+            vec![PENDING_NOTE.to_owned()]
+        } else if enabled || signed {
             Vec::new()
         } else {
             c.why_not()

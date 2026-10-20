@@ -8,4 +8,6 @@ pub enum Preview {
     Setup(Box<crate::ipc::commands::projects::SetupPlan>),
     /// `action_preview` → `action_apply`.
     Action(Box<crate::ipc::commands::steps::HeldAction>),
+    /// `sign_preview` → `sign_apply`.
+    Sign(Box<crate::signing::HeldSign>),
 }

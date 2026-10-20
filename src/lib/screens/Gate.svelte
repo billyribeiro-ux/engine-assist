@@ -225,6 +225,23 @@
 						: failureText(f);
 		}
 	}
+	// AC-F014-11, -13: APPROVED BY is written but the commit didn't finish.
+	const commitPending = $derived(
+		g?.closeout.some((s) => s.key === 'sign' && s.state === 'failed') ?? false
+	);
+	async function retryCommit(): Promise<void> {
+		const c = await ipc();
+		try {
+			const r = await c.signRetryCommit({ projectId: pid, stage: stageNo });
+			if (r.kind === 'signed') {
+				ui.toast(`Committed ${r.commit}. Stage ${stageNo} is signed.`, 'pass', 'stamp');
+				refresh(`project:${pid}`, 'today', 'projects');
+			} else if (r.kind === 'commitPending') ui.say(`The commit didn't finish: ${r.stderrTail}`);
+			else ui.say('Read-back found a difference. The stage stays commit pending.');
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
+		}
+	}
 	const signWhy = $derived(
 		g?.signable
 			? ''
@@ -424,6 +441,11 @@
 							onclick={openSign}
 							><Icon name="pen" />{g.state === 'signed' ? 'Packet signed' : 'Sign packet'}</button
 						>
+						{#if commitPending}
+							<button class="btn" type="button" onclick={retryCommit}
+								><Icon name="pen" />Retry commit</button
+							>
+						{/if}
 						{#if !g.signable}<span class="reason" id="sign-why">{signWhy}</span>{/if}
 					</div>
 				{/if}

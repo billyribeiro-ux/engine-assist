@@ -13,6 +13,7 @@ pub mod preview;
 pub mod project;
 pub mod render;
 pub mod runs;
+pub mod signing;
 pub mod state;
 pub mod text;
 pub mod watch;
