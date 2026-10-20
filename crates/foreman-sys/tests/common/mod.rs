@@ -38,7 +38,13 @@ pub fn fake_claude() -> PathBuf {
 pub fn install_fake(dir: &Path, name: &str, config: &serde_json::Value) -> PathBuf {
     std::fs::create_dir_all(dir).unwrap();
     let dst = dir.join(name);
-    std::fs::copy(fake_claude(), &dst).unwrap();
+    // Copy under a temporary name, then rename, then pause: a process forked by a parallel test
+    // while the copy's write fd was open holds it until its own exec, and exec of a file open for
+    // writing fails with ETXTBSY. The fd is gone well within the pause.
+    let tmp = dir.join(format!(".{name}.tmp"));
+    std::fs::copy(fake_claude(), &tmp).unwrap();
+    std::fs::rename(&tmp, &dst).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
     std::fs::write(dir.join("fake.json"), config.to_string()).unwrap();
     dst
 }
