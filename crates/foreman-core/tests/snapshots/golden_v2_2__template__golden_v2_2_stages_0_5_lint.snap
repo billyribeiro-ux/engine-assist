@@ -1,0 +1,6 @@
+---
+source: crates/foreman-core/tests/golden_v2_2.rs
+expression: "warnings.join(\"\\n\")"
+---
+lint.alt-missing · stage Some(4) · 4.7: the RUN WITH names an alternative; the annotation has no alt= (judgment alternatives are substitutions or overrides, DR-024)
+lint.out-disagrees · stage Some(5) · 5.5: the prompt writes docs/runbook-deploy.md, which isn't in out=

@@ -49,6 +49,12 @@ fails only for a milestone marked `done` below. Statuses: `todo`, `in-progress`,
 | M1-32 | done | M1 benchmarks |
 | M1-33 | review-pending | M1 exit review |
 
+## M4 tickets (stage/05-annotate)
+
+| Ticket | Status | Notes |
+| ------ | ------ | ----- |
+| M4-04 | done | Annotate blueprint v2.2: Stages 0 and 3–5; golden through Stage 5. The M1-01 generator (`scripts/blueprint/annotate-v2.2.py`) already wrote DR-038's annotations for Stages 0 and 3–5, so the fixture is unchanged; what M4-04 adds is the proof: snapshots `golden_v2_2_stage_0`, `_3`, `_4`, `_5` and `golden_v2_2_stages_0_5_lint` beside the Stages 1–2 and Gate ones, `template::golden_v2_2_stages_0_to_5` (zero errors, 40 runnable steps, 6–18 still needs-annotation) and `template::pin_clean_through_stage_5` (pin check clean; an error in Stage 0, 3, 4 or 5 is scoped and doesn't block the pin). Two lint warnings remain (4.7, 5.5): [CR-004](change-requests/CR-004-stage-4-5-lint-warnings.md), proposed. Template-health data for M4-06: the core already carries every field (steps' annotations, outs, lint diagnostics, per-stage status). The `TemplateHealth` DTO (`src-tauri`) has the per-stage rows and diagnostics but not the per-runnable-step annotations and outputs (AC-F003-05); adding them is M4-06's work, outside this core-only change. |
+
 ## Known deviations (M1, reviewed 2026-10-20)
 
 Where the M1 build differs from the docs, the doc that should change (or the decision Billy owes), and what was done. "Doc changed" means this branch edited it; the rest wait for Billy.
@@ -79,7 +85,7 @@ The runner halves below are built and tested; each ticket's IPC command, native 
 
 | Ticket | Status | Runner part done here | Left for the app |
 | ------ | ------ | --------------------- | ---------------- |
-| M2-06 | in-progress | argv builder, fixed flags, prompt last, `--name`; `argv::*`, `spawn::no_shell_in_any_code_path`, abuse argv | preview UI |
+| M2-06 | in-progress | argv builder, fixed flags, prompt last, `--name`; `argv::*`, `spawn::no_shell_in_any_code_path`, abuse argv | `clipboard_copy { target: "command" }` done (`stage/05-chat`); preview UI left |
 | M2-07 | in-progress | child env + PATH sanitizing; `env::*` | pass-through setting |
 | M2-08 | in-progress | PTY/non-PTY lifecycle, no inherited fds, SIGHUP quit path | app: run table + startup scan done, `lifecycle::crash_leaves_interrupted` passes (`src-tauri/tests/launch.rs`); quit guard left (M3-13) |
 | M2-09 | in-progress | run settings file (fresh, `0600`); `run_settings::*` | — |
@@ -91,7 +97,7 @@ The runner halves below are built and tested; each ticket's IPC command, native 
 | M3-05 | in-progress | DR-120 order, version floor; `launch::progress_phase_order`, `compat::blocks_below_floor` | plan IDs, bench |
 | M3-09 | in-progress | `PtySession` (env exact, no fds, back-pressure, live-only writes) | Channel adapter |
 | M3-10 | in-progress | `start_session` | app: `launch_start`, `run.json` before spawn, index lines, `runlog::record_before_spawn`/`argv_prompt_redacted`/`no_env_values` done; tabs UI left |
-| M3-12 | in-progress | SR-28 paste sanitizer; `pty::paste_strips_escape_sequences` | app: `pty_paste` done; `terminal_link_open` waits for an opener (`Unsupported`) |
+| M3-12 | in-progress | SR-28 paste sanitizer; `pty::paste_strips_escape_sequences` | app: `pty_paste` done; `terminal_link_open` done (`stage/05-chat`: `foreman_core::urls::terminal_url`, native dialog, `foreman-sys` `open -u`, CR-006; `opener::terminal_link_scheme_policy`, `terminal::link_handler_routes_to_rust`); left: the `@xterm/addon-web-links` handler (the addon isn't installed; only OSC 8 links route today) and the S-0 real-TUI paste check |
 | M3-13 | in-progress | terminate (SIGTERM → SIGKILL), hangup | app: `pty_terminate` native dialog done; quit guard left |
 | M3-14 | in-progress | chain planning, S-3/S-8 branches, transcript path; `chain::*` | — |
 | M3-15 | in-progress | re-arm machine + driver; `rearm::*` | app: `rearm_start`/`rearm_continue` with the native idle dialog done (`rearm::relaunches_after_idle_confirm`) |
@@ -123,10 +129,7 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 | Ticket | Commands |
 | ------ | -------- |
 | S-7′ | `project_env_approve` |
-| M2-06 | `clipboard_copy { target: "command" }` |
-| M3-12 | `terminal_link_open` |
 | M3-18, M4-12…M4-14 | `probe_folder_open`, `probe_run`, `doctor_capture_login_path`, `doctor_login_path_apply` |
-| M3-23, M3-24 | `chat_copy_and_open`, `chat_link_set`, `paste_back_*` |
 | M3-26, M4-02, M4-03 | `metrics_export`, `metrics_view`, `runs_clear`, `runs_search` (run records first) |
 | M4-16…M4-33 | gates, signing, `tamper_restore`, lessons, manifest, assembler, desktop, `add_step`, `add_item`, `run_sheet_export`, `item_kind_confirm`, `terminal_open_here` |
 
@@ -134,10 +137,19 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 
 | Ticket | Status | Done | Notes |
 | ------ | ------ | ---- | ----- |
-| M3-20 | done | `packet::normalize_packet` (DR-131 notes per kind with lines), `packet::split_paste` (DR-132: preamble kept apart, two packets / wrong stage refused), `packet::fix_request_text` (DR-137; `Problem.field` added); `crates/foreman-core/tests/packet_paste.rs` (`packet::normalization_golden` over Foreman's own packets, `split_paste`, `fix_request_text`, variants, idempotence proptest) | `paste_back_*` (M3-24, chat agent) should call `normalize_packet` then `split_paste`; `clipboard_copy { fixRequest }` now uses the core text. |
+| M3-20 | done | `packet::normalize_packet` (DR-131 notes per kind with lines), `packet::split_paste` (DR-132: preamble kept apart, two packets / wrong stage refused), `packet::fix_request_text` (DR-137; `Problem.field` added); `crates/foreman-core/tests/packet_paste.rs` (`packet::normalization_golden` over Foreman's own packets, `split_paste`, `fix_request_text`, variants, idempotence proptest) | `paste_back_preview` passes `packet::normalize_paste` to `pasteback::plan` (test `packet::pasteback_uses_full_normalizer`); the planner keeps its own DR-132 split, so `split_paste` is the core's reference implementation; `clipboard_copy { fixRequest }` uses the core text. |
 | M3-21 | done | `packet_view` normalization notes and the AC-F004-12 problem; `packet_normalize_apply` (CAS, `packet:changed`); `packet_signature_confirm` tested (Cancel, stale, void on change); watcher started by `project_open`, mapped in `src-tauri/src/watch.rs`; Doctor warning on a stopped watcher; focus re-stat; Packet screen "Formatting Foreman can fix"; `src-tauri/tests/packet_landing.rs` (`packet::outside_signature_needs_confirmation`, `watcher::packet_visible_within_1s` …) | Rename-over saves only in the latency test (20 writes, not ADR-013's 100). FSEvents latency is a **Mac task**: run `cargo test -p foreman-app --test packet_landing watcher` on macOS. |
 | M3-22 | done | `project::refresh_decisions` from watcher hints (`decision:pending` live); per-run `HintWatcher` over the fingerprint sources replaces the 5 s tick (now a 60 s fallback, 5 s only without a watcher); `src-tauri/tests/outside_change_live.rs` (`decisions::outside_edit_has_no_effect_until_accepted` live, `watcher::config_changed_by_watcher_event`, `watcher::config_targets_relevance`) | `watcher::config_changed_marks_open_runs` stays in `tests/launch.rs`. |
 | M3-16 | done | `progress_rebuild_preview`/`_apply` (unreadable file kept as `progress.json.corrupt-<ts>`, CAS, single use); a missing `progress.json` is rebuilt from packets on open; `read_progress` error names the file; Rebuild from repo on the project error screen; Interrupted sessions with Resume on Today (`chain_resume_prepare` → `launch_start`); `src-tauri/tests/restart.rs` (`lifecycle::crash_leaves_interrupted` restart case, `rebuild::*`) | A hand signature confirmed before app data was deleted must be confirmed again (it lived in approvals; DR-135). Stage records (M4) will add signing entries to the rebuild. |
+
+## M3 chat tickets (branch `stage/05-chat`)
+
+| Ticket | Status | Title |
+| ------ | ------ | ----- |
+| M3-17 | done | Followup and manual steps, switches and overrides: followup copy returns the chain's live tab (`focusRun`), the UI copies-and-focuses a live chain and relaunches otherwise; Open file starts a `manual` step and a later change to its file finishes it (re-stat on open); a per-run override is consumed by the run that used it (DR-103, it wasn't before). Tests: core `steps::followup_copy_or_relaunch`, `steps::finish_rules`, `policy::switches_never_typed`, `policy::override_scope`, plus `src-tauri/tests/followup.rs` (same names, against fake-claude). |
+| M3-23 | done | Chat chips, links and Copy and open: `chat_copy_and_open` (sanitized prompt, SR-25 recheck of the stored link, `chatCopy` run record with time to start, prompt hash only), `chat_link_set` (claude.ai only, stored on the chain start), chips from the RUN WITH prose (`ChatChips.svelte`), the step says which link to set (inline Project link form). Tests: `chain::chat_links`, `chain::stored_link_rechecked`, `opener::only_allowed_urls` (core + app), `src/lib/components/chat.svelte.test.ts`. |
+| M3-24 | in-progress | Paste-back preview and apply: `foreman_core::pasteback` plans every target from declared paths only (packet, attachments, extra outs, outputs; wrong stage, two packets, P1 appends refused), apply re-checks every stamp before the first write. Tests: `pasteback::lists_targets_before_write`, `atomic::refuses_newer_file` (paste-back conflict), invalid packet → fix request, clipboard errors, policy refusal, AC-XC-16 `pasteback::no_chat_content_stored`. **Left:** field-level normalization (DR-131: unsigned forms, `none`, smart quotes, NBSP, header variants) is M3-20's `packet::normalize_packet`; `chat::paste_back_preview` now passes `packet::normalize_paste` (M3-20, swapped in `stage/05-packets`; `pasteback::prepare` stays as the planner tests' structural baseline). AC-F012-13's "explicit Open action" for pasted links has no command in ipc.md (links show as text). |
+| M3-25 | done | Close-out checklist step (P1): `foreman_core::steps::closeout`, `StageView.closeoutChecklist` (ipc.md §2.4), `CloseOutChecklist.svelte` once the packet is valid and the stage unsigned. Test: `steps::closeout_sequences`, component tests. |
 
 ### Open follow-ups
 
@@ -148,4 +160,6 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 - `PtySession::wait_exit` now returns only after the sink was told of the exit (`pty::write_requires_live_run` raced the sink: 3 of 60 runs under load failed; 0 of 60 after).
 - The launch's own environment takes `HOME` from the app's home folder (`App::own_env`), so the transcript check and the child agree on `~/.claude` (tests no longer write to the real `~/.claude/projects`).
 - `sensor::hash_checked_per_run` (M4-08) waits for the P2 sensor hooks; the app passes `sensor: None`.
+- (stage/05-chat) URLs open through `foreman-sys` `/usr/bin/open -u` (CR-006, proposed); **Mac task:** confirm `open -u https://claude.ai/` opens the browser.
+- (stage/05-chat) `pasteback::prepare` is the stand-in normalizer until M3-20; `foreman_core::pasteback::plan` takes the normalizer as a parameter.
 - Item 4 above: the `OutsidePending` refusal maps to `Conflict` with the file's path (ipc.md §2.4).

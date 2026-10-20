@@ -8,7 +8,7 @@ pub mod normalize;
 pub mod split;
 pub mod validate;
 
-pub use normalize::{Normalized, Note, NoteKind, normalize_packet};
+pub use normalize::{Normalized, Note, NoteKind, normalize_packet, normalize_paste};
 pub use split::{Split, SplitError, split_paste};
 pub use validate::{PacketCtx, Problem, fix_request_text, validate_packet};
 

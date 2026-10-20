@@ -15,7 +15,7 @@ mod common;
 
 use std::fmt::Write as _;
 
-use common::{blueprint, parse};
+use common::{blueprint, parse, replace_once};
 use foreman_core::template::grammar::{self, SourcePos, StepAnnotation};
 use foreman_core::template::render::render_step;
 use foreman_core::template::{Step, Template};
@@ -194,8 +194,9 @@ mod template {
     use super::*;
     use proptest::prelude::*;
 
-    /// AC-F001-01, EX-M1-02, M1-01: zero errors; every annotated step equals DR-038; the snapshot
-    /// of Stages 1–2 and F.2 (every field and the prompt text) matches the golden file.
+    /// AC-F001-01, AC-F001-02, EX-M1-02, EX-M4-02, M1-01, M4-04: zero errors; every annotated step
+    /// equals DR-038; the snapshots of Stages 0–5, the Gate and F.2 (every field and the prompt
+    /// text) match the golden files.
     #[test]
     fn golden_v2_2() {
         let t = parse(&blueprint());
@@ -243,6 +244,20 @@ mod template {
             snap.push_str(&snapshot(&t, s));
         }
         insta::assert_snapshot!("golden_v2_2_stages_1_2", snap);
+        // Stages 0 and 3–5 (M4-04): the same snapshot, stage by stage. Stage 5's snapshot holds its
+        // own steps; its Gate instances are in the gate snapshot below.
+        for stage in [0u8, 3, 4, 5] {
+            let mut snap = String::new();
+            for s in t
+                .steps
+                .iter()
+                .filter(|s| s.stage == stage && (stage != 5 || s.template_id.is_none()))
+            {
+                snap.push_str(&snapshot(&t, s));
+            }
+            assert!(!snap.is_empty(), "stage {stage}");
+            insta::assert_snapshot!(format!("golden_v2_2_stage_{stage}"), snap);
+        }
         let mut gate = String::new();
         for s in t.stage_steps(5).filter(|s| s.template_id.is_some()) {
             gate.push_str(&snapshot(&t, s));
@@ -262,6 +277,91 @@ mod template {
             .filter(|l| !l.starts_with("<!-- fm:") && !l.starts_with("     "))
             .collect();
         assert!(stripped.len() < common::blueprint_v21().lines().count() + 60);
+    }
+
+    /// M4-04 / AC-F001-02 / EX-M4-02: Stages 0 and 3–5, the Gate and F.2 parse with zero errors
+    /// and every one of their steps is runnable; Stages 6–18 stay needs-annotation in v1. The
+    /// lint warnings the blueprint carries today are pinned, so a new one shows up in review.
+    #[test]
+    fn golden_v2_2_stages_0_to_5() {
+        use foreman_core::template::StepStatus;
+        let t = parse(&blueprint());
+        for d in &t.diagnostics {
+            assert!(!d.is_error(), "{d:?}");
+            assert!(d.rule.starts_with("lint."), "{d:?}");
+        }
+        let mut from_stage_0_5 = 0;
+        for s in &t.steps {
+            if s.stage <= 5 {
+                from_stage_0_5 += 1;
+                assert_eq!(s.status, StepStatus::Runnable, "{}", s.key);
+            } else if s.template_id.is_none() {
+                assert_eq!(s.status, StepStatus::NeedsAnnotation, "{}", s.key);
+                assert!(s.annotation.is_none(), "{}", s.key);
+            }
+        }
+        // Stage 0: 2 + F.2; 1: 6 + F.2; 2: 8 + F.2; 3: 2 + F.2; 4: 8 + F.2; 5: 6 + 3 Gate instances.
+        assert_eq!(from_stage_0_5, 40);
+        for stage in 0..=5u8 {
+            assert!(
+                t.stage_steps(stage).any(|s| s.template_id.is_none()),
+                "stage {stage} has steps"
+            );
+        }
+        let gate_a = t
+            .stage_steps(5)
+            .filter(|s| s.template_id.as_deref() == Some("gate.A"))
+            .count();
+        assert_eq!(gate_a, 1);
+        // Items: the inspection lists of Stages 0–5 carry explicit IDs, unique template-wide.
+        let mut ids: Vec<&str> = t
+            .items
+            .iter()
+            .filter(|i| i.stage <= 5)
+            .filter_map(|i| i.id.as_deref())
+            .collect();
+        let n = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), n, "item IDs are unique across the template");
+        assert!(
+            t.items
+                .iter()
+                .filter(|i| i.stage <= 5)
+                .all(|i| i.id.is_some())
+        );
+        let warnings: Vec<String> = t
+            .diagnostics
+            .iter()
+            .map(|d| format!("{} · stage {:?} · {}", d.rule, d.stage, d.message))
+            .collect();
+        insta::assert_snapshot!("golden_v2_2_stages_0_5_lint", warnings.join("\n"));
+    }
+
+    /// CR-003 / M4-04: the pin check stays clean for Stages 1–2 (and F.2) on the Stages 0–5
+    /// fixture; an error in Stage 0, 3, 4 or 5 is listed in its stage, leaves Stages 1–2 runnable
+    /// and doesn't block the pin (only P1 errors do).
+    #[test]
+    fn pin_clean_through_stage_5() {
+        use foreman_core::pin_check::p1_annotation_errors;
+        use foreman_core::template::StepStatus;
+        assert!(p1_annotation_errors(&blueprint()).is_ok());
+        for (id, stage) in [("0.2", 0u8), ("3.2", 3), ("4.3", 4), ("5.3", 5)] {
+            let anchor = format!("<!-- fm:step id={id} ");
+            let broken = replace_once(&blueprint(), &anchor, &format!("{anchor}bogus=1 "));
+            let t = parse(&broken);
+            let errs: Vec<_> = t.errors().collect();
+            assert!(!errs.is_empty(), "{id}");
+            assert!(
+                errs.iter().all(|d| d.stage == Some(stage)),
+                "{id}: {errs:?}"
+            );
+            assert_eq!(t.step(id).unwrap().status, StepStatus::Invalid, "{id}");
+            for k in ["1.1", "1.4", "2.2", "2.6", "1:F.2", "2:F.2"] {
+                assert_eq!(t.step(k).unwrap().status, StepStatus::Runnable, "{id}: {k}");
+            }
+            assert!(p1_annotation_errors(&broken).is_ok(), "{id}");
+        }
     }
 
     proptest! {

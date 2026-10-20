@@ -1,0 +1,74 @@
+---
+source: crates/foreman-core/tests/golden_v2_2.rs
+expression: snap
+---
+## 0.1 · Opportunity scan · Runnable
+kind=prompt tag=optional when=!idea_known
+surface=chat cwd=- session=New chain=0.1
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Act as a venture analyst and a principal engineer together. Use Research
+and web search to find software products I can build that have proven,
+growing demand and clear willingness to pay, where my advantages give me
+an edge.
+
+My advantages: [MY_ADVANTAGES]
+Budget and time: [BUDGET_TIME]
+Stack I build in best: [PREFERRED_STACK]
+
+Method: find demand evidence, not opinions. Look for people paying for
+clunky tools, recurring complaints in reviews and forums, search-trend
+growth, job posts describing manual work a product could replace, and
+spreadsheet workflows people share. For each candidate, find the
+incumbents, their pricing, their scale (public numbers only), and their
+top complaints. Prefer recurring-revenue B2B or prosumer products.
+
+Deliver 10 candidates, each with: the problem and who pays, demand
+evidence (cited), incumbents and their weaknesses (cited), a realistic
+price point, how my advantages create an edge, build size (S/M/L) for a
+solo principal engineer using Claude Code, and the biggest risk.
+Score each 1-5 on demand, willingness to pay, competition gap, my edge,
+build speed, and defensibility. Show a table sorted by total.
+Cite every factual claim. Mark estimates as estimates.
+
+## 0.2 · Red-team and pick · Runnable
+kind=prompt tag=optional when=!idea_known
+surface=chat cwd=- session=Continue chain=0.1
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[docs/handoff/stage-00.md] appends=- requires=[]
+--- prompt part ---
+Take the top 3. Argue as hard as you can that each will fail. Then pick
+the one that survives best, and design a 7-day experiment that would
+confirm or kill it.
+
+When I say "approved", output the OPPORTUNITY PACKET exactly in this
+format, inside one code block:
+
+=== HANDOFF PACKET · Stage 0 → Stage 1 ===
+PROJECT: <working name>
+APPROVED BY: <blank>
+IDEA: <one sentence>
+FOR: <who pays, specifically>
+PROBLEM: <their pain, in their words>
+EVIDENCE: <the 5 strongest demand signals, each with a link>
+INCUMBENTS: <name — price — biggest weakness>, one per line
+PRICE POINT: <estimate + reasoning>
+MY EDGE: <why I win>
+TOP RISKS: <3 bullets>
+VALIDATION EXPERIMENT: <the 7-day test + pass threshold>
+OPEN ITEMS: none
+NEXT: Stage 1 · Meet the Architect · Claude chat · Opus 5.5
+
+## 0:F.2 · Lessons in the chat stages (0–4) · Runnable
+kind=followup tag=core when=-
+surface=chat cwd=- session=Continue chain=0.1
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=docs/lessons.md requires=[]
+--- prompt part ---
+Before we move on, review this conversation for lessons: questions you
+should have asked earlier, answers I had to correct, output I had to
+redo, and anything in your prompt instructions that was unclear or
+missing. Write lesson entries in the L-NNN format (I'll paste the
+format), each with the exact proposed edit to that stage's prompt in the
+blueprint. If it went cleanly, say so in one line.

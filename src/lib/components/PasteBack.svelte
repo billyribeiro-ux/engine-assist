@@ -6,6 +6,7 @@
 	import { toIpcFailure } from '#lib/ipc/errors.ts';
 	import { ipc } from '#lib/ipc/index.ts';
 	import type { PastePreview } from '#lib/ipc/types.ts';
+	import Diff from '#lib/render/Diff.svelte';
 	import Text from '#lib/render/Text.svelte';
 	import { refresh } from '#lib/stores/bus.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
@@ -31,8 +32,20 @@
 	let preview = $state<PastePreview | null>(null);
 	let error = $state<string | null>(null);
 	let busy = $state(false);
+	/** The written packet has problems: offer Copy fix request (AC-F012-11). */
+	let fixable = $state(false);
 	let writeBtn = $state<HTMLButtonElement>();
 	const headId = $derived(`pb-${step.replace(/[^a-z0-9]/gi, '-')}`);
+
+	// Refusals whose Rust message is the exact sentence to show (AC-F012-10, -14).
+	const OWN_WORDS = new Set([
+		'wrong-stage-packet',
+		'two-packets',
+		'appends-in-p1',
+		'no-packet',
+		'not-a-packet-step',
+		'no-output'
+	]);
 
 	$effect(() => {
 		api?.(trigger);
@@ -42,6 +55,7 @@
 	async function trigger(): Promise<true | string> {
 		const c = await ipc();
 		error = null;
+		fixable = false;
 		try {
 			preview = await c.pasteBackPreview({ projectId, step, kind: 'auto', source: 'clipboard' });
 			// The exact writes are the next decision: move focus to Write so the keyboard can act.
@@ -55,8 +69,8 @@
 			error =
 				d?.kind === 'clipboard' && d.why === 'empty'
 					? 'Clipboard is empty'
-					: d?.kind === 'notAllowed' && d.rule === 'wrong-stage-packet'
-						? `This isn't the Stage ${stage} packet; this step expects Stage ${stage}`
+					: d?.kind === 'notAllowed' && OWN_WORDS.has(d.rule) && f.message
+						? f.message
 						: failureText(f);
 			return true;
 		}
@@ -66,11 +80,13 @@
 		if (!preview) return;
 		const c = await ipc();
 		busy = true;
+		const invalid = preview.problems.length > 0 && preview.packetFields !== null;
 		try {
 			const r = await c.pasteBackApply({ previewId: preview.previewId });
 			preview = null;
+			fixable = invalid && !r.stepDone;
 			ui.toast(
-				`Wrote ${r.written.length} ${r.written.length === 1 ? 'file' : 'files'}${r.stepDone ? '; step done' : ''}.`
+				`Wrote ${r.written.length} ${r.written.length === 1 ? 'file' : 'files'}${r.stepDone ? '; step done' : fixable ? '; the packet still has problems' : ''}.`
 			);
 			refresh(`project:${projectId}`, `packet:${projectId}:${stage}`, 'today');
 		} catch (e: unknown) {
@@ -79,6 +95,23 @@
 			preview = null;
 		} finally {
 			busy = false;
+		}
+	}
+
+	async function copyFix(): Promise<void> {
+		const c = await ipc();
+		try {
+			await c.clipboardCopy({
+				projectId,
+				target: 'fixRequest',
+				step: null,
+				chain: null,
+				path: null,
+				stage
+			});
+			ui.toast('Fix request copied. Paste it into the chat.', 'pass', 'copy');
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
 		}
 	}
 
@@ -117,7 +150,11 @@
 						><code><Text text={t.path} layout={false} /></code>
 						{#if i === 1 && preview.packetFields}<span class="muted"
 								>press release and FAQ, {lines(t)} lines found after the packet</span
-							>{/if}</span
+							>{/if}
+						{#if t.exists}<details class="pb-diff">
+								<summary>Show what changes</summary>
+								<Diff diff={t} label="Changes to {t.path}" />
+							</details>{/if}</span
 					>
 				</li>
 			{/each}
@@ -125,7 +162,12 @@
 				<li><span class="what">Normalized</span><span>{preview.notes.join('; ')}</span></li>
 			{/if}
 			{#each preview.problems as p, i (i)}
-				<li><span class="what err">Problem</span><span>{p.message}</span></li>
+				<li>
+					<span class="what err">Problem</span><span
+						>{#if p.line !== null}<span class="muted">line {p.line}:</span>
+						{/if}<Text text={p.message} layout={false} /></span
+					>
+				</li>
 			{/each}
 		</ul>
 		<div class="actions">
@@ -134,7 +176,8 @@
 			>
 			<button class="btn ghost" type="button" onclick={() => (preview = null)}>Cancel</button>
 			{#if creates < total}<span class="reason"
-					>Overwrites show their diff when you open the file.</span
+					>{total - creates} existing {total - creates === 1 ? 'file is' : 'files are'} replaced; check
+					what changes first.</span
 				>{/if}
 		</div>
 	{:else}
@@ -148,6 +191,14 @@
 				><Icon name="paste" />Paste back<kbd>⌘⇧V</kbd></button
 			>
 		</div>
+		{#if fixable}
+			<div class="actions">
+				<button class="btn" type="button" onclick={copyFix}
+					><Icon name="copy" />Copy fix request</button
+				>
+				<span class="reason">The packet was written with problems. Ask Claude to fix them.</span>
+			</div>
+		{/if}
 		<p class="hint">
 			{packet
 				? 'Copy the packet Claude prints after you say "approved". Foreman validates it before writing anything.'

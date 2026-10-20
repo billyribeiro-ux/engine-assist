@@ -85,6 +85,12 @@ pub fn file_open(app: &App, req: FileOpenReq) -> Result<(), IpcError> {
         ));
     };
     let abs = checked(app, req.project_id.as_str(), req.path.as_str())?;
+    // AC-F007-04: Open file on a manual step's file starts that step.
+    {
+        let _w = app.writing();
+        let mut p = project::open(app, req.project_id.as_str())?;
+        crate::ipc::commands::steps::manual_start_on_open(app, &mut p, req.path.as_str())?;
+    }
     opener(app, &SpawnRequest::OpenWithBundle { bundle, path: abs })
 }
 

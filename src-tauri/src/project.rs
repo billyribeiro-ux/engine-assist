@@ -352,6 +352,8 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         opened.rebuilt = true;
     }
     opened.progress = progress;
+    // AC-F007-04: a started manual step whose file changed since is done (re-stat on open).
+    crate::ipc::commands::steps::manual_outs_changed(app, &mut opened);
     if mode != OpenMode::Rebuild && opened.progress != original {
         opened.save_progress(app)?;
     }
@@ -1006,10 +1008,17 @@ impl Opened {
                 signed: signed.contains(&n),
             }
         });
+        // AC-F015-01 (P1): the close-out checklist once the packet is valid, until signed.
+        let closeout_checklist = steps::closeout::checklist(
+            n,
+            packet.as_ref().is_some_and(|p| p.exists && p.problems == 0),
+            signed.contains(&n),
+        );
         StageView {
             stage: Stage(n),
             title: title.to_owned(),
             applicable,
+            closeout_checklist,
             signed: signed.contains(&n).then(|| self.signed_info(n)),
             steps,
             packet,

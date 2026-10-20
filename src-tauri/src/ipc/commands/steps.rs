@@ -28,7 +28,7 @@ use crate::ipc::dto::steps::{
 use crate::ipc::error::StaleWhat;
 use crate::ipc::types::{
     ActionKind, Blocker, CopyTarget, Explained, NotRunnableReason, PreviewId, PromptSegment,
-    RepoPath, RunOverride, Start, Timestamp, ValueOrigin,
+    RepoPath, RunId, RunOverride, Start, Timestamp, ValueOrigin,
 };
 use crate::os::Confirm;
 use crate::preview::Preview;
@@ -336,37 +336,19 @@ pub fn view_of(app: &App, p: &Opened, key: &str) -> Result<StepView, IpcError> {
         origin: ValueOrigin::from(&e.origin),
         from: e.from.map(Start::from),
     });
-    let chips = (s.surface == Some(CoreSurface::Chat)).then(|| {
-        let link = s
-            .chain
-            .as_ref()
-            .and_then(|c| project.chat_urls.get(c).cloned())
-            .map(|u| (u, "Open conversation"))
-            .or_else(|| {
-                project
-                    .chat_project_url
-                    .clone()
-                    .map(|u| (u, "Open Project"))
-            });
-        let mut chips = Vec::new();
-        if let Some(st) = start.as_ref() {
-            chips.push(ChatChip {
-                id: "model".into(),
-                label: model_name(st.value.model.into()),
-                strong: true,
-            });
-            chips.push(ChatChip {
-                id: "effort".into(),
-                label: format!("{} thinking", st.value.effort_label()),
-                strong: false,
-            });
-        }
-        ChatChips {
-            chips,
-            link_label: link.as_ref().map(|(_, l)| (*l).to_owned()),
-            link: link.map(|(u, _)| u),
-        }
-    });
+    let chips = if s.surface == Some(CoreSurface::Chat) {
+        let (t, _, _) = p.parts()?;
+        Some(chat_chips(
+            t,
+            p,
+            s,
+            start.as_ref(),
+            &project.name,
+            &project.chat_urls,
+        ))
+    } else {
+        None
+    };
     let root = p.root()?;
     let outs = s
         .out
@@ -419,6 +401,74 @@ pub fn view_of(app: &App, p: &Opened, key: &str) -> Result<StepView, IpcError> {
     })
 }
 
+/// AC-F012-01 / DR-043: the chat setup chips (memory aids): the session chip ("New conversation
+/// in Project …" or "Same chat as …", bold), the model Billy should pick (the effective one, so a
+/// substitution shows), the effort, and "web search ON" / "Research ON" from the RUN WITH prose.
+/// `link` is the chain's linked conversation, shown on the Link this chat button.
+fn chat_chips(
+    t: &foreman_core::template::Template,
+    p: &Opened,
+    s: &Step,
+    start: Option<&Explained<Start>>,
+    project_name: &str,
+    chat_urls: &BTreeMap<CoreKey, String>,
+) -> ChatChips {
+    let prose = foreman_core::template::lint::chat_chips(t, s, project_name);
+    let mut chips = Vec::new();
+    let fresh = matches!(
+        crate::ipc::commands::chat::chat_target_kind(p, s),
+        crate::ipc::dto::steps::MissingLink::Project
+    );
+    let session = if fresh {
+        format!("New conversation in Project {project_name}")
+    } else {
+        prose
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "Same chat as the previous step".to_owned())
+    };
+    chips.push(ChatChip {
+        id: "session".into(),
+        label: session,
+        strong: true,
+    });
+    if let Some(st) = start {
+        chips.push(ChatChip {
+            id: "model".into(),
+            label: model_name(st.value.model.into()),
+            strong: false,
+        });
+        chips.push(ChatChip {
+            id: "effort".into(),
+            label: format!("{} effort", st.value.effort_label()),
+            strong: false,
+        });
+    }
+    for (needle, id, label) in [
+        ("web search ON", "web-search", "Web search ON"),
+        ("Research ON", "research", "Research ON"),
+    ] {
+        if prose.iter().any(|c| c == needle) {
+            chips.push(ChatChip {
+                id: id.into(),
+                label: label.into(),
+                strong: false,
+            });
+        }
+    }
+    let link = s
+        .chain
+        .as_ref()
+        .and_then(|c| chat_urls.get(c))
+        .filter(|u| foreman_core::urls::chat_url(u).is_ok())
+        .cloned();
+    ChatChips {
+        chips,
+        link_label: link.as_deref().map(crate::ipc::commands::chat::short_link),
+        link,
+    }
+}
+
 trait EffortLabel {
     fn effort_label(&self) -> String;
 }
@@ -443,8 +493,8 @@ pub fn step_view(app: &App, req: StepViewReq) -> Result<StepView, IpcError> {
     view_of(app, &p, req.step.as_str())
 }
 
-/// Applies a step event (DR-065) and saves.
-fn apply_event(
+/// Applies a step event (DR-065); the caller saves.
+pub(crate) fn apply_event(
     app: &App,
     p: &mut Opened,
     key: &str,
@@ -803,10 +853,120 @@ pub fn wait_start(app: &App, req: WaitStartReq) -> Result<StepView, IpcError> {
     view_of(app, &p, req.step.as_str())
 }
 
+/// AC-F007-04 / DR-066: opening a `manual` step's declared file starts the step (the moment its
+/// file is watched from). Called by `file_open` before the editor opens.
+///
+/// # Errors
+/// `Conflict`, `Io` (saving progress).
+pub fn manual_start_on_open(app: &App, p: &mut Opened, path: &str) -> Result<(), IpcError> {
+    if p.writable().is_err() {
+        return Ok(());
+    }
+    let Ok((t, _, _)) = p.parts() else {
+        return Ok(());
+    };
+    let keys: Vec<String> = t
+        .steps
+        .iter()
+        .filter(|s| s.kind == CoreKind::Manual && s.out.iter().any(|o| o == path))
+        .map(|s| s.key.as_str().to_owned())
+        .collect();
+    let mut changed = false;
+    for k in keys {
+        if p.step_progress(&k).state == foreman_core::schema::progress::StoredState::NotStarted
+            && apply_event(app, p, &k, &StepEvent::Start, "not-runnable").is_ok()
+        {
+            changed = true;
+        }
+    }
+    if changed {
+        p.save_progress(app)?;
+    }
+    Ok(())
+}
+
+/// AC-F007-04 / DR-066: a started `manual` step whose declared file changed after it started is
+/// done (re-stat on open, ADR-013; no watcher event acts, IPC-R6). Returns whether any changed.
+pub fn manual_outs_changed(app: &App, p: &mut Opened) -> bool {
+    use foreman_core::schema::progress::StoredState;
+    let (Some(t), Some(root)) = (p.template.as_ref(), p.root.as_ref()) else {
+        return false;
+    };
+    let mut done = Vec::new();
+    for s in t.steps.iter().filter(|s| s.kind == CoreKind::Manual) {
+        let sp = p
+            .progress
+            .steps
+            .get(&s.key)
+            .cloned()
+            .unwrap_or_else(steps::fresh);
+        if sp.state != StoredState::Running {
+            continue;
+        }
+        let Some(since) = sp
+            .started_at
+            .as_deref()
+            .and_then(|a| a.parse::<jiff::Timestamp>().ok())
+        else {
+            continue;
+        };
+        let changed = s.out.iter().any(|o| {
+            pathpolicy::check_read(o, ReadClass::Decision)
+                .ok()
+                .and_then(|rel| root.read_opt(&rel, ReadClass::Decision).ok())
+                .is_some_and(|(_, stamp)| match stamp {
+                    foreman_core::store::ReadStamp::Present { mtime_ns, .. } => {
+                        i128::from(mtime_ns) > since.as_nanosecond()
+                    }
+                    foreman_core::store::ReadStamp::Absent => false,
+                })
+        });
+        if changed {
+            done.push(s.clone());
+        }
+    }
+    let mut any = false;
+    for s in done {
+        let ctx = p.step_ctx(app, &s);
+        let cur = p.step_progress(s.key.as_str());
+        if let Ok(next) = steps::transition(&cur, &ctx, &StepEvent::OutChanged) {
+            p.progress.steps.insert(s.key.clone(), next);
+            any = true;
+        }
+    }
+    any
+}
+
 /// DR-137: the fix request for a packet's problems (`foreman_core::packet::fix_request_text`).
 #[must_use]
 pub fn fix_request(problems: &[foreman_core::packet::Problem]) -> String {
     foreman_core::packet::fix_request_text(problems)
+}
+
+/// POSIX shell quoting for Copy command: bare when only safe characters, else single quotes.
+#[must_use]
+pub fn shell_quote(a: &str) -> String {
+    let safe = !a.is_empty()
+        && a.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_./=:@%+,".contains(&b));
+    if safe {
+        a.to_owned()
+    } else {
+        format!("'{}'", a.replace('\'', "'\\''"))
+    }
+}
+
+/// The live run of a step's chain in this project (DR-068), if its process is running.
+#[must_use]
+pub fn chain_live_run(app: &App, p: &Opened, s: &Step) -> Option<String> {
+    let start = s.chain.as_ref()?;
+    p.progress
+        .chains
+        .iter()
+        .filter(|c| &c.start == start)
+        .find_map(|c| app.runs().of_chain(&c.id))
+        .filter(|r| r.project_id == p.id())
+        .map(|r| r.run_id.clone())
 }
 
 fn required<T>(v: Option<T>, field: &str) -> Result<T, IpcError> {
@@ -852,6 +1012,11 @@ pub fn clipboard_copy(app: &App, req: ClipboardCopyReq) -> Result<CopyResult, Ip
                 ));
             }
             let removed = copy_text(app, &text)?;
+            // DR-068 / AC-F007-07: a followup copies and focuses its chain's live tab; nothing
+            // is typed into the PTY. With no live process, the UI relaunches it instead.
+            let focus = (s.kind == CoreKind::Followup)
+                .then(|| chain_live_run(app, &p, &s))
+                .flatten();
             if s.kind == CoreKind::Followup && p.read_only.is_none() {
                 apply_event(app, &mut p, key.as_str(), &StepEvent::Copy, "not-runnable")?;
                 p.progress
@@ -862,13 +1027,48 @@ pub fn clipboard_copy(app: &App, req: ClipboardCopyReq) -> Result<CopyResult, Ip
             }
             Ok(CopyResult {
                 removed_controls: removed,
+                focus_run: focus.map(RunId::from_trusted),
+            })
+        }
+        CopyTarget::Command => {
+            // ⌘⌥C (M2-06): the exact command the next launch would run, shell-quoted, from the
+            // same preparation as Run (the UI never builds argv).
+            let key = required(req.step, "step")?;
+            let prepared = crate::launch::prepare(
+                app,
+                &mut p,
+                key.as_str(),
+                crate::ipc::types::EntryPoint::StageView,
+                crate::ipc::dto::requests::PrepareMode::Normal,
+                None,
+                &|_| {},
+            )?;
+            let Some(held) = prepared.held else {
+                let why = match &prepared.outcome {
+                    crate::ipc::dto::launch::PrepareOutcome::Blocked { blockers, .. } => {
+                        match blockers.first() {
+                            Some(Blocker::NotRunnable { text, .. }) if !text.is_empty() => {
+                                text.clone()
+                            }
+                            _ => "This step can't run yet, so it has no command. Run shows why."
+                                .to_owned(),
+                        }
+                    }
+                    crate::ipc::dto::launch::PrepareOutcome::Ready(_) => String::new(),
+                };
+                return Err(IpcError::not_allowed("not-runnable", why));
+            };
+            let line = std::iter::once(held.plan.program.display().to_string())
+                .chain(held.plan.argv.iter().cloned())
+                .map(|a| shell_quote(&a))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let removed = copy_text(app, &line)?;
+            Ok(CopyResult {
+                removed_controls: removed,
                 focus_run: None,
             })
         }
-        CopyTarget::Command => Err(IpcError::not_yet_available(
-            "clipboard_copy.command",
-            "M2-06",
-        )),
         CopyTarget::SessionId => {
             let chain = required(req.chain, "chain")?;
             let c = p

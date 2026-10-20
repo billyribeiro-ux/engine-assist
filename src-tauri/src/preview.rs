@@ -10,4 +10,6 @@ pub enum Preview {
     Action(Box<crate::ipc::commands::steps::HeldAction>),
     /// `progress_rebuild_preview` → `progress_rebuild_apply`.
     Rebuild(Box<crate::ipc::commands::decisions::RebuildPlan>),
+    /// `paste_back_preview` → `paste_back_apply`.
+    Paste(Box<crate::ipc::commands::chat::HeldPaste>),
 }

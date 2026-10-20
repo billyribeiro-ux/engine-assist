@@ -1,0 +1,80 @@
+---
+source: crates/foreman-core/tests/golden_v2_2.rs
+expression: snap
+---
+## 5.1 · Scaffold · Runnable
+kind=prompt tag=core when=-
+surface=cli cwd=project session=New chain=5.1
+start=opusplan@medium/plan switches=[plan-approved:opusplan@medium/acceptEdits] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Read docs/handoff/stage-04.md, CLAUDE.md, docs/design-doc.md, and every
+ADR. Plan the M0 scaffold exactly as the ADRs specify: the monorepo
+layout, pnpm workspace, frontend app, backend service, shared types
+package, local Postgres via docker compose, migration tooling, and
+lint/format/typecheck configs at [QUALITY_BAR] strictness.
+Use the latest stable versions, verified against official docs and the
+registries, never from memory. Pin with lockfiles. List every file you
+will create. Do not write files yet.
+
+## 5.1b · Approve the plan: Opus hands off and Sonnet executes. Then: · Runnable
+kind=followup tag=core when=-
+surface=cli cwd=project session=Continue chain=5.1
+start=opusplan@medium/acceptEdits switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Use the test-runner agent to run the full verification suite and fix
+everything until it reports ALL GREEN.
+
+## 5.2 · CI with security gates · Runnable
+kind=prompt tag=core when=-
+surface=cli cwd=project session=Continue chain=5.1
+start=opus@high/plan switches=[plan-approved:opus@high/acceptEdits] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Plan a GitHub Actions CI pipeline that runs on every PR and blocks merge
+on failure: typecheck, lint, unit, integration (real Postgres), build;
+static analysis (CodeQL or Semgrep); secret scanning; dependency
+vulnerability scanning (pnpm audit, cargo audit) and license checks;
+SBOM generation for each build; and migration up/down tests. Add branch
+protection: no direct pushes to main, every change via a reviewed PR.
+Verify each tool's current setup in its official docs. Then implement
+it after I approve.
+
+## 5.3 · ADR reality check · Runnable
+kind=prompt tag=core when=-
+surface=cli cwd=project session=Continue chain=5.1
+start=opus@high/plan switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Now that real code and real library versions exist, re-check every ADR
+against them and their current docs. For each, report VALID, NEEDS
+AMENDMENT (what), or CONTRADICTED (evidence). Don't edit anything.
+
+## 5.4 · Automation and preview config · Runnable
+kind=prompt tag=core when=-
+surface=cli cwd=project session=Continue chain=5.1
+start=sonnet@low/acceptEdits switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Create .claude/settings.json with a PostToolUse hook matching Edit|Write.
+It reads tool_input.file_path from the hook's stdin JSON and formats
+only that file (prettier for TS/Svelte, rustfmt for .rs), via
+scripts/claude-format.sh, which must be executable.
+Create .claude/launch.json with "web" (pnpm dev, port 5173, autoPort
+true) and "api" (cargo run in apps/api, port 8080, autoPort false) so
+the Desktop Browser pane can preview and auto-verify the app.
+
+## 5.5 · Staging pipeline · Runnable
+kind=prompt tag=conditional when=server
+surface=cli cwd=project session=Continue chain=5.1
+start=opus@high/plan switches=[plan-approved:opus@high/acceptEdits] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Implement the deploy ADR for staging: multi-stage Dockerfiles with
+minimal runtime images, a non-root user, and healthchecks; signed build
+artifacts with provenance. The deploy workflow runs only after CI passes
+on main; migrations run before new code takes traffic; rollout is
+health-checked; rollback is one command. Secrets come from the CI
+secret store only. Write docs/runbook-deploy.md. List every secret I
+must create by hand; never create or print secrets yourself.

@@ -11,6 +11,7 @@ import type { IpcClient, Requests, Responses } from './contract.ts';
 import { COMMAND_MAP, type CommandName } from './contract.ts';
 import { IPC_ERROR_TEXT, IpcFailure } from './errors.ts';
 import { requests as REQUEST_FIXTURES } from './fixtures/requests.ts';
+import { closeoutSequence } from './mock/closeout.ts';
 import { PROMPTS, DEFAULT_PROMPT } from './mock/prompts.ts';
 import { CONDITIONS, PHASES, STAGE_SUBTITLES, STAGE_TITLES, VARIABLES } from './mock/template.ts';
 import {
@@ -81,7 +82,12 @@ const EFFORTS: readonly T.Effort[] = [
 function fail(code: T.IpcErrorCode, detail: T.IpcErrorDetail | null = null): IpcFailure {
 	return new IpcFailure({ code, message: IPC_ERROR_TEXT[code], detail });
 }
-const notAllowed = (rule: string) => fail('notAllowed', { kind: 'notAllowed', rule });
+const notAllowed = (rule: string, message?: string) =>
+	new IpcFailure({
+		code: 'notAllowed',
+		message: message ?? IPC_ERROR_TEXT.notAllowed,
+		detail: { kind: 'notAllowed', rule }
+	});
 const notFound = () => fail('notFound');
 
 /** CR-003: the pin refused for annotation errors in Stages 1–2 and F.2 (`annotationErrors` world). */
@@ -361,7 +367,11 @@ export class MockIpcClient implements IpcClient {
 					: null,
 			subtitle: STAGE_SUBTITLES[s.stage] ?? '',
 			status: s.status,
-			statusWhy: s.statusWhy
+			statusWhy: s.statusWhy,
+			closeoutChecklist:
+				(s.packetExists || !!pk) && s.packetProblems === 0 && s.status !== 'signed'
+					? closeoutSequence(s.stage)
+					: []
 		};
 	}
 	private conditionViews(p: MProject): Partial<Record<T.ConditionId, T.ConditionView>> {
@@ -639,12 +649,12 @@ export class MockIpcClient implements IpcClient {
 						...(/same chat as (\S+)/.exec(st.tpl.where)
 							? [
 									{
-										id: 'same-chat',
+										id: 'session',
 										label: `Same chat as ${/same chat as (\S+)/.exec(st.tpl.where)?.[1] ?? ''}`,
 										strong: true
 									}
 								]
-							: [{ id: 'new-chat', label: 'New conversation in the Project', strong: true }]),
+							: [{ id: 'session', label: `New conversation in Project ${p.name}`, strong: true }]),
 						{ id: 'model', label: st.tpl.model ?? 'Opus 5.5', strong: false },
 						{ id: 'effort', label: 'Adaptive effort', strong: false },
 						...(st.tpl.note === 'Research off'
@@ -1540,10 +1550,15 @@ export class MockIpcClient implements IpcClient {
 			st.copiedAt = NOW;
 			const runId = this.uuid('a');
 			this.touch(p);
+			const missingLink: T.MissingLink | null = st.tpl.where.includes('same chat as')
+				? null
+				: p.chatProjectUrl
+					? null
+					: 'project';
 			return {
 				runId,
-				opened: true,
-				missingLink: p.chatProjectUrl ? null : 'project',
+				opened: missingLink === null,
+				missingLink,
 				removedControls: 0
 			};
 		});
@@ -1576,6 +1591,11 @@ export class MockIpcClient implements IpcClient {
 			if (enc.encode(text).length > 1024 * 1024)
 				throw fail('clipboard', { kind: 'clipboard', why: 'tooLarge' });
 			const stage = this.stageOf(p, st.tpl.key).stage;
+			if (st.tpl.key.endsWith('F.2'))
+				throw notAllowed(
+					'appends-in-p1',
+					'This step appends to docs/lessons.md. In this version, add the entries to docs/lessons.md yourself.'
+				);
 			const packets = [...text.matchAll(/=== HANDOFF PACKET · Stage (\d+)/g)];
 			const writesPacket = st.tpl.note?.includes('packet') ?? false;
 			const add = (path: string, lines: string[], exists = false): T.Diff => ({
@@ -1591,9 +1611,17 @@ export class MockIpcClient implements IpcClient {
 			});
 			if (writesPacket || req.kind === 'packet') {
 				if (packets.length === 0) throw notAllowed('no-packet');
-				if (packets.length > 1) throw notAllowed('two-packets');
+				if (packets.length > 1)
+					throw notAllowed(
+						'two-packets',
+						`This paste has ${packets.length} packets. Paste one packet at a time.`
+					);
 				const n = Number(packets[0]?.[1]);
-				if (n !== stage) throw notAllowed('wrong-stage-packet');
+				if (n !== stage)
+					throw notAllowed(
+						'wrong-stage-packet',
+						`This is the Stage ${n} packet; this step expects Stage ${stage}.`
+					);
 				const nn = String(stage).padStart(2, '0');
 				const split = text.split(/\n(?=PRESS RELEASE|FAQ)/);
 				const targets = [add(`docs/handoff/stage-${nn}.md`, (split[0] ?? text).split('\n'))];

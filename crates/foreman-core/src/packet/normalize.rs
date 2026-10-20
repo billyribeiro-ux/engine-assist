@@ -246,3 +246,12 @@ pub fn normalize_packet(input: &str) -> Normalized {
             .collect(),
     }
 }
+
+/// [`normalize_packet`] for a paste (DR-131, `pasteback::Normalize`): blank lines around the paste
+/// are dropped too, and the notes are their words. The paste-back planner splits the result.
+#[must_use]
+pub fn normalize_paste(text: &str) -> (String, Vec<String>) {
+    let n = normalize_packet(text);
+    let trimmed = n.text.trim_matches('\n').to_owned();
+    (trimmed, n.notes.into_iter().map(|x| x.message).collect())
+}

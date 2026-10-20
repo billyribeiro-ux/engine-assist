@@ -206,3 +206,10 @@ impl ProjectApp {
         out
     }
 }
+
+/// A local git identity in the project repo, so Foreman's own decision commits (DR-153) work in
+/// a sandbox without a global one.
+pub fn git_identity(p: &ProjectApp) {
+    git(&p.project, &["config", "user.name", "Billy Test"]);
+    git(&p.project, &["config", "user.email", "billy@example.com"]);
+}

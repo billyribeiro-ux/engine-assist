@@ -18,6 +18,7 @@ pub mod json;
 pub mod launch;
 pub mod lock;
 pub mod packet;
+pub mod pasteback;
 pub mod pathpolicy;
 pub mod pin_check;
 pub mod policy;
@@ -31,6 +32,7 @@ pub mod session_state;
 pub mod steps;
 pub mod store;
 pub mod template;
+pub mod urls;
 
 /// The crate version, as built.
 #[must_use]

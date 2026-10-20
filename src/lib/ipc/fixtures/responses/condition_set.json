@@ -197,7 +197,8 @@
 			},
 			"subtitle": "Find where the money is.",
 			"status": "notApplicable",
-			"statusWhy": "idea_known = yes"
+			"statusWhy": "idea_known = yes",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 1,
@@ -401,7 +402,8 @@
 			},
 			"subtitle": "Interview, brainstorm, and write the App Brief in one claude.ai chat.",
 			"status": "signed",
-			"statusWhy": "2026-10-12"
+			"statusWhy": "2026-10-12",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 2,
@@ -779,7 +781,8 @@
 			},
 			"subtitle": "Design the entire product. Council in Claude Code, then freeze the Master Spec.",
 			"status": "inProgress",
-			"statusWhy": null
+			"statusWhy": null,
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 3,
@@ -906,7 +909,8 @@
 			},
 			"subtitle": "Business, security, privacy, legal.",
 			"status": "locked",
-			"statusWhy": "until Stage 2 is signed"
+			"statusWhy": "until Stage 2 is signed",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 4,
@@ -1249,7 +1253,8 @@
 			},
 			"subtitle": "The complete build package.",
 			"status": "locked",
-			"statusWhy": null
+			"statusWhy": null,
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 5,
@@ -1520,7 +1525,8 @@
 			},
 			"subtitle": "Repo, CI, environments.",
 			"status": "locked",
-			"statusWhy": null
+			"statusWhy": null,
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 6,
@@ -1584,7 +1590,8 @@
 			},
 			"subtitle": "Database, auth, domain core.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 7,
@@ -1618,7 +1625,8 @@
 			},
 			"subtitle": "The walking skeleton.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 8,
@@ -1652,7 +1660,8 @@
 			},
 			"subtitle": "Security controls from the threat model.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 9,
@@ -1686,7 +1695,8 @@
 			},
 			"subtitle": "Data flows and integrations.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 10,
@@ -1721,7 +1731,8 @@
 			},
 			"subtitle": "Payments and entitlements.",
 			"status": "notApplicable",
-			"statusWhy": "payments = no"
+			"statusWhy": "payments = no",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 11,
@@ -1755,7 +1766,8 @@
 			},
 			"subtitle": "Observability, SLOs, and error budgets.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 12,
@@ -1789,7 +1801,8 @@
 			},
 			"subtitle": "Complete every feature.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 13,
@@ -1838,7 +1851,8 @@
 			},
 			"subtitle": "Design system, polish, accessibility.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 14,
@@ -1902,7 +1916,8 @@
 			},
 			"subtitle": "Independent audits.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 15,
@@ -1951,7 +1966,8 @@
 			},
 			"subtitle": "Copy, onboarding, growth surfaces.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 16,
@@ -2000,7 +2016,8 @@
 			},
 			"subtitle": "Readiness review, drills, dogfood, beta.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 17,
@@ -2049,7 +2066,8 @@
 			},
 			"subtitle": "Ring-based launch and revenue.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		},
 		{
 			"stage": 18,
@@ -2123,7 +2141,8 @@
 			"packet": null,
 			"subtitle": "Operate and grow.",
 			"status": "needsAnnotation",
-			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5",
+			"closeoutChecklist": []
 		}
 	],
 	"pendingChanges": 1,

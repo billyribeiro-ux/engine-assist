@@ -412,6 +412,39 @@ mod packet {
         );
     }
 
+    /// The paste-back planner (M3-24) with the full DR-131 normalizer: a Foreman packet pasted
+    /// back fenced, with smart quotes, `<leave blank for me to sign>` and `None.`, plans exactly
+    /// the real file unsigned, and the press release after it goes to the attachments.
+    #[test]
+    fn pasteback_uses_full_normalizer() {
+        use foreman_core::pasteback::{PasteInput, PasteKind, Role, plan};
+        let t = tpl();
+        let fmt = t.packet_format(1).unwrap();
+        let (paste, _) = pasted(1);
+        let release = "# Press release\n\nForeman runs the blueprint for you.\n";
+        let text = format!("Here it is:\n\n{paste}\n{release}");
+        let out = vec!["docs/handoff/stage-01.md".to_owned()];
+        let p = plan(
+            &PasteInput {
+                text: &text,
+                kind: PasteKind::Auto,
+                out: &out,
+                appends: None,
+                format: Some(fmt),
+            },
+            &pk::normalize_paste,
+        )
+        .unwrap();
+        assert_eq!(p.kind, PasteKind::Packet);
+        assert_eq!(p.targets[0].role, Role::Packet);
+        assert_eq!(p.targets[0].text, unsigned(1));
+        assert_eq!(p.targets[1].role, Role::Attachments);
+        assert_eq!(p.targets[1].text, release);
+        for note in ["removed code fence", "fixed smart quotes", "unsigned"] {
+            assert!(p.notes.iter().any(|n| n == note), "{note}: {:?}", p.notes);
+        }
+    }
+
     proptest! {
         /// Normalization never panics, and is idempotent on any input without a fence or BOM (a
         /// fence inside a removed fence is the next wrapping fence, by design).

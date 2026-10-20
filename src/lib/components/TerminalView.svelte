@@ -109,7 +109,8 @@
 				activate: (_e, text) => {
 					void ipc().then(async (c) => {
 						const r = await c.terminalLinkOpen({ runId, url: text });
-						if (r === 'refused') ui.say('Foreman opens only https links.');
+						if (r === 'refused')
+							ui.say('Foreman opens only https links (or http to localhost) without a user name.');
 					});
 				}
 			}
