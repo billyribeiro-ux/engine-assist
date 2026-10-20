@@ -230,4 +230,27 @@ describe('StageWorkspace selected step (AC-F030-01, AC-F006, AC-F008)', () => {
 		// Names only: no value is rendered for any variable.
 		expect(text).not.toMatch(/=\S+.*Environment names/);
 	});
+	it('AC-F030-03: a read-only project states why in a banner and no Run action is enabled', async () => {
+		const m = fresh('readOnly');
+		const p = await project(m, IDS.tradelog);
+		expect(p.readOnly?.reason).toBe('lockMismatch');
+		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
+		const banner = s.container.querySelector('.banner[role="alert"]');
+		expect(banner?.textContent).toMatch(/This project is open read-only\./);
+		expect(banner?.textContent).toContain("doesn't match the hash in .foreman/blueprint.lock.json");
+		const r = row(s.container, '2.5');
+		await ensureOpen(r);
+		const primary = r.querySelector('.actions .primary');
+		expect(primary?.getAttribute('aria-disabled')).toBe('true');
+		expect(r.textContent).toMatch(/Open read-only:/);
+		// The hidden path is closed as well: the command the button would send does not launch.
+		const out = await m.launchPrepare({
+			projectId: IDS.tradelog,
+			step: '2.5',
+			entry: 'stageView',
+			mode: 'normal'
+		});
+		expect(out.kind).toBe('blocked');
+		if (out.kind === 'blocked') expect(out.blockers.map((b) => b.kind)).toContain('readOnly');
+	});
 });

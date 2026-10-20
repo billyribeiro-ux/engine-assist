@@ -112,7 +112,7 @@
 					>{#if step > 1}<Icon name="check" size="glyph" tone="pass" />{:else}1{/if}</span
 				>
 				<div>
-					<div class="fr-t">Blueprint repo</div>
+					<div class="fr-t">{repo ? 'Blueprint repo' : 'Choose your blueprint repo'}</div>
 					{#if repo}
 						<div class="fr-d">
 							Found {repo.displayPath}. Blueprint {repo.version} at {repo.commit}, grammar v{repo.grammarVersion}.

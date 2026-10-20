@@ -212,7 +212,7 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         opened.read_only = Some(ro(
             ReadOnlyReason::FolderMissing,
             format!(
-                "The project folder {} is missing. Move it back or remove the project.",
+                "Project folder not found: {}. Move it back or remove the project.",
                 escape_visible(&app.display(folder))
             ),
         ));
@@ -295,6 +295,20 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
                     .read_only
                     .get_or_insert_with(|| ro(reason, escape_visible(&why)));
             }
+        }
+    }
+    // An approved copy this Foreman can't use (a newer schema, adopted from a folder set up by a
+    // newer Foreman) leaves the project read-only (AC-F018-07, AC-F030-03).
+    for kind in CoreKind::ALL {
+        if let Some(why) = d.approved_problem(kind) {
+            let reason = if why.contains("newer Foreman") {
+                ReadOnlyReason::NewerSchema
+            } else {
+                ReadOnlyReason::DecisionFileInvalid
+            };
+            opened
+                .read_only
+                .get_or_insert_with(|| ro(reason, escape_visible(&why)));
         }
     }
     // A decision file that no longer differs drops its stale pending entry.
@@ -538,7 +552,7 @@ pub fn light_summary(app: &App, e: &ProjectEntry, app_root: &Root) -> ProjectSum
         read_only: folder_missing.then(|| {
             ro(
                 ReadOnlyReason::FolderMissing,
-                "The project folder is missing. Move it back or remove the project.",
+                "Project folder not found. Move it back or remove the project.",
             )
         }),
         current_stage: current.map(Stage),
@@ -1321,19 +1335,14 @@ fn kind_of(s: &Step) -> StepKind {
 }
 
 /// The state word with its detail, the condition note and why the step can't run.
-fn state_words(
+pub(crate) fn state_words(
     state: &CoreState,
     s: &Step,
     path: Option<&ApplicablePath>,
 ) -> (String, Option<String>, Option<String>) {
-    let undecided_note = || {
+    let undecided = || {
         path.and_then(|p| match p.step(s.key.as_str()) {
-            Some(CoreApp::Undecided(cs)) => Some(
-                cs.iter()
-                    .map(|c| format!("{c} = undecided"))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ),
+            Some(CoreApp::Undecided(cs)) => Some(cs.clone()),
             _ => None,
         })
     };
@@ -1358,14 +1367,27 @@ fn state_words(
             Some(format!("Waiting until {d}")),
         ),
         CoreState::Undecided => {
-            let note = undecided_note();
+            // AC-F004-04: "Decide <condition> to continue"; the note keeps the full `x = undecided`.
+            let cs = undecided();
+            let note = cs.as_ref().map(|cs| {
+                cs.iter()
+                    .map(|c| format!("{c} = undecided"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            });
+            let names = cs.map_or_else(
+                || "its condition".to_owned(),
+                |cs| {
+                    cs.iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                },
+            );
             (
                 "Undecided".into(),
-                note.clone(),
-                Some(format!(
-                    "Decide {} to continue",
-                    note.unwrap_or_else(|| "its condition".into())
-                )),
+                note,
+                Some(format!("Decide {names} to continue")),
             )
         }
         CoreState::NeedsAnnotation => (
