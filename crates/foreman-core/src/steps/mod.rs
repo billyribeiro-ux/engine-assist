@@ -130,6 +130,7 @@ fn with(p: &StepProgress, state: StoredState) -> StepProgress {
 /// [`Rejected`] with the reason.
 #[allow(
     clippy::too_many_lines,
+    clippy::many_single_char_names,
     reason = "the whole transition table in one place (DR-065)"
 )]
 pub fn transition(
