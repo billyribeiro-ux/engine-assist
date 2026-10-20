@@ -26,6 +26,11 @@ echo "▶ toolchain: $(rustup show active-toolchain)"
 pnpm install --frozen-lockfile
 pnpm verify
 
+echo "▶ foreman-sensor (embedded in the app binary by src-tauri/build.rs, ADR-009)"
+cargo build --release --locked -p foreman-sensor --target aarch64-apple-darwin
+export FOREMAN_SENSOR_BIN="$PWD/target/aarch64-apple-darwin/release/foreman-sensor"
+echo "  sha256(sensor) $(shasum -a 256 "$FOREMAN_SENSOR_BIN" | cut -d' ' -f1)"
+
 echo "▶ tauri build (aarch64-apple-darwin, ad-hoc signed via bundle.macOS.signingIdentity \"-\")"
 pnpm tauri build --target aarch64-apple-darwin --bundles app -- --locked
 

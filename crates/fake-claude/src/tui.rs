@@ -17,7 +17,7 @@
 //!   `{"type":"key","bytes":[…]}`, `{"type":"resize","cols":…,"rows":…}`, `{"type":"hook",…}`.
 //!
 //! Script keys under `"tui"`: `ignoreExit` (bool), `burstBytes` (output on start),
-//! `exitCode` (for `/exit`), `banner` (extra text).
+//! `exitCode` (for `/exit`), `banner` (extra text), `noHooks` (bool: no hook ever fires).
 
 use std::io::{Read as _, Write as _};
 use std::path::{Path, PathBuf};
@@ -263,6 +263,12 @@ pub fn run(args: &[&str], script: &Value, record: Option<PathBuf>) -> u8 {
             format!("{}\n", json!({ "type": "session", "id": session })),
         );
     }
+    // `tui.noHooks`: a session whose hooks never fire (managed settings, a broken sensor).
+    let hook_settings = if tui.get("noHooks").and_then(Value::as_bool) == Some(true) {
+        None
+    } else {
+        f.settings.as_deref()
+    };
     // Raw mode, as the real TUI: Ctrl-C arrives as a byte, not SIGINT.
     let stdin = rustix::stdio::stdin();
     if let Ok(mut t) = rustix::termios::tcgetattr(stdin) {
@@ -283,7 +289,7 @@ pub fn run(args: &[&str], script: &Value, record: Option<PathBuf>) -> u8 {
         _ => "startup",
     };
     fire_hooks(
-        f.settings.as_deref(),
+        hook_settings,
         "SessionStart",
         &hook_input(&f, &session, "SessionStart", json!({ "source": source })),
         &log,
@@ -310,7 +316,7 @@ pub fn run(args: &[&str], script: &Value, record: Option<PathBuf>) -> u8 {
                 return None;
             }
             fire_hooks(
-                f.settings.as_deref(),
+                hook_settings,
                 "SessionEnd",
                 &hook_input(
                     &f,
@@ -332,7 +338,7 @@ pub fn run(args: &[&str], script: &Value, record: Option<PathBuf>) -> u8 {
             let reply = format!("ECHO: {text}");
             out(&format!("{reply}\r\n"));
             fire_hooks(
-                f.settings.as_deref(),
+                hook_settings,
                 "Stop",
                 &hook_input(
                     &f,

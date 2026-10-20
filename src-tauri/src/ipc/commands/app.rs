@@ -27,11 +27,12 @@ fn capabilities(app: &App, s: &foreman_core::schema::settings::SettingsFile) -> 
         .and_then(foreman_core::compat::parse_version_output);
     Capabilities {
         desktop: parsed.as_ref().is_some_and(|v| semver_ge(v, DESKTOP_MIN)),
-        sensor: false,
-        probes_verified: s
-            .contract
-            .as_ref()
-            .is_some_and(|c| Some(c.version.as_str()) == version.as_deref()),
+        sensor: app.sensor().available(),
+        // `contract.version` is the semver the probes verified (app::probe).
+        probes_verified: s.contract.as_ref().is_some_and(|c| {
+            parsed.as_ref().map(ToString::to_string).as_deref() == Some(c.version.as_str())
+                || Some(c.version.as_str()) == version.as_deref()
+        }),
         claude_version: version,
     }
 }

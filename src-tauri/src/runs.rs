@@ -409,6 +409,8 @@ pub fn on_exit(app: &App, run_id: &str, info: ExitInfo) {
         };
         f.exit_code = info.code;
         f.t.exited = Some(ms_since(live.started));
+        // P2: what the sensor saw (model, effort, mode); `null` without it (files.md §4.6).
+        f.observed = crate::sensor_ingest::observed(&root, run_id).or(f.observed);
         if write_run(&root, &f, &stamp).is_ok() {
             append_index(
                 &root,
@@ -611,6 +613,8 @@ pub fn interrupted(app: &App) -> Result<Vec<RunSummary>, IpcError> {
     if first {
         // A failed prune keeps the tails and tries again at the next start.
         let _ = prune_tails(app);
+        // SR-53: sensor events 30 days after their run ended.
+        let _ = crate::sensor::prune_events(app);
     }
     Ok(out)
 }

@@ -380,6 +380,19 @@ pub fn view_of(app: &App, p: &Opened, key: &str) -> Result<StepView, IpcError> {
         })
         .collect();
     let progress = p.step_progress(key);
+    let mut warnings: Vec<String> = r
+        .as_ref()
+        .and_then(|r| r.result.as_ref().ok())
+        .map(|ok| ok.notes.clone())
+        .unwrap_or_default();
+    // P2 mode guard (AC-F011-06): the live session's mode or effort differs from the run's.
+    if let Some(run) = progress.last_run_id.as_deref()
+        && let Ok((f, _)) = crate::runs::read_run(&p.app_root, run)
+        && let Some(intended) = f.intended
+        && let Some(w) = crate::sensor_ingest::mode_guard(app, run, intended)
+    {
+        warnings.push(w);
+    }
     Ok(StepView {
         prompt: r.as_ref().map(|r| segments(s, r)).unwrap_or_default(),
         inputs,
@@ -393,11 +406,7 @@ pub fn view_of(app: &App, p: &Opened, key: &str) -> Result<StepView, IpcError> {
         argv_preview: None,
         env_names: Vec::new(),
         blockers: blockers(p, app, s, r.as_ref()),
-        warnings: r
-            .as_ref()
-            .and_then(|r| r.result.as_ref().ok())
-            .map(|ok| ok.notes.clone())
-            .unwrap_or_default(),
+        warnings,
         remaps: Vec::new(),
         outs,
         r#override: over.map(|o| RunOverride {

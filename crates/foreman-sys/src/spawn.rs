@@ -126,6 +126,32 @@ pub enum SpawnRequest {
     /// `/usr/bin/open -u <url>`: a URL that passed `foreman_core::urls` (SR-25, SR-29). `-u`
     /// opens it with the app that claims its scheme, even if the text also names a file path.
     OpenUrl(foreman_core::urls::OpenUrl),
+    /// The single consented shell (SR-02, ADR-007 §8, AC-F019-12): `<shell> -l -c 'printf %s
+    /// "$PATH"'` with exactly [`LOGIN_SHELL_ARGS`], in app data, after Billy's native dialog. The
+    /// caller has checked that `shell` is listed in `/etc/shells`.
+    LoginShellPath {
+        /// `$SHELL`: absolute, an executable regular file.
+        shell: PathBuf,
+        /// Proof the native consent dialog was answered.
+        consent: LoginShellConsent,
+    },
+}
+
+/// The login shell's fixed argument vector (SR-02): a login shell that prints `$PATH` and
+/// nothing else. No part of it comes from input.
+pub const LOGIN_SHELL_ARGS: [&str; 3] = ["-l", "-c", "printf %s \"$PATH\""];
+
+/// Proof that Billy consented to the login-shell run in a native dialog (SR-02, SR-24a). Only
+/// `foreman-app`'s `doctor_capture_login_path` makes one, right after the dialog returns OK.
+#[derive(Debug, Clone)]
+pub struct LoginShellConsent(());
+
+impl LoginShellConsent {
+    /// Billy answered the native consent dialog with Capture.
+    #[must_use]
+    pub const fn granted_in_native_dialog() -> Self {
+        Self(())
+    }
 }
 
 /// How to run it.
@@ -314,6 +340,11 @@ fn program_and_args(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnE
                 vec!["-b".into(), bundle.clone(), path.display().to_string()],
             )
         }
+        SpawnRequest::LoginShellPath { .. } => {
+            return Err(SpawnError::InvalidRequest(
+                "the login shell isn't an allowlisted program".into(),
+            ));
+        }
         SpawnRequest::OpenUrl(url) => {
             // Only `https:`/`http:` URLs are constructible, so the argument can't start with `-`;
             // re-checked here anyway, as every request kind is.
@@ -453,6 +484,11 @@ fn reader<R: std::io::Read + Send + 'static>(
 /// # Errors
 /// See [`SpawnError`].
 pub fn run(req: &SpawnRequest, opts: &RunOpts, ctx: &SpawnCtx) -> Result<Output, SpawnError> {
+    if let SpawnRequest::LoginShellPath { shell, consent: _ } = req {
+        let exe = check_login_shell(shell, ctx)?;
+        let args: Vec<String> = LOGIN_SHELL_ARGS.iter().map(|a| (*a).to_owned()).collect();
+        return exec(&exe, &args, &ctx.app_data, opts, None, None);
+    }
     let (program, args) = program_and_args(req)?;
     let exe = resolve(program, ctx)?;
     let cwd = match (&opts.cwd, req) {
@@ -479,10 +515,59 @@ pub fn run(req: &SpawnRequest, opts: &RunOpts, ctx: &SpawnCtx) -> Result<Output,
         SpawnRequest::Git { stdin, .. } => stdin.clone(),
         _ => None,
     };
-    let mut cmd = Command::new(&exe);
-    cmd.args(&args)
+    let index = match req {
+        SpawnRequest::Git {
+            index_file: Some(f),
+            ..
+        } => Some(f.as_path()),
+        _ => None,
+    };
+    exec(&exe, &args, &cwd, opts, stdin_bytes, index)
+}
+
+/// The login shell's checks (SR-01's path rules for a program that isn't on the allowlist by
+/// name): absolute, an executable regular file, not inside a registered project, not in a
+/// world-writable folder.
+fn check_login_shell(shell: &Path, ctx: &SpawnCtx) -> Result<PathBuf, SpawnError> {
+    let shown = shell.display().to_string();
+    if !shell.is_absolute() {
+        return Err(SpawnError::RelativePath(shown));
+    }
+    let target =
+        std::fs::canonicalize(shell).map_err(|_| SpawnError::NotExecutable(shown.clone()))?;
+    let roots: Vec<PathBuf> = ctx
+        .projects
+        .iter()
+        .map(|r| std::fs::canonicalize(r).unwrap_or_else(|_| r.clone()))
+        .chain(ctx.projects.iter().cloned())
+        .collect();
+    if inside_any(shell, &roots) || inside_any(&target, &roots) {
+        return Err(SpawnError::InsideProject(shown));
+    }
+    let md = std::fs::metadata(&target).map_err(|_| SpawnError::NotExecutable(shown.clone()))?;
+    if !md.is_file() || md.permissions().mode() & 0o111 == 0 {
+        return Err(SpawnError::NotExecutable(shown));
+    }
+    if world_writable_dir(&target) || world_writable_dir(shell) {
+        return Err(SpawnError::WorldWritable(shown));
+    }
+    Ok(shell.to_path_buf())
+}
+
+/// Spawns `exe` with exactly `args`, `opts.env` (after `env_clear`) and `cwd`, in its own process
+/// group, and waits up to the timeout with capped output.
+fn exec(
+    exe: &Path,
+    args: &[String],
+    cwd: &Path,
+    opts: &RunOpts,
+    stdin_bytes: Option<Vec<u8>>,
+    index_file: Option<&Path>,
+) -> Result<Output, SpawnError> {
+    let mut cmd = Command::new(exe);
+    cmd.args(args)
         .env_clear()
-        .current_dir(&cwd)
+        .current_dir(cwd)
         .process_group(0)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -494,11 +579,7 @@ pub fn run(req: &SpawnRequest, opts: &RunOpts, ctx: &SpawnCtx) -> Result<Output,
     for (k, v) in &opts.env {
         cmd.env(k, v);
     }
-    if let SpawnRequest::Git {
-        index_file: Some(f),
-        ..
-    } = req
-    {
+    if let Some(f) = index_file {
         cmd.env("GIT_INDEX_FILE", f);
     }
     let mut child = cmd.spawn().map_err(|e| SpawnError::Spawn(e.to_string()))?;
