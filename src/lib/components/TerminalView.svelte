@@ -132,9 +132,11 @@
 			if (live)
 				void terminal.write(runId, d).catch((e: unknown) => ui.say(failureText(toIpcFailure(e))));
 		});
-		const off = terminal.connect(runId, (bytes) => {
-			void terminal.track(runId, bytes.length);
-			t.write(bytes, () => void terminal.track(runId, -bytes.length));
+		// The write callback fires after the tab may be gone, so it keeps the id it was made for.
+		const id = runId;
+		const off = terminal.connect(id, (bytes) => {
+			void terminal.track(id, bytes.length);
+			t.write(bytes, () => void terminal.track(id, -bytes.length));
 		});
 		const ro = new ResizeObserver(() => {
 			fit();

@@ -9,6 +9,7 @@
 	import { doNext, report, runStep } from '#lib/actions/run.ts';
 	import { ipc } from '#lib/ipc/index.ts';
 	import type { ProjectView, Surface } from '#lib/ipc/types.ts';
+	import { type ActionId, handlerFor, NOT_HERE, SHORTCUTS } from '#lib/keyboard/registry.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
@@ -64,6 +65,28 @@
 		chat: 'chat',
 		desktop: 'desktop'
 	};
+
+	// The A.7 shortcuts that act on the selection or the screen (AC-F028-05). The palette runs the
+	// same handler the shortcut does, so a refusal says the same one line (AC-F028-03).
+	const SHORTCUT_ACTIONS: { id: ActionId; icon: IconName; keywords: string }[] = [
+		{ id: 'run', icon: 'play', keywords: 'launch start' },
+		{ id: 'copyCommand', icon: 'copy', keywords: 'argv claude' },
+		{ id: 'nextStage', icon: 'chev', keywords: 'forward' },
+		{ id: 'prevStage', icon: 'chev', keywords: 'back' },
+		{ id: 'openGate', icon: 'check', keywords: 'inspection sign close out' },
+		{ id: 'toggleInspector', icon: 'inspector', keywords: 'panel details' },
+		{ id: 'pasteBack', icon: 'paste', keywords: 'chat reply output' },
+		{ id: 'markDone', icon: 'check', keywords: 'finish chat step' },
+		{ id: 'focusMode', icon: 'terminal', keywords: 'full screen' },
+		{ id: 'returnFocus', icon: 'terminal', keywords: 'leave terminal workspace' }
+	];
+
+	async function viaShortcut(id: ActionId): Promise<void> {
+		// The palette is closing; the window is inert until it has.
+		await tick();
+		const h = handlerFor(id);
+		report(h ? await h() : NOT_HERE[id] || 'That action isn’t available here.');
+	}
 
 	const items: Item[] = $derived.by(() => {
 		const out: Item[] = [];
@@ -155,6 +178,20 @@
 				}
 			);
 		}
+		for (const a of SHORTCUT_ACTIONS) {
+			const sc = SHORTCUTS.find((x) => x.id === a.id);
+			if (!sc) continue;
+			out.push({
+				id: `act-${a.id}`,
+				group: 'Actions',
+				icon: a.icon,
+				title: sc.label,
+				sub: '',
+				hint: sc.keys,
+				keywords: a.keywords,
+				open: () => viaShortcut(a.id)
+			});
+		}
 		out.push(
 			{
 				id: 'do-next',
@@ -244,14 +281,22 @@
 		return out;
 	});
 
+	// Each group is capped so a long group never pushes the others out of the list; with no query
+	// the Steps group is the open stage's steps.
+	const CAP = { Steps: 12, Actions: 30, Projects: 12, Stages: 19 } as const;
 	const shown: Item[] = $derived.by(() => {
 		const q = query.trim().toLowerCase();
+		const stageNo = current.stage ?? current.project?.summary.currentStage ?? null;
+		const name = current.project?.summary.name ?? '\u0000';
 		const list = q
 			? items.filter((i) => `${i.title} ${i.sub} ${i.keywords ?? ''}`.toLowerCase().includes(q))
 			: items.filter(
-					(i) => i.group !== 'Steps' || i.sub.includes(current.project?.summary.name ?? '\u0000')
+					(i) =>
+						i.group !== 'Steps' ||
+						(i.sub.startsWith(`${name}, Stage ${stageNo},`) && stageNo !== null)
 				);
-		return list.slice(0, 40);
+		const seen: Record<string, number> = {};
+		return list.filter((i) => (seen[i.group] = (seen[i.group] ?? 0) + 1) <= CAP[i.group]);
 	});
 	const groups = $derived(
 		(['Steps', 'Actions', 'Projects', 'Stages'] as const)
