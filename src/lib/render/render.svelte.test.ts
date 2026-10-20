@@ -44,11 +44,16 @@ describe('render', () => {
 		expect(s.container.querySelector('a, i')).toBeNull();
 		expect(s.container.textContent).toContain('javascript:alert(1)');
 		// And no source file has an HTML path at all.
-		const sources = import.meta.glob(['/src/**/*.svelte', '/src/**/*.ts', '!/src/**/*.test.ts'], {
-			query: '?raw',
-			import: 'default',
-			eager: true
-		});
+		// `__plant_*` files are the lint-plants test's deliberate violations, written into src/
+		// only while that test runs (scripts/lint-plants); a parallel run must not see them.
+		const sources = import.meta.glob(
+			['/src/**/*.svelte', '/src/**/*.ts', '!/src/**/*.test.ts', '!/src/**/__plant_*'],
+			{
+				query: '?raw',
+				import: 'default',
+				eager: true
+			}
+		);
 		const offenders = Object.entries(sources)
 			.filter(([, text]) =>
 				/\{@html|\.innerHTML\b|\.outerHTML\b|insertAdjacentHTML/.test(

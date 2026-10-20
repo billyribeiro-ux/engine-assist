@@ -336,12 +336,28 @@ mod terminal {
                 .join("../src/lib/components/TerminalView.svelte"),
         )
         .unwrap();
+        // Both paths (OSC 8 `linkHandler` and the plain-URL `registerLinkProvider`, M3-12) call
+        // `openLink`, and `openLink` is the one place that sends the URL to `terminal_link_open`.
         let handler = src
             .split("linkHandler")
             .nth(1)
             .expect("an OSC 8 linkHandler");
         let body = &handler[..handler.find("});").unwrap_or(handler.len())];
-        assert!(body.contains("terminalLinkOpen"), "{body}");
+        assert!(body.contains("openLink(text)"), "{body}");
+        assert!(
+            src.contains("registerLinkProvider(urlLinks(t, openLink))"),
+            "plain URLs route the same way"
+        );
+        let open = src
+            .split("function openLink(")
+            .nth(1)
+            .expect("an openLink function");
+        let open = &open[..open.find("\n\t}").unwrap_or(open.len())];
+        assert!(open.contains("terminalLinkOpen"), "{open}");
+        let links = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/lib/terminal/links.ts"),
+        )
+        .unwrap();
         for banned in [
             "window.open",
             "location.href",
@@ -349,6 +365,7 @@ mod terminal {
             "addon-clipboard",
         ] {
             assert!(!src.contains(banned), "{banned}");
+            assert!(!links.contains(banned), "links.ts: {banned}");
         }
     }
 }

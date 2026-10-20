@@ -14,6 +14,7 @@ pub mod os;
 pub mod preview;
 pub mod probe;
 pub mod project;
+pub mod quit;
 pub mod render;
 pub mod runs;
 pub mod sensor;
@@ -148,6 +149,9 @@ pub fn run() -> tauri::Result<()> {
                 app_data: app.path().app_data_dir()?,
                 home: app.path().home_dir()?,
             };
+            if logging::attach(&paths.app_data).is_ok() {
+                tracing::info!(target: "app", version = env!("CARGO_PKG_VERSION"), "started");
+            }
             let os = Arc::new(os::TauriOs::new(app.handle().clone()));
             let state = state::App::new(os, paths);
             watch::start(state.weak());
@@ -166,6 +170,16 @@ pub fn run() -> tauri::Result<()> {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // AC-F009-09: closing the window with live sessions goes through the quit guard.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event
+                && !quit::confirmed()
+                && let Some(s) = window.try_state::<ipc::Shared>()
+                && !s.runs().live().is_empty()
+            {
+                api.prevent_close();
+                ask_to_quit(window.app_handle().clone(), Arc::clone(s.inner()));
+                return;
+            }
             // ADR-013: a focus re-stats the watched projects and re-checks live runs' config, so a
             // missed file event can't hide a change past the next interaction.
             if let tauri::WindowEvent::Focused(true) = event
@@ -180,5 +194,37 @@ pub fn run() -> tauri::Result<()> {
                     });
             }
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())?
+        .run(|handle, event| {
+            // AC-F009-09: ⌘Q with live sessions goes through the quit guard first.
+            if let tauri::RunEvent::ExitRequested { api, .. } = event
+                && !quit::confirmed()
+                && let Some(s) = handle.try_state::<ipc::Shared>()
+                && !s.runs().live().is_empty()
+            {
+                api.prevent_exit();
+                ask_to_quit(handle.clone(), Arc::clone(s.inner()));
+            }
+        });
+    Ok(())
+}
+
+/// Asks the quit guard off the main thread (native dialogs block) and exits on OK.
+fn ask_to_quit<R: Runtime>(handle: tauri::AppHandle<R>, state: ipc::Shared) {
+    if !quit::begin_asking() {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("fm-quit-guard".into())
+        .spawn(move || {
+            let ok = quit::guard(&state);
+            quit::end_asking();
+            if ok {
+                quit::confirm();
+                handle.exit(0);
+            }
+        });
+    if spawned.is_err() {
+        quit::end_asking();
+    }
 }

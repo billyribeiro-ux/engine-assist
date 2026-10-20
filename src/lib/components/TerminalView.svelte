@@ -1,25 +1,34 @@
 <script lang="ts">
-	// One run's terminal (F-009): xterm 6 fed with raw PTY bytes. With the terminal focused every key
-	// goes to Claude Code except ⌘-chords and ⌃` (components.md); ⌘V pastes through Rust (pty_paste:
-	// clipboard reads happen only in Rust, AC-XC-29) and links open only through terminal_link_open,
-	// which asks in a native dialog (SR-29). Colors come from the --term-* tokens.
+	// One run's terminal (F-009, ADR-006): xterm 6 fed with raw PTY bytes. Options come from
+	// `#lib/terminal/options.ts` (window options off, no clipboard addon, no title subscription,
+	// SR-29) and keys are routed by `#lib/terminal/keys.ts` (AC-F009-08): with the terminal focused
+	// every key goes to Claude Code except ⌘-chords and ⌃`; ⌘C copies the selection, ⌘V pastes
+	// through Rust (pty_paste: clipboard reads happen only in Rust, AC-XC-29), ⌘A selects the
+	// buffer, ⌘F finds in it, ⌘⇧E returns to the workspace. Links open only through
+	// terminal_link_open, which asks in a native dialog (SR-29). Colors come from the --term-* tokens.
 	import '@xterm/xterm/css/xterm.css';
 
 	import { Terminal } from '@xterm/xterm';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 
 	import { failureText } from '#lib/actions/words.ts';
 	import { toIpcFailure } from '#lib/ipc/errors.ts';
 	import { ipc } from '#lib/ipc/index.ts';
 	import { terminal } from '#lib/stores/terminal.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
+	import { bufferText, findNext, type Match } from '#lib/terminal/archive.ts';
+	import { routeKey, xtermHandles } from '#lib/terminal/keys.ts';
+	import { urlLinks } from '#lib/terminal/links.ts';
+	import { SCROLLBACK_DEFAULT, terminalOptions } from '#lib/terminal/options.ts';
+	import { withStyleNonce } from '#lib/terminal/style-nonce.ts';
 
 	let {
 		runId,
 		live,
 		label,
 		fontSize = 12,
-		scrollback = 10000,
+		scrollback = SCROLLBACK_DEFAULT,
+		macOptionIsMeta = true,
 		screenReaderMode = false
 	}: {
 		runId: string;
@@ -27,11 +36,17 @@
 		label: string;
 		fontSize?: number;
 		scrollback?: number;
+		macOptionIsMeta?: boolean;
 		screenReaderMode?: boolean;
 	} = $props();
 
 	let host: HTMLDivElement;
 	let term: Terminal | undefined;
+	let finding = $state(false);
+	let query = $state('');
+	let found = $state<Match | null>(null);
+	let findStatus = $state('');
+	let findInput = $state<HTMLInputElement>();
 
 	function css(name: string): string {
 		return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -91,42 +106,101 @@
 		}
 	}
 
+	/** Every terminal link goes to Rust: it opens only allowed URLs, after a native dialog. */
+	function openLink(url: string): void {
+		void ipc().then(async (c) => {
+			const r = await c.terminalLinkOpen({ runId, url });
+			if (r === 'refused')
+				ui.say('Foreman opens only https links (or http to localhost) without a user name.');
+		});
+	}
+
+	/** ⌘C: the selection only; with nothing selected nothing happens (no interrupt). */
+	function copy(): void {
+		const text = term?.getSelection() ?? '';
+		if (!text) return;
+		void navigator.clipboard.writeText(text).then(
+			() => ui.announce('Copied the selection'),
+			() => ui.say("The selection couldn't be copied.")
+		);
+	}
+
+	async function openFind(): Promise<void> {
+		finding = true;
+		findStatus = '';
+		await tick();
+		findInput?.focus();
+		findInput?.select();
+	}
+
+	function closeFind(): void {
+		finding = false;
+		found = null;
+		findStatus = '';
+		term?.clearSelection();
+		term?.focus();
+	}
+
+	function findAgain(): void {
+		if (!term) return;
+		const m = findNext(bufferText(term.buffer.active), query, found);
+		found = m;
+		if (!m) {
+			term.clearSelection();
+			findStatus = query ? 'No match' : '';
+			return;
+		}
+		findStatus = `Line ${(m.row + 1).toLocaleString('en-US')}`;
+		term.select(m.col, m.row, m.length);
+		term.scrollToLine(Math.max(0, m.row - Math.floor(term.rows / 2)));
+	}
+
+	function onFindKey(e: KeyboardEvent): void {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			findAgain();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			closeFind();
+		}
+	}
+
 	onMount(() => {
-		const t = new Terminal({
-			fontFamily: css('--font-mono'),
-			fontSize,
-			lineHeight: 1.25,
-			scrollback,
-			screenReaderMode,
-			macOptionIsMeta: true,
-			disableStdin: !live,
-			cursorBlink: false,
-			// WCAG 2.2 AA for terminal text too, dim (SGR 2) included: xterm adjusts the foreground.
-			minimumContrastRatio: 4.5,
-			allowProposedApi: false,
-			theme: theme(),
-			linkHandler: {
-				activate: (_e, text) => {
-					void ipc().then(async (c) => {
-						const r = await c.terminalLinkOpen({ runId, url: text });
-						if (r === 'refused')
-							ui.say('Foreman opens only https links (or http to localhost) without a user name.');
-					});
+		const t = new Terminal(
+			terminalOptions({
+				fontFamily: css('--font-mono'),
+				fontSize,
+				scrollback,
+				macOptionIsMeta,
+				screenReaderMode,
+				live,
+				theme: theme(),
+				// OSC 8 links (SR-29): the URL goes to Rust, which checks it and asks first.
+				linkHandler: {
+					activate: (_e, text) => {
+						openLink(text);
+					}
 				}
-			}
-		});
+			})
+		);
 		term = t;
+		// Plain URLs in the output take the same path (AC-F009-17).
+		const links = t.registerLinkProvider(urlLinks(t, openLink));
 		t.attachCustomKeyEventHandler((ev) => {
-			if (ev.type !== 'keydown') return !ev.metaKey;
-			if (ev.metaKey && ev.key.toLowerCase() === 'v') {
-				void paste();
-				return false;
+			const route = routeKey(ev);
+			if (ev.type === 'keydown') {
+				if (route === 'paste') void paste();
+				else if (route === 'copy') copy();
+				else if (route === 'selectAll') t.selectAll();
+				else if (route === 'find') void openFind();
+				if (route !== 'pty' && route !== 'app') ev.preventDefault();
 			}
-			if (ev.metaKey) return false;
-			if (ev.ctrlKey && (ev.key === '`' || ev.code === 'Backquote')) return false;
-			return true;
+			return xtermHandles(route);
 		});
-		t.open(host);
+		// xterm's runtime style elements carry the page's style nonce (style-src 'self', ADR-014).
+		withStyleNonce(() => {
+			t.open(host);
+		});
 		fit();
 		const data = t.onData((d) => {
 			if (live)
@@ -138,10 +212,15 @@
 			void terminal.track(id, bytes.length);
 			t.write(bytes, () => void terminal.track(id, -bytes.length));
 		});
+		terminal.setCols(id, t.cols);
+		const resized = t.onResize((s) => {
+			terminal.setCols(id, s.cols);
+		});
 		const ro = new ResizeObserver(() => {
 			fit();
 		});
 		ro.observe(host);
+		// xterm's own paste handling is off: ⌘V goes through Rust (SR-28).
 		const block = (e: ClipboardEvent) => {
 			e.preventDefault();
 		};
@@ -155,7 +234,9 @@
 		mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 		return () => {
 			off();
+			links.dispose();
 			data.dispose();
+			resized.dispose();
 			ro.disconnect();
 			mo.disconnect();
 			media.removeEventListener('change', retheme);
@@ -176,15 +257,65 @@
 	});
 </script>
 
-<div class="term-host" data-terminal bind:this={host} aria-label={label} role="group"></div>
+<div class="term-wrap">
+	{#if finding}
+		<div class="find" role="search" aria-label="Find in terminal">
+			<input
+				bind:this={findInput}
+				class="input mono"
+				type="search"
+				aria-label="Find in terminal output"
+				placeholder="Find"
+				bind:value={query}
+				oninput={() => {
+					found = null;
+					findStatus = '';
+				}}
+				onkeydown={onFindKey}
+			/>
+			<button class="btn ghost" type="button" onclick={findAgain}>Next</button>
+			<button class="btn ghost" type="button" onclick={closeFind}>Done</button>
+			<span class="find-status" role="status">{findStatus}</span>
+		</div>
+	{/if}
+	<div class="term-host" data-terminal bind:this={host} aria-label={label} role="group"></div>
+</div>
 
 <style>
+	.term-wrap {
+		position: relative;
+		height: 100%;
+		min-height: 0;
+		min-width: 0;
+	}
 	.term-host {
 		height: 100%;
 		min-height: 0;
 		min-width: 0;
 		overflow: hidden;
 		padding: 0 var(--space-3);
+	}
+	.find {
+		position: absolute;
+		top: var(--space-2);
+		right: var(--space-4);
+		z-index: 5;
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-2);
+		background: var(--sheet-raised);
+		color: var(--ink);
+		border-radius: var(--radius-control);
+		box-shadow: var(--shadow-overlay);
+	}
+	.find .input {
+		width: 220px;
+	}
+	.find-status {
+		font-size: var(--text-12);
+		color: var(--ink-muted);
+		min-width: 64px;
 	}
 	/* SGR 2 (dim) text: xterm's DOM renderer draws it at 50% alpha, which fails AA on --term-bg.
 	   Dim maps to the muted terminal ink instead, which passes in both themes (AC-XC-24). */

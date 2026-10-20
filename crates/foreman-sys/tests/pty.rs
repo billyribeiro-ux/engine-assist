@@ -78,6 +78,36 @@ const SID: &str = "6f1c2a3b-1d2e-4f50-8a9b-0c1d2e3f4a5b";
 mod pty {
     use super::*;
 
+    /// NFR-22 (M3-09): 3 concurrent sessions, and 12 without degrading: every session answers
+    /// typed input while the others run, and all of them end cleanly.
+    #[test]
+    fn concurrent_sessions_3_and_12() {
+        for n in [3_usize, 12] {
+            let r = rig(serde_json::json!({}));
+            let sinks: Vec<Arc<Collect>> = (0..n).map(|_| Arc::new(Collect::default())).collect();
+            let sessions: Vec<PtySession> = sinks
+                .iter()
+                .map(|k| spawn(&r, &["--session-id", SID], k))
+                .collect();
+            let t = std::time::Instant::now();
+            for (i, s) in sessions.iter().enumerate() {
+                s.write(format!("ping-{i}\r").as_bytes()).unwrap();
+            }
+            for (i, k) in sinks.iter().enumerate() {
+                k.wait_for(&format!("ECHO: ping-{i}"), 10);
+            }
+            let all = t.elapsed();
+            eprintln!("{n} sessions: every echo within {} ms", all.as_millis());
+            assert!(all < Duration::from_secs(5), "{n} sessions took {all:?}");
+            for s in &sessions {
+                s.hangup();
+            }
+            for s in &sessions {
+                assert!(s.wait_exit(Duration::from_secs(10)).is_some());
+            }
+        }
+    }
+
     /// SR-05 / SR-57: the child sees exactly the built environment (portable-pty's `SHELL` is
     /// the one from the allowlist), the argv and the cwd.
     #[test]

@@ -39,6 +39,30 @@ pub enum IpcErrorCode {
     Internal,
 }
 
+impl IpcErrorCode {
+    /// The wire name (`notAllowed`), for the diagnostic log.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Invalid => "invalid",
+            Self::NotFound => "notFound",
+            Self::Expired => "expired",
+            Self::Stale => "stale",
+            Self::ReadOnly => "readOnly",
+            Self::NotAllowed => "notAllowed",
+            Self::Conflict => "conflict",
+            Self::PolicyViolation => "policyViolation",
+            Self::ToolMissing => "toolMissing",
+            Self::ToolFailed => "toolFailed",
+            Self::Clipboard => "clipboard",
+            Self::Cancelled => "cancelled",
+            Self::Unsupported => "unsupported",
+            Self::Io => "io",
+            Self::Internal => "internal",
+        }
+    }
+}
+
 /// What went stale (§3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

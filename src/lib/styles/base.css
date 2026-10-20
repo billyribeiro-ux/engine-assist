@@ -70,6 +70,9 @@ textarea {
 	font: inherit;
 	color: inherit;
 }
+/* SvelteKit's route announcer: its own inline style attribute is removed at build time
+   (vite.config.ts, style-src 'self'), so it is hidden here the same way. */
+#svelte-announcer,
 .vh {
 	position: absolute !important;
 	width: 1px;

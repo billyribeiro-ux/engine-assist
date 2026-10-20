@@ -8,6 +8,7 @@ import type { EntryPoint, PrepareMode, PrepareOutcome, Surface } from '#lib/ipc/
 import { refresh } from '#lib/stores/bus.ts';
 import { pendingOutput, terminal } from '#lib/stores/terminal.svelte.ts';
 import { ui } from '#lib/stores/ui.svelte.ts';
+import { archiveOf } from '#lib/terminal/archive.ts';
 
 import { blockerText, failureText } from './words.ts';
 
@@ -36,13 +37,18 @@ async function start(
 		if (res.kind === 'endYourself')
 			return "Claude didn't exit. End it yourself, then press Continue.";
 		out.bind(res.runId);
-		if (old) terminal.setStatus(old.runId, 'exited', 0);
-		terminal.add(
-			res,
-			t.projectId,
-			null,
-			old ? { label: old.tabName, lines: terminal.lines(old.runId) } : null
-		);
+		// AC-F009-06: the old buffer becomes the new tab's collapsed, read-only archive, and the
+		// new run starts in a fresh buffer; the old tab goes away (one tab per chain).
+		const archived = old
+			? await archiveOf(
+					old.tabName,
+					terminal.chunks(old.runId),
+					terminal.colsOf(old.runId),
+					terminal.scrollback
+				)
+			: null;
+		terminal.add(res, t.projectId, null, archived);
+		if (old) terminal.close(old.runId);
 	} else {
 		const res = await client.launchStart({ planId: prep.planId }, out.cb);
 		out.bind(res.runId);

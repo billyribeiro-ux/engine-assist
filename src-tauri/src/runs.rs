@@ -226,6 +226,52 @@ impl Runs {
     }
 }
 
+/// How often a live run's output tail is written (ADR-006: every 5 s and at exit).
+pub const OUTPUT_FLUSH: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// AC-F009-07, ADR-006, SR-53: the run's last 2,000 lines to `runs/<runId>/output.log` (`0600`,
+/// app data). Best effort: a diagnostic tail, not durable state; a failed write is tried again at
+/// the next flush.
+pub fn flush_output(app_root: &Root, run_id: &str, session: &PtySession) {
+    let Ok(rel) = pathpolicy::check_app_data(&format!("runs/{run_id}/output.log")) else {
+        return;
+    };
+    let (bytes, _) = session.tail();
+    let Ok((old, stamp)) = app_root.read_opt(&rel, ReadClass::AppState) else {
+        return;
+    };
+    if old.as_deref() == Some(bytes.as_slice()) {
+        return;
+    }
+    let _ = app_root.write(&rel, &bytes, &stamp);
+}
+
+/// Writes a live run's output tail every [`OUTPUT_FLUSH`] until it exits (the exit handler writes
+/// the last one).
+pub fn watch_output(app: &App, run_id: &str) {
+    let weak = app.weak();
+    let run = run_id.to_owned();
+    let _ = std::thread::Builder::new()
+        .name("fm-output-tail".into())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(OUTPUT_FLUSH);
+                let Some(app) = weak.upgrade() else {
+                    return;
+                };
+                let Some(live) = app.runs().get(&run) else {
+                    return;
+                };
+                if !live.session.is_live() {
+                    return;
+                }
+                if let Ok(root) = app.app_root() {
+                    flush_output(&root, &run, &live.session);
+                }
+            }
+        });
+}
+
 /// Emits `run:status`.
 pub fn emit_status(app: &App, run_id: &str, status: RunStatus) {
     app.runs().observe(run_id, status);
@@ -425,6 +471,8 @@ pub fn on_exit(app: &App, run_id: &str, info: ExitInfo) {
         };
         f.exit_code = info.code;
         f.t.exited = Some(ms_since(live.started));
+        flush_output(&root, run_id, &live.session);
+        tracing::info!(target: "run", run_id, code = ?info.code, "exited");
         // P2: what the sensor saw (model, effort, mode); `null` without it (files.md §4.6).
         f.observed = crate::sensor_ingest::observed(&root, run_id).or(f.observed);
         if write_run(&root, &f, &stamp).is_ok() {
@@ -618,6 +666,8 @@ pub fn interrupted(app: &App) -> Result<Vec<RunSummary>, IpcError> {
             f.status = FileStatus::Interrupted;
             if write_run(&root, &f, &stamp).is_ok() {
                 append_index(&root, &f, IndexStatus::Interrupted);
+                // AC-XC-18: after a crash the run-log entry is the run's `interrupted` status.
+                tracing::warn!(target: "run", run_id = id.as_str(), "interrupted by a crash or forced quit");
             }
         }
         if f.status == FileStatus::Interrupted {
