@@ -294,7 +294,7 @@ fn ms_since(t: Instant) -> u64 {
 }
 
 /// Appends the run's index line (`runs/index-YYYY-MM.jsonl`, ≤ 4 KB, append-only).
-fn append_index(app_root: &Root, f: &RunFile, status: IndexStatus) {
+pub fn append_index(app_root: &Root, f: &RunFile, status: IndexStatus) {
     let month: String = f.t.wall_start.chars().take(7).collect();
     let line = RunIndexLine {
         schema_version: 1,
@@ -302,7 +302,11 @@ fn append_index(app_root: &Root, f: &RunFile, status: IndexStatus) {
         project_id: f.project_id.clone(),
         stage: f.stage,
         step_id: f.step_id.clone(),
-        surface: IndexSurface::Cli,
+        surface: match f.surface {
+            RunSurface::Chat => IndexSurface::Chat,
+            RunSurface::Desktop => IndexSurface::Desktop,
+            RunSurface::Cli | RunSurface::Probe => IndexSurface::Cli,
+        },
         entry_point: match f.entry_point {
             RunEntry::Palette => IndexEntryPoint::Palette,
             RunEntry::StageView => IndexEntryPoint::StageView,

@@ -6,6 +6,7 @@ use jiff::civil::Date;
 use serde::{Deserialize, Serialize};
 
 pub mod actions;
+pub mod closeout;
 
 use crate::ids::Surface;
 use crate::rules::Applicability;

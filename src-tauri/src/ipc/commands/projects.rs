@@ -540,7 +540,7 @@ pub fn setup_apply(app: &App, req: SetupApplyReq) -> Result<ProjectSummary, IpcE
     let _w = app.writing();
     let plan = match app.inner().previews.take(req.preview_id.as_str())? {
         Preview::Setup(p) => p,
-        Preview::Action(_) => return Err(IpcError::expired()),
+        _ => return Err(IpcError::expired()),
     };
     let id = plan.project.project_id.clone();
     if plan.adopt.is_some() {

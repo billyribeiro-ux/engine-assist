@@ -322,6 +322,8 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
     }
     opened.root = Some(root);
     opened.progress = progress;
+    // AC-F007-04: a started manual step whose file changed since is done (re-stat on open).
+    crate::ipc::commands::steps::manual_outs_changed(app, &mut opened);
     if opened.progress != original {
         opened.save_progress(app)?;
     }
