@@ -15,6 +15,7 @@
 	import type { IconName } from '#lib/components/icons.ts';
 	import type { InboxItem, NextStepRow, RunSummary } from '#lib/ipc/types.ts';
 	import { registerShortcuts } from '#lib/keyboard/registry.ts';
+	import { sortInbox } from '#lib/nav/inbox.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import type { Tone } from '#lib/nav/status.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
@@ -54,7 +55,7 @@
 	}
 
 	const rows: NextStepRow[] = $derived(today.value?.rows ?? []);
-	const inbox: InboxItem[] = $derived(today.value?.inbox ?? []);
+	const inbox: InboxItem[] = $derived(sortInbox(today.value?.inbox ?? []));
 	const projectCount = $derived(new Set(inbox.map((i) => i.project)).size);
 
 	const INBOX_LOOK: Record<InboxItem['kind'], { icon: IconName; tone: Tone; action: string }> = {

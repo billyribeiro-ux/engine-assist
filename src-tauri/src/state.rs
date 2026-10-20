@@ -121,6 +121,14 @@ pub struct Inner {
     pub previews: OneTime<crate::preview::Preview>,
     /// The last `packet:changed` revision (ipc.md §6).
     pub packet_rev: u32,
+    /// The inbox items already notified (kind and identifiers), so each notifies once while it
+    /// stays in the inbox (AC-F017-09).
+    pub notified: std::collections::HashSet<String>,
+    /// `run()` switches this on: events then schedule an inbox sync (badge, notifications).
+    /// Tests leave it off and call `inbox::sync` themselves.
+    pub inbox_sync: bool,
+    /// An inbox sync is already scheduled.
+    pub inbox_scheduled: bool,
 }
 
 /// The app state.
@@ -285,7 +293,18 @@ impl App {
 
     /// Emits a §6 event.
     pub fn emit(&self, e: Event) {
+        let wakes_inbox = matches!(
+            e,
+            Event::PacketChanged(_)
+                | Event::DecisionPending(_)
+                | Event::TamperDetected(_)
+                | Event::RunStatus(_)
+                | Event::ProjectChanged(_)
+        );
         self.os.emit(&e);
+        if wakes_inbox {
+            crate::inbox::schedule(self);
+        }
     }
 
     /// Emits `project:changed` with a project's new revision.

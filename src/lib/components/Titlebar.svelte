@@ -1,14 +1,17 @@
 <script lang="ts">
 	// Title bar (components.md "Layout"): title, subtitle (path and branch), toolbar.
+	import { current } from '#lib/stores/project.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
 
 	import Icon from './Icon.svelte';
+	import ProjectMenu from './ProjectMenu.svelte';
 </script>
 
 <header class="titlebar">
 	<span class="titlebar-title">{ui.chrome.title}</span>
 	{#if ui.chrome.sub}<span class="titlebar-sub">{ui.chrome.sub}</span>{/if}
 	<span class="spacer"></span>
+	{#if current.project}<ProjectMenu project={current.project.summary} />{/if}
 	<button
 		class="btn ghost icon-only"
 		type="button"

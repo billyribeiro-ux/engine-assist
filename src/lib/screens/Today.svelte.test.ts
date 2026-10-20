@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
+
+import { goto } from '$app/navigation';
+import type { InboxItem } from '#lib/ipc/types.ts';
+import { handlerFor } from '#lib/keyboard/registry.ts';
+import { TODAY_TICK_MS } from '#lib/stores/bus.ts';
 
 import { failing, fresh, said } from '#lib/test/screen.ts';
 
@@ -78,5 +84,83 @@ describe('Today', () => {
 		const list = s.getByRole('list', { name: 'Interrupted sessions' });
 		await expect.element(list.getByText(/Transcript removed after 30 days/).first()).toBeVisible();
 		await expect.element(s.getByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
+	});
+});
+
+// M4-25 (AC-F017-07): the inbox in priority order, J/K and Enter.
+describe('Today inbox', () => {
+	// A Today whose inbox holds one item per given kind, in the order given.
+	const stub = (m: ReturnType<typeof fresh>, order: InboxItem['kind'][]) => {
+		const real = m.todayGet.bind(m);
+		return vi.spyOn(m, 'todayGet').mockImplementation(async (req) => {
+			const view = await real(req);
+			const base = view.inbox[0];
+			if (!base) throw new Error('the happy world has an inbox item to copy');
+			return {
+				...view,
+				inbox: order.map((kind, n) => ({
+					...base,
+					kind,
+					title: `item ${n} ${kind}`,
+					detail: 'detail'
+				}))
+			};
+		});
+	};
+
+	it('orders the rows by AC-F017-07 whatever order they arrive in', async () => {
+		const m = fresh('happy');
+		stub(m, [
+			'stepReady',
+			'tamper',
+			'waitElapsed',
+			'sessionYourTurn',
+			'gateFailed',
+			'packetLanded'
+		]);
+		const s = await render(Today);
+		const list = s.getByRole('list', { name: 'Waiting on you, in priority order' });
+		await expect.element(list).toBeVisible();
+		const text = list.element().textContent;
+		const at = (k: string) => text.indexOf(k);
+		expect(at('sessionYourTurn')).toBeLessThan(at('packetLanded'));
+		expect(at('packetLanded')).toBeLessThan(at('gateFailed'));
+		expect(at('gateFailed')).toBeLessThan(at('tamper'));
+		expect(at('tamper')).toBeLessThan(at('waitElapsed'));
+		expect(at('waitElapsed')).toBeLessThan(at('stepReady'));
+	});
+
+	it('J and K move between rows and Return runs the focused row’s action', async () => {
+		const m = fresh('happy');
+		stub(m, ['gateSignable', 'packetInvalid']);
+		const s = await render(Today);
+		const list = s.getByRole('list', { name: 'Waiting on you, in priority order' });
+		const buttons = () => [...list.element().querySelectorAll<HTMLElement>('[data-today-row]')];
+		await vi.waitFor(() => expect(buttons()).toHaveLength(2));
+		expect(buttons().map((b) => b.textContent.trim())).toEqual(['Open packet', 'Review and sign']);
+		buttons()[0]?.focus();
+		const next = handlerFor('nextStep');
+		expect(next).toBeDefined();
+		await next?.();
+		expect(document.activeElement).toBe(buttons()[1]);
+		await handlerFor('prevStep')?.();
+		expect(document.activeElement).toBe(buttons()[0]);
+		await userEvent.keyboard('{Enter}');
+		await vi.waitFor(() => expect(goto).toHaveBeenCalledWith(expect.stringContaining('/packet')));
+	});
+
+	it('polls once a minute, because wait and awaiting-paste items appear with time', async () => {
+		const m = fresh('happy');
+		const spy = vi.spyOn(m, 'todayGet');
+		vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+		try {
+			await render(Today);
+			await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+			const before = spy.mock.calls.length;
+			await vi.advanceTimersByTimeAsync(TODAY_TICK_MS);
+			await vi.waitFor(() => expect(spy.mock.calls.length).toBeGreaterThan(before));
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });

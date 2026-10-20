@@ -124,6 +124,9 @@ pub struct Runs {
     scanned: AtomicBool,
     marks: Mutex<HashMap<(String, String), Marks>>,
     chat_open: Mutex<HashMap<(String, String), (String, jiff::Timestamp)>>,
+    /// The last status `run:status` announced for each run (the Today inbox's blocked and
+    /// your-turn sessions, AC-F017-07).
+    observed: Mutex<HashMap<String, RunStatus>>,
 }
 
 /// What Billy did to a step's prompt since its last run (F-026, AC-F026-01): the proxies for a
@@ -197,10 +200,22 @@ impl Runs {
             .unwrap_or_default()
     }
 
+    /// Records the status a run was announced with.
+    pub fn observe(&self, run_id: &str, status: RunStatus) {
+        lock(&self.observed).insert(run_id.to_owned(), status);
+    }
+
+    /// The last status announced for a run.
+    #[must_use]
+    pub fn observed(&self, run_id: &str) -> Option<RunStatus> {
+        lock(&self.observed).get(run_id).copied()
+    }
+
     /// Forgets everything held for the run history (Clear run history).
     fn forget_history(&self) {
         lock(&self.marks).clear();
         lock(&self.chat_open).clear();
+        lock(&self.observed).clear();
     }
 
     /// Hangs up every live session (quit, after the native quit guard; SR-57).
@@ -213,6 +228,7 @@ impl Runs {
 
 /// Emits `run:status`.
 pub fn emit_status(app: &App, run_id: &str, status: RunStatus) {
+    app.runs().observe(run_id, status);
     let rev = app.runs().next_rev();
     app.emit(Event::RunStatus(RunStatusChanged {
         run_id: RunId::from_trusted(run_id),

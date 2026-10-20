@@ -19,6 +19,11 @@ type Listener = (key: RefreshKey) => void;
 const listeners = new Set<Listener>();
 const revs = new Map<string, number>();
 let started: Promise<void> | null = null;
+let ticker: ReturnType<typeof setInterval> | null = null;
+
+/** Items that appear with time (a chat prompt copied 10 minutes ago, a wait step's day arriving)
+ * are not events, so Today and the sidebar refetch once a minute (AC-F017-08). */
+export const TODAY_TICK_MS = 60_000;
 
 export function onRefresh(fn: Listener): () => void {
 	listeners.add(fn);
@@ -73,6 +78,7 @@ export function keysFor<E extends EventName>(event: E, p: EventPayloads[E]): Ref
 /** Subscribes once to every event and fans them out as refresh keys. */
 export function startBus(): Promise<void> {
 	started ??= (async () => {
+		ticker ??= setInterval(() => refresh('today'), TODAY_TICK_MS);
 		const client = await ipc();
 		for (const name of EVENT_NAMES) {
 			await client.listen(name, (payload) => {
@@ -85,6 +91,8 @@ export function startBus(): Promise<void> {
 
 /** Test helper: forget subscriptions and revisions. */
 export function resetBus(): void {
+	if (ticker !== null) clearInterval(ticker);
+	ticker = null;
 	started = null;
 	revs.clear();
 }

@@ -4,6 +4,7 @@
 	// is a glyph plus words (AC-XC-25); the Doctor dot shows its last level (AC-F019-07).
 	import { page } from '$app/state';
 	import type { InboxItem, ProjectSummary, StageView } from '#lib/ipc/types.ts';
+	import { projectLevel } from '#lib/nav/inbox.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import { DOCTOR, SHEET } from '#lib/nav/status.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
@@ -35,13 +36,13 @@
 	const inbox: InboxItem[] = $derived(today.value?.inbox ?? []);
 	const openId = $derived(page.params.projectId ?? null);
 
-	const FAIL = new Set(['packetInvalid', 'gateFailed', 'tamper']);
-	function badge(p: ProjectSummary): 'fail' | 'attention' | null {
-		const mine = inbox.filter((i) => i.project === p.id);
-		if (p.readOnly || mine.some((i) => FAIL.has(i.kind))) return 'fail';
-		if (mine.some((i) => i.kind === 'gateSignable' || i.kind === 'packetLanded'))
-			return 'attention';
-		return null;
+	// AC-F017-10: every project shows a status dot, as a shape and words (AC-XC-25): a problem (cross),
+	// something waiting on Billy (attention dot) or all clear (pass dot).
+	function level(p: ProjectSummary): { kind: 'problem' | 'waiting' | 'clear'; word: string } {
+		const kind = projectLevel(inbox, p.id, p.readOnly !== null);
+		if (kind === 'problem') return { kind, word: p.readOnly ? 'Read-only' : 'Has a problem' };
+		if (kind === 'waiting') return { kind, word: 'Waiting on you' };
+		return { kind, word: 'No problems' };
 	}
 
 	interface Row {
@@ -114,7 +115,7 @@
 		{/if}
 		<ul aria-labelledby="side-projects">
 			{#each projects.value ?? [] as p (p.id)}
-				{@const b = badge(p)}
+				{@const lv = level(p)}
 				{@const isOpen = p.id === openId}
 				<li>
 					<a
@@ -123,17 +124,21 @@
 						aria-current={isOpen ? 'page' : undefined}
 						title={p.pinned ? `${p.name} (⌘${p.pinned})` : p.name}
 						><Icon name="folder" /><span class="label">{p.name}</span>
-						{#if !isOpen && b === 'fail'}
-							<span class="badge" aria-label={p.readOnly ? 'Read-only' : '1 problem'}
-								><Icon name="cross" size="glyph" tone="fail" /></span
-							>
-						{:else if !isOpen && b === 'attention'}
-							<span class="badge" aria-label="Packet waiting for your signature"
-								><span class="dot attention"></span></span
-							>
-						{:else if p.currentStage !== null}
-							<span class="meta">Stage {p.currentStage}</span>
-						{/if}</a
+						<span class="trail"
+							>{#if p.currentStage !== null}<span class="meta">Stage {p.currentStage}</span
+								>{/if}{#if p.pinned}<span
+									class="meta pin"
+									aria-label="Pinned: press Command {p.pinned} to open">⌘{p.pinned}</span
+								>{/if}<span class="badge" role="img" aria-label={lv.word}
+								>{#if lv.kind === 'problem'}<Icon
+										name="cross"
+										size="glyph"
+										tone="fail"
+									/>{:else if lv.kind === 'waiting'}<span class="dot attention"></span>{:else}<span
+										class="dot pass"
+									></span>{/if}</span
+							></span
+						></a
 					>
 					{#if isOpen && rows.length}
 						<ol class="side-stages" aria-label="{p.name} stages">
@@ -191,6 +196,17 @@
 </nav>
 
 <style>
+	.trail {
+		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-3);
+		flex: none;
+	}
+	.trail .meta,
+	.trail .badge {
+		margin-left: 0;
+	}
 	.side-empty {
 		font-size: var(--text-12);
 		color: var(--ink-muted);

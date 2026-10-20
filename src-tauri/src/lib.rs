@@ -5,9 +5,11 @@
 pub mod closeout;
 pub mod convert;
 pub mod diff;
+pub mod inbox;
 pub mod ipc;
 pub mod launch;
 pub mod logging;
+pub mod notify;
 pub mod os;
 pub mod preview;
 pub mod project;
@@ -25,13 +27,14 @@ use tauri::{Builder, Manager as _, Runtime};
 
 /// The builder with every IPC command and the Rust-side plugins registered. `generate_handler!`
 /// must list exactly `ipc::COMMANDS` (capabilities::every_command_declared_and_granted). The
-/// dialog and clipboard plugins are used from Rust only; no capability grants the webview any of
+/// dialog, clipboard and notification plugins are used from Rust only; no capability grants the webview any of
 /// their permissions (SR-22).
 #[must_use]
 pub fn builder<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     let builder = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             ipc::handlers::app_bootstrap,
             ipc::handlers::settings_get,
@@ -145,6 +148,7 @@ pub fn run() -> tauri::Result<()> {
             let os = Arc::new(os::TauriOs::new(app.handle().clone()));
             let state = state::App::new(os, paths);
             watch::start(state.weak());
+            inbox::start(&state);
             app.manage::<ipc::Shared>(state);
             window::build_main(app)?;
             Ok(())
@@ -158,7 +162,10 @@ pub fn run() -> tauri::Result<()> {
                 let state = Arc::clone(s.inner());
                 let _ = std::thread::Builder::new()
                     .name("fm-focus-restat".into())
-                    .spawn(move || watch::on_focus(&state));
+                    .spawn(move || {
+                        watch::on_focus(&state);
+                        inbox::schedule(&state);
+                    });
             }
         })
         .run(tauri::generate_context!())

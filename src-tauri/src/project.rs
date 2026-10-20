@@ -1291,7 +1291,7 @@ pub fn mode_name(m: foreman_core::ids::Mode) -> String {
     .to_owned()
 }
 
-fn display_number(s: &Step) -> String {
+pub(crate) fn display_number(s: &Step) -> String {
     match s.template_id.as_deref() {
         Some("gate.A") => "Gate A".to_owned(),
         Some("gate.B") => "Gate B".to_owned(),

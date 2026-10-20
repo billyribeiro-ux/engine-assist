@@ -103,7 +103,8 @@ pub fn next_step<'a>(app: &App, p: &'a Opened) -> Result<&'a foreman_core::templ
     })
 }
 
-/// `today_get` (P1 Next step rows; the P2 inbox is empty in P1).
+/// `today_get`: the Next step rows (P1) and the inbox (P2, AC-F017-07), in the order of
+/// [`crate::inbox::rank`].
 ///
 /// # Errors
 /// `Io`.
@@ -114,7 +115,7 @@ pub fn today_get(app: &App, req: TodayGetReq) -> Result<TodayView, IpcError> {
     for summary in summaries(app)? {
         let row = match project::open(app, summary.id.as_str()) {
             Ok(p) => {
-                inbox.extend(crate::signing::tamper_inbox(app, &p));
+                inbox.extend(crate::inbox::project_items(app, &p));
                 let strip = p.stage_views(app).iter().map(|v| v.status).collect();
                 let stage_title = p.current_stage().and_then(|n| {
                     p.template
@@ -149,6 +150,8 @@ pub fn today_get(app: &App, req: TodayGetReq) -> Result<TodayView, IpcError> {
         };
         rows.push(row);
     }
+    inbox.extend(crate::inbox::interrupted_items(app)?);
+    crate::inbox::sort(&mut inbox);
     Ok(TodayView { rows, inbox })
 }
 

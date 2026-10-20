@@ -5,6 +5,7 @@
 // unknown request fields are `Invalid`; one-time preview and plan IDs expire; native dialogs are
 // scripted (`setDialogAnswer`), so the webview never approves anything itself (SR-24a); mutations
 // emit the same events with the next `rev`; PTY output is raw bytes through the same callback.
+import { sortInbox } from '#lib/nav/inbox.ts';
 import { isHidden, visibleSpans, visibleText } from '#lib/render/escape.ts';
 
 import type { IpcClient, Requests, Responses } from './contract.ts';
@@ -847,7 +848,7 @@ export class MockIpcClient implements IpcClient {
 					strip: row.strip,
 					stageTitle: row.stageTitle
 				})),
-				inbox: this.world.inbox
+				inbox: sortInbox(this.world.inbox)
 			};
 		});
 	}

@@ -572,4 +572,25 @@ mod tests {
         assert_eq!(p, Program::Open);
         assert_eq!(args, ["-u", "https://claude.ai/chat/abc"]);
     }
+
+    /// SR-25a: "Open terminal here" is `/usr/bin/open -b com.apple.Terminal <dir>`, an absolute
+    /// path only.
+    #[test]
+    fn open_terminal_argv() {
+        let req = SpawnRequest::OpenWithBundle {
+            bundle: "com.apple.Terminal".to_owned(),
+            path: PathBuf::from("/Users/billy/Code/tradelog"),
+        };
+        let (p, args) = program_and_args(&req).unwrap();
+        assert_eq!(p, Program::Open);
+        assert_eq!(
+            args,
+            ["-b", "com.apple.Terminal", "/Users/billy/Code/tradelog"]
+        );
+        let relative = SpawnRequest::OpenWithBundle {
+            bundle: "com.apple.Terminal".to_owned(),
+            path: PathBuf::from("tradelog"),
+        };
+        assert!(program_and_args(&relative).is_err());
+    }
 }

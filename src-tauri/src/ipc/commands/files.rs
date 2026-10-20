@@ -103,11 +103,22 @@ pub fn file_reveal(app: &App, req: FileRevealReq) -> Result<(), IpcError> {
     opener(app, &SpawnRequest::OpenReveal(abs))
 }
 
-/// `terminal_open_here`: not built yet (M4-33; IPC-R12). Opening Terminal by bundle ID at a
-/// folder needs a `foreman-sys::spawn` request it doesn't have yet.
+/// `terminal_open_here` (P2): Terminal, by bundle ID, at the project root
+/// (`/usr/bin/open -b com.apple.Terminal <root>`; AC-F014-11, SR-25a). No shell and no command
+/// is typed into it.
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M4-33`).
-pub fn terminal_open_here(_app: &App, _req: TerminalOpenHereReq) -> Result<(), IpcError> {
-    Err(IpcError::not_yet_available("terminal_open_here", "M4-33"))
+/// `NotFound` (unknown project or missing folder), `ReadOnly`, `ToolFailed`.
+pub fn terminal_open_here(app: &App, req: TerminalOpenHereReq) -> Result<(), IpcError> {
+    let p = project::open(app, req.project_id.as_str())?;
+    let dir = p.root()?.path().to_path_buf();
+    if !dir.is_dir() {
+        return Err(IpcError::not_found(
+            "The project folder isn't there any more.",
+        ));
+    }
+    let ctx = app.spawn_ctx_now()?;
+    app.os()
+        .open_terminal(&dir, &ctx)
+        .map_err(|_| IpcError::tool_failed("open", None, false, String::new()))
 }

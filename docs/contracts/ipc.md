@@ -425,6 +425,7 @@ Res   TodayView { rows: Vec<NextStepRow>, inbox: Vec<InboxItem> }        // inbo
 Err   Io
 ```
 F-017 · AC-F017-01, -03, -04, -05, -07, -08 · SR-56 (inbox notifications are Rust-side templates).
+As built (M4-25): `inbox` is sorted by AC-F017-07's rank (`foreman_app::inbox::rank`; items of one rank keep the project order) and each item also carries `projectName`, `title`, `detail`, `chain` and `run` (Foreman-written text only, SR-56). Sources: live runs announced `blocked`/`idle` through `runs::emit_status` (session-blocked, session-your-turn), `closeout::gather` + `gates::view` (packet landed/invalid, gate failed/signable), pending outside changes, the tamper check, a chat step `copied` more than 10 minutes ago (`chat-awaiting-paste`), wait steps whose day has come (`wait-elapsed`) and interrupted runs. `step-ready` is never emitted: the Next step rows already show every project's next step. Time-derived items are not events, so the webview refetches once a minute (`bus.TODAY_TICK_MS`). When Foreman isn't focused, a new `session-blocked`/`packet-landed` item shows a macOS notification from a template in `src-tauri/src/notify.rs` (once per item per app run); the Dock badge counts the first four kinds. A notification click only activates Foreman (no action handler is registered). The webview and `tauri-plugin-notification` get no permission: both calls are made from Rust.
 
 **`do_next`** · P1 · M2 · **mem** (one-time plan)
 ```text
@@ -940,6 +941,7 @@ Res   ()
 Err   NotFound · ToolFailed
 ```
 F-014 · AC-F014-11, AC-XC-28 · SR-25a.
+As built (M4-25): `/usr/bin/open -b com.apple.Terminal <project root>` through `foreman-sys::spawn` (`SpawnRequest::OpenWithBundle`) behind the `Os::open_terminal` seam; no shell and no command is typed into Terminal. A project whose folder is missing answers `ReadOnly`/`NotFound`; a non-zero `open` is `ToolFailed`.
 
 ### 4.9 Decisions and recovery
 

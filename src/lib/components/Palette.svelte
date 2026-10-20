@@ -5,6 +5,7 @@
 	import { goto } from '$app/navigation';
 	import { tick } from 'svelte';
 
+	import { openTerminalHere, removeProject, togglePin } from '#lib/actions/project.ts';
 	import { doNext, report, runStep } from '#lib/actions/run.ts';
 	import { ipc } from '#lib/ipc/index.ts';
 	import type { ProjectView, Surface } from '#lib/ipc/types.ts';
@@ -118,6 +119,41 @@
 					ui.toast('Prompt copied', 'pass', 'copy');
 				}
 			});
+		}
+		if (proj) {
+			const pr = proj.summary;
+			out.push(
+				{
+					id: 'pin-project',
+					group: 'Actions',
+					icon: 'link',
+					title: pr.pinned ? `Unpin ${pr.name}` : `Pin ${pr.name}`,
+					sub: pr.pinned ? `from ⌘${pr.pinned}` : 'to a ⌘ number',
+					hint: '',
+					keywords: 'pin unpin shortcut slot',
+					open: () => togglePin(pr.id)
+				},
+				{
+					id: 'terminal-here',
+					group: 'Actions',
+					icon: 'terminal',
+					title: 'Open terminal here',
+					sub: `${pr.name}'s folder, in Terminal`,
+					hint: '',
+					keywords: 'terminal shell folder',
+					open: () => openTerminalHere(pr.id)
+				},
+				{
+					id: 'remove-project',
+					group: 'Actions',
+					icon: 'cross',
+					title: `Remove ${pr.name}…`,
+					sub: 'Foreman forgets it; the folder stays',
+					hint: '',
+					keywords: 'delete forget',
+					open: () => removeProject(pr.id)
+				}
+			);
 		}
 		out.push(
 			{

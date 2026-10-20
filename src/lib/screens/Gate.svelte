@@ -3,6 +3,7 @@
 	// results, the inspection items in review order (failed, waiting, then passed collapsed), the attest
 	// control, Gate B and C, and Sign. The sign sheet is the review; Sign packet only *requests*
 	// signing and Rust raises the native confirmation (SR-24a). After read-back the stamp lands.
+	import { openTerminalHere } from '#lib/actions/project.ts';
 	import { report, runPrepared, runStep } from '#lib/actions/run.ts';
 	import { failureText } from '#lib/actions/words.ts';
 	import Dialog from '#lib/components/Dialog.svelte';
@@ -444,6 +445,9 @@
 						{#if commitPending}
 							<button class="btn" type="button" onclick={retryCommit}
 								><Icon name="pen" />Retry commit</button
+							>
+							<button class="btn" type="button" onclick={() => openTerminalHere(pid)}
+								><Icon name="terminal" />Open terminal here</button
 							>
 						{/if}
 						{#if !g.signable}<span class="reason" id="sign-why">{signWhy}</span>{/if}

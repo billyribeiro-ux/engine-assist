@@ -7,7 +7,7 @@
 //! implementation or answer a dialog (`ipc::security_confirmations_are_native`).
 
 use std::collections::VecDeque;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use foreman_core::urls::OpenUrl;
@@ -58,6 +58,17 @@ pub enum Pick {
     Tool(&'static str),
 }
 
+/// A notification (SR-56): a title and body written by Foreman from a fixed template
+/// (`crate::notify`); never prompt, packet, terminal or assistant text. Clicking it only brings
+/// Foreman to the front: no action handler is registered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Notice {
+    /// The title.
+    pub title: String,
+    /// The body.
+    pub body: String,
+}
+
 /// The OS seam.
 pub trait Os: Send + Sync {
     /// Shows a native confirmation and returns true only for OK (SR-24a).
@@ -84,6 +95,21 @@ pub trait Os: Send + Sync {
     /// # Errors
     /// The spawn's failure, as text.
     fn open_url(&self, url: &OpenUrl, ctx: &SpawnCtx) -> Result<(), String>;
+    /// Opens Terminal (by bundle ID, `/usr/bin/open -b com.apple.Terminal <dir>`) at a project
+    /// folder (AC-F014-11, SR-25a).
+    ///
+    /// # Errors
+    /// The spawn's failure, as text.
+    fn open_terminal(&self, dir: &Path, ctx: &SpawnCtx) -> Result<(), String>;
+    /// Shows a notification from a Foreman template (SR-56, AC-F017-09).
+    ///
+    /// # Errors
+    /// The notification service's failure, as text.
+    fn notify(&self, n: &Notice) -> Result<(), String>;
+    /// Sets the Dock badge (`None` clears it; AC-F017-09).
+    fn set_badge(&self, count: Option<u32>);
+    /// Whether Foreman's window is the focused one (notifications only fire when it isn't).
+    fn app_focused(&self) -> bool;
     /// Now, UTC.
     fn now(&self) -> jiff::Timestamp;
     /// Today's local date (wait steps, DR-067).
@@ -190,6 +216,37 @@ impl<R: tauri::Runtime> Os for TauriOs<R> {
         sys_open_url(url, ctx)
     }
 
+    fn open_terminal(&self, dir: &Path, ctx: &SpawnCtx) -> Result<(), String> {
+        sys_open_terminal(dir, ctx)
+    }
+
+    fn notify(&self, n: &Notice) -> Result<(), String> {
+        use tauri_plugin_notification::NotificationExt as _;
+        // No action type and no handler is registered, so a click only activates the app.
+        self.app
+            .notification()
+            .builder()
+            .title(n.title.clone())
+            .body(n.body.clone())
+            .show()
+            .map_err(|e| e.to_string())
+    }
+
+    fn set_badge(&self, count: Option<u32>) {
+        use tauri::Manager as _;
+        if let Some(w) = self.app.get_webview_window("main") {
+            // A platform without a Dock badge answers an error; nothing depends on it.
+            let _ = w.set_badge_count(count.map(i64::from));
+        }
+    }
+
+    fn app_focused(&self) -> bool {
+        use tauri::Manager as _;
+        self.app
+            .get_webview_window("main")
+            .is_some_and(|w| w.is_focused().unwrap_or(false))
+    }
+
     fn now(&self) -> jiff::Timestamp {
         jiff::Timestamp::now()
     }
@@ -201,7 +258,29 @@ impl<R: tauri::Runtime> Os for TauriOs<R> {
 /// # Errors
 /// The spawn failure or a non-zero exit, as text.
 pub fn sys_open_url(url: &OpenUrl, ctx: &SpawnCtx) -> Result<(), String> {
-    use foreman_sys::spawn::{self, Cwd, RunOpts, SpawnRequest};
+    sys_open(&foreman_sys::spawn::SpawnRequest::OpenUrl(url.clone()), ctx)
+}
+
+/// Terminal's bundle ID: "Open terminal here" never uses the default terminal or a shell
+/// (SR-25a, ADR-014).
+pub const TERMINAL_BUNDLE: &str = "com.apple.Terminal";
+
+/// `/usr/bin/open -b com.apple.Terminal <dir>` through `foreman-sys::spawn`.
+///
+/// # Errors
+/// The spawn failure or a non-zero exit, as text.
+pub fn sys_open_terminal(dir: &Path, ctx: &SpawnCtx) -> Result<(), String> {
+    sys_open(
+        &foreman_sys::spawn::SpawnRequest::OpenWithBundle {
+            bundle: TERMINAL_BUNDLE.to_owned(),
+            path: dir.to_path_buf(),
+        },
+        ctx,
+    )
+}
+
+fn sys_open(req: &foreman_sys::spawn::SpawnRequest, ctx: &SpawnCtx) -> Result<(), String> {
+    use foreman_sys::spawn::{self, Cwd, RunOpts};
     let opts = RunOpts {
         env: vec![
             ("HOME".to_owned(), ctx.home.display().to_string()),
@@ -211,8 +290,7 @@ pub fn sys_open_url(url: &OpenUrl, ctx: &SpawnCtx) -> Result<(), String> {
         output_cap: 64 * 1024,
         cwd: Cwd::AppData,
     };
-    let out =
-        spawn::run(&SpawnRequest::OpenUrl(url.clone()), &opts, ctx).map_err(|e| e.to_string())?;
+    let out = spawn::run(req, &opts, ctx).map_err(|e| e.to_string())?;
     if out.code == Some(0) {
         Ok(())
     } else {
@@ -247,7 +325,11 @@ pub struct ScriptedOs {
     clipboard: Mutex<Option<String>>,
     events: Mutex<Vec<Event>>,
     opened: Mutex<Vec<String>>,
+    terminals: Mutex<Vec<PathBuf>>,
     open_fails: Mutex<bool>,
+    notices: Mutex<Vec<Notice>>,
+    badge: Mutex<Option<u32>>,
+    focused: Mutex<bool>,
     now: Mutex<jiff::Timestamp>,
 }
 
@@ -262,7 +344,11 @@ impl Default for ScriptedOs {
             clipboard: Mutex::new(None),
             events: Mutex::new(Vec::new()),
             opened: Mutex::new(Vec::new()),
+            terminals: Mutex::new(Vec::new()),
             open_fails: Mutex::new(false),
+            notices: Mutex::new(Vec::new()),
+            badge: Mutex::new(None),
+            focused: Mutex::new(true),
             // ipc.md §7.2: the mock's fixed clock.
             now: Mutex::new(jiff::Timestamp::from_second(1_792_400_400).unwrap_or_default()),
         }
@@ -318,9 +404,28 @@ impl ScriptedOs {
     pub fn opened(&self) -> Vec<String> {
         lock(&self.opened).clone()
     }
+    /// Every folder "Open terminal here" opened so far.
+    #[must_use]
+    pub fn terminals(&self) -> Vec<PathBuf> {
+        lock(&self.terminals).clone()
+    }
     /// Makes the next opens fail (as `open` exiting non-zero would).
     pub fn fail_opens(&self, fail: bool) {
         *lock(&self.open_fails) = fail;
+    }
+    /// Every notification shown so far.
+    #[must_use]
+    pub fn notices(&self) -> Vec<Notice> {
+        lock(&self.notices).clone()
+    }
+    /// The Dock badge as last set.
+    #[must_use]
+    pub fn badge(&self) -> Option<u32> {
+        *lock(&self.badge)
+    }
+    /// Whether the window counts as focused (default: yes).
+    pub fn set_focused(&self, focused: bool) {
+        *lock(&self.focused) = focused;
     }
 }
 
@@ -358,6 +463,27 @@ impl Os for ScriptedOs {
         }
         lock(&self.opened).push(url.as_str().to_owned());
         Ok(())
+    }
+
+    fn open_terminal(&self, dir: &Path, _ctx: &SpawnCtx) -> Result<(), String> {
+        if *lock(&self.open_fails) {
+            return Err("open exited with Some(1)".to_owned());
+        }
+        lock(&self.terminals).push(dir.to_path_buf());
+        Ok(())
+    }
+
+    fn notify(&self, n: &Notice) -> Result<(), String> {
+        lock(&self.notices).push(n.clone());
+        Ok(())
+    }
+
+    fn set_badge(&self, count: Option<u32>) {
+        *lock(&self.badge) = count;
+    }
+
+    fn app_focused(&self) -> bool {
+        *lock(&self.focused)
     }
 
     fn now(&self) -> jiff::Timestamp {
