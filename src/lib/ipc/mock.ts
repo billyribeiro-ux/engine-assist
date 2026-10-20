@@ -1011,6 +1011,57 @@ export class MockIpcClient implements IpcClient {
 						c('opus@xhigh'),
 						t('. The annotation wins.')
 					])
+				],
+				steps: [
+					{
+						key: '1.1',
+						stage: 1,
+						number: '1.1',
+						title: 'Describe the idea',
+						annotation: 'fm:step id=1.1 surface=chat start=opus@adaptive',
+						warnings: [],
+						outs: []
+					},
+					{
+						key: '2.2',
+						stage: 2,
+						number: '2.2',
+						title: 'Convene the council',
+						annotation:
+							'fm:step id=2.2 surface=cli cwd=spec start=opus@xhigh/plan switch=plan-approved:acceptEdits',
+						warnings: [],
+						outs: ['spec/council/r1-research.md', 'spec/council/r2-options.md']
+					},
+					{
+						key: '4.5',
+						stage: 4,
+						number: '4.5',
+						title: 'Threat model',
+						annotation: 'fm:step id=4.5 surface=cli cwd=app start=opus@xhigh/plan',
+						warnings: [
+							d(4, 'warning', 946, 1, [
+								t('4.5: RUN WITH says effort "high"; the annotation says '),
+								c('opus@xhigh'),
+								t('. The annotation wins.')
+							])
+						],
+						outs: ['docs/threat-model.md']
+					},
+					{
+						key: '5.3',
+						stage: 5,
+						number: '5.3',
+						title: 'Scaffold the workspace',
+						annotation: 'fm:step id=5.3 surface=cli cwd=app start=sonnet@high/acceptEdits',
+						warnings: [
+							d(5, 'warning', 1105, 1, [
+								t('5.3: RUN WITH says "same session"; the annotation says '),
+								c('session=new'),
+								t('. The annotation wins; check which one you meant.')
+							])
+						],
+						outs: []
+					}
 				]
 			};
 		});

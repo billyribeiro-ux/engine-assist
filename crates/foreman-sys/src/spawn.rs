@@ -103,6 +103,10 @@ pub enum SpawnRequest {
     ClaudeAuthStatusInLaunch,
     /// A zero-token contract probe (`--init-only …`, ADR-017), always in `<app-data>/probe/`.
     ClaudeProbe(Vec<String>),
+    /// `claude --desktop` or `claude --desktop --resume <uuid>` (P2, F-024, ADR-008): in the step
+    /// cwd with the exact launch environment, like the in-launch auth check. The arguments come
+    /// from `foreman_core::launch::argv::desktop_open` / `desktop` and nothing else.
+    ClaudeDesktop(Vec<String>),
     /// `<tool> --version` for `node`, `pnpm`, `cargo`.
     ToolVersion(Program),
     /// git with validated arguments (built by `foreman_core::git`).
@@ -309,6 +313,22 @@ fn program_and_args(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnE
             }
             (Program::Claude, args.clone())
         }
+        SpawnRequest::ClaudeDesktop(args) => {
+            check_claude_args(args)?;
+            let ok = match args.as_slice() {
+                [d] => d == "--desktop",
+                [d, r, id] => {
+                    d == "--desktop" && r == "--resume" && foreman_core::ids::is_uuid_v4(id)
+                }
+                _ => false,
+            };
+            if !ok {
+                return Err(SpawnError::InvalidRequest(
+                    "a desktop handoff is --desktop [--resume <uuid>] only".into(),
+                ));
+            }
+            (Program::Claude, args.clone())
+        }
         SpawnRequest::ToolVersion(p) => {
             if !matches!(p, Program::Node | Program::Pnpm | Program::Cargo) {
                 return Err(SpawnError::InvalidRequest(format!("{p:?} --version")));
@@ -499,6 +519,16 @@ pub fn run(req: &SpawnRequest, opts: &RunOpts, ctx: &SpawnCtx) -> Result<Output,
         (Cwd::AppData, SpawnRequest::ClaudeAuthStatusInLaunch) => {
             return Err(SpawnError::InvalidRequest(
                 "auth status in a launch needs the step cwd".into(),
+            ));
+        }
+        // Desktop opens on the step's folder (AC-F024-01), a checked session cwd.
+        (Cwd::Dir(d), SpawnRequest::ClaudeDesktop(_)) => {
+            check_session_cwd(d)?;
+            d.clone()
+        }
+        (Cwd::AppData, SpawnRequest::ClaudeDesktop(_)) => {
+            return Err(SpawnError::InvalidRequest(
+                "a desktop handoff needs the step cwd".into(),
             ));
         }
         // Non-session helpers always run in app data, whatever was asked (T-038).

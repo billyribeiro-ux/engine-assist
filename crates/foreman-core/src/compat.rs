@@ -100,6 +100,12 @@ pub fn floor(t: &Template, kit_agents: &[Model], p: &ModelPolicy) -> (Version, V
     (max, reqs)
 }
 
+/// The minimum version a feature of [`TABLE`] needs (`"--desktop"`, `"Opus 5.5"`, …).
+#[must_use]
+pub fn feature_min(feature: &str) -> Option<Version> {
+    min_of(feature)
+}
+
 /// Whether a found version meets the floor.
 #[must_use]
 pub fn meets(found: &Version, floor: &Version) -> bool {

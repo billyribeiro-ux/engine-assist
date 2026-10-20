@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
 
+pub mod assembler;
 pub mod chain;
 pub mod compat;
 pub mod decisions;
@@ -19,6 +20,7 @@ pub mod json;
 pub mod launch;
 pub mod lessons;
 pub mod lock;
+pub mod manifest;
 pub mod packet;
 pub mod pasteback;
 pub mod pathpolicy;
@@ -28,6 +30,7 @@ pub mod rearm;
 pub mod resolver;
 pub mod retention;
 pub mod rules;
+pub mod runsheet;
 pub mod runlog;
 pub mod sanitize;
 pub mod schema;

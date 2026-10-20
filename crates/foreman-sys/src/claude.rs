@@ -153,6 +153,28 @@ pub fn auth_status(ctx: &SpawnCtx, cwd: &Path, env: &[(String, String)]) -> Auth
     }
 }
 
+/// How long `claude --desktop` may take to hand over to Claude Desktop and exit.
+pub const DESKTOP_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// `claude --desktop [--resume <id>]` (P2, F-024): in the step cwd with the exact launch
+/// environment (the same allowlisted program and environment as a launch, AC-F024-01). `args`
+/// come from `foreman_core::launch::argv::desktop_open` or `desktop`.
+///
+/// # Errors
+/// [`SpawnError`] when it can't run (a non-zero exit is the caller's to report).
+pub fn desktop(
+    ctx: &SpawnCtx,
+    cwd: &Path,
+    env: &[(String, String)],
+    args: Vec<String>,
+) -> Result<Output, SpawnError> {
+    spawn::run(
+        &SpawnRequest::ClaudeDesktop(args),
+        &opts(env, DESKTOP_TIMEOUT, Cwd::Dir(cwd.to_path_buf())),
+        ctx,
+    )
+}
+
 /// The two contract probes' outcomes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProbeReport {

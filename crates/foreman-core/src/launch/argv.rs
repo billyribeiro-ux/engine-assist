@@ -414,6 +414,13 @@ pub fn desktop(id: Uuid) -> Result<Argv, ArgvError> {
     flags_to_argv(&[Flag::Desktop, Flag::Resume(id)]).map(Argv)
 }
 
+/// Open in Desktop for a `surface=desktop` step (P2, F-024, DR-122): `--desktop` and no other
+/// flag; Billy picks the model, effort and mode in Desktop from the step's chips.
+#[must_use]
+pub fn desktop_open() -> Argv {
+    Argv(vec!["--desktop".to_owned()])
+}
+
 /// `true` when `arg` is one of the [`FORBIDDEN`] spellings (also as `--flag=value`).
 #[must_use]
 pub fn is_forbidden(arg: &str) -> bool {

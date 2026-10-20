@@ -3,7 +3,7 @@
 	// blueprint: counts, the stages table, and every error and warning grouped by stage with its line.
 	import { failureText } from '#lib/actions/words.ts';
 	import Icon from '#lib/components/Icon.svelte';
-	import type { Diagnostic, StageHealth } from '#lib/ipc/types.ts';
+	import type { Diagnostic, StageHealth, StepHealth } from '#lib/ipc/types.ts';
 	import Text from '#lib/render/Text.svelte';
 	import { resource } from '#lib/stores/resource.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
@@ -35,6 +35,20 @@
 		}
 		return m;
 	});
+	// AC-F003-05: every runnable step with its annotation, lint warnings and declared outputs,
+	// grouped by stage; a stage's list opens on request (all closed at first, the long view).
+	const stepsByStage = $derived.by(() => {
+		const m: { stage: number; list: StepHealth[] }[] = [];
+		for (const st of h?.steps ?? []) {
+			const g = m.find((x) => x.stage === st.stage);
+			if (g) g.list.push(st);
+			else m.push({ stage: st.stage, list: [st] });
+		}
+		return m;
+	});
+	let open = $state<Record<number, boolean>>({});
+	// AC-F003-06: a template with no errors or warnings says so instead of empty groups.
+	const spotless = $derived(!!h && h.counts.errors === 0 && h.counts.warnings === 0);
 	const clean = $derived(
 		h
 			? h.stages
@@ -112,6 +126,12 @@
 					<div class="section-head">
 						<h2 class="section-title" id="dg-h">Errors and warnings</h2>
 					</div>
+					{#if spotless}
+						<p class="empty none" role="status">
+							<strong>No errors or warnings.</strong>Every annotation in blueprint {h.version} parsed cleanly
+							and the prose agrees with it.
+						</p>
+					{/if}
 					{#each byStage as g (g.stage)}
 						<h3 class="field-label grp">Stage {g.stage}</h3>
 						<ul class="diag">
@@ -128,13 +148,84 @@
 							{/each}
 						</ul>
 					{/each}
-					{#if clean.length}
+					{#if clean.length && !spotless}
 						<h3 class="field-label grp">Stages {clean[0]} to {clean.at(-1)}</h3>
 						<p class="empty none">No errors or warnings.</p>
 					{/if}
 					<p class="remap">Foreman proposes fixes; you edit the blueprint and re-pin.</p>
 				</section>
 			</div>
+			<section class="section" aria-labelledby="rs-h">
+				<div class="section-head">
+					<h2 class="section-title" id="rs-h">Runnable steps</h2>
+				</div>
+				{#if stepsByStage.length === 0}
+					<p class="empty">
+						<strong>No runnable steps.</strong>Annotate a stage with <code>fm:step</code> to make its
+						steps runnable.
+					</p>
+				{/if}
+				{#each stepsByStage as g (g.stage)}
+					{@const expanded = open[g.stage] ?? false}
+					<h3 class="grp-h">
+						<button
+							type="button"
+							class="disclosure"
+							aria-expanded={expanded}
+							aria-controls="rs-{g.stage}"
+							onclick={() => (open[g.stage] = !expanded)}
+							><Icon name={expanded ? 'chev-down' : 'chev'} />Stage {g.stage}
+							<span class="meta"
+								>{g.list.length} runnable step{g.list.length === 1 ? '' : 's'}{g.list.some(
+									(x) => x.warnings.length
+								)
+									? ', with warnings'
+									: ''}</span
+							></button
+						>
+					</h3>
+					<ul class="steps" id="rs-{g.stage}" hidden={!expanded}>
+						{#each g.list as st (st.key)}
+							<li>
+								<p class="step-name"><span class="num">{st.number}</span><span>{st.title}</span></p>
+								<dl class="kv">
+									<dt>Annotation</dt>
+									<dd><code class="annot">{st.annotation}</code></dd>
+									<dt>Outputs</dt>
+									<dd>
+										{#if st.outs.length}
+											<ul class="outs">
+												{#each st.outs as o (o)}<li><code>{o}</code></li>{/each}
+											</ul>
+										{:else}
+											<span class="muted">None declared</span>
+										{/if}
+									</dd>
+									<dt>Lint</dt>
+									<dd>
+										{#if st.warnings.length}
+											<ul class="outs">
+												{#each st.warnings as w, i (i)}
+													<li class="warn">
+														<Icon name="warn" size="glyph" tone="attention" /><span class="loc"
+															>{w.line}:{w.column}</span
+														>
+														<span><Text spans={w.message} /></span>
+													</li>
+												{/each}
+											</ul>
+										{:else}
+											<span class="muted">No warnings</span>
+										{/if}
+									</dd>
+								</dl>
+							</li>
+						{/each}
+					</ul>
+				{/each}
+			</section>
+		{:else if health.loading}
+			<p class="page-sub" role="status">Reading the blueprint…</p>
 		{/if}
 	</div>
 </main>
@@ -205,5 +296,57 @@
 	}
 	.none {
 		padding-top: var(--space-2);
+	}
+	.grp-h {
+		margin-top: var(--space-3);
+	}
+	.disclosure {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-2) 0;
+		border: 0;
+		background: transparent;
+		color: var(--ink);
+		font: inherit;
+		font-size: var(--text-13);
+		font-weight: var(--weight-semibold);
+		cursor: default;
+	}
+	.disclosure .meta {
+		color: var(--ink-muted);
+		font-weight: var(--weight-regular);
+		font-size: var(--text-12);
+	}
+	.steps > li {
+		padding: var(--space-3) 0;
+		border-bottom: var(--hairline) solid var(--rule);
+	}
+	.step-name {
+		display: flex;
+		gap: var(--space-3);
+		font-size: var(--text-13);
+		margin-bottom: var(--space-2);
+	}
+	.num {
+		color: var(--ink-muted);
+		font-variant-numeric: tabular-nums;
+		min-width: 32px;
+	}
+	.annot {
+		font-family: var(--font-mono);
+		overflow-wrap: anywhere;
+	}
+	.outs {
+		display: grid;
+		gap: var(--space-1);
+	}
+	.outs .warn {
+		display: grid;
+		grid-template-columns: 16px 64px minmax(0, 1fr);
+		gap: var(--space-2);
+	}
+	.muted {
+		color: var(--ink-muted);
 	}
 </style>

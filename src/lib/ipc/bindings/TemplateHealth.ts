@@ -2,8 +2,10 @@
 import type { Counts } from "./Counts";
 import type { Diagnostic } from "./Diagnostic";
 import type { StageHealth } from "./StageHealth";
+import type { StepHealth } from "./StepHealth";
 
 /**
- * `TemplateHealth` (§4.2) with `commit` and `file` (§2.4).
+ * `TemplateHealth` (§4.2) with `commit` and `file` (§2.4), and (M4-06) `steps`: every
+ * runnable step in template order.
  */
-export type TemplateHealth = { version: string, grammarVersion: number, counts: Counts, stages: Array<StageHealth>, diagnostics: Array<Diagnostic>, commit: string, file: string, };
+export type TemplateHealth = { version: string, grammarVersion: number, counts: Counts, stages: Array<StageHealth>, diagnostics: Array<Diagnostic>, commit: string, file: string, steps: Array<StepHealth>, };

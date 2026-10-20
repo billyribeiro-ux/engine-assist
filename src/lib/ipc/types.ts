@@ -285,6 +285,7 @@ export type { StageHealthStatus } from './bindings/StageHealthStatus.ts';
 export type { StageView } from './bindings/StageView.ts';
 export type { StaleWhat } from './bindings/StaleWhat.ts';
 export type { Start } from './bindings/Start.ts';
+export type { StepHealth } from './bindings/StepHealth.ts';
 export type { StepKey } from './bindings/StepKey.ts';
 export type { StepKind } from './bindings/StepKind.ts';
 export type { StepMarkDoneReq } from './bindings/StepMarkDoneReq.ts';

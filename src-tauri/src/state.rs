@@ -129,6 +129,9 @@ pub struct Inner {
     pub inbox_sync: bool,
     /// An inbox sync is already scheduled.
     pub inbox_scheduled: bool,
+    /// (M4-27) The knowledge-manifest files Billy marked "in the claude.ai Project", per
+    /// project. Kept in memory: `progress.json` v1 has no field for it (CR-014).
+    pub knowledge: HashMap<String, std::collections::BTreeSet<String>>,
 }
 
 /// The app state.

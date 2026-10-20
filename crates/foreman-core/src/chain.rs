@@ -324,6 +324,44 @@ pub fn mark_broken(chains: &[Chain], chain: Uuid) -> Vec<Chain> {
         .collect()
 }
 
+/// S-23's branch (AC-F024-03; pending Billy's run, `Shared` is the specified pass branch): does
+/// Desktop continue the CLI session's own transcript?
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DesktopShare {
+    /// Desktop appends to the same transcript: the chain is `handed-off` and the next continuing
+    /// step forks (AC-F010-15).
+    #[default]
+    Shared,
+    /// Desktop copies the conversation: no fork; the CLI chain continues unaffected.
+    Copied,
+}
+
+/// The chain list after `claude --desktop --resume <chain>` succeeded, by S-23's branch.
+#[must_use]
+pub fn after_handoff(chains: &[Chain], chain: Uuid, share: DesktopShare) -> Vec<Chain> {
+    match share {
+        DesktopShare::Shared => mark_handed_off(chains, chain),
+        DesktopShare::Copied => chains.to_vec(),
+    }
+}
+
+/// Billy confirmed Claude Desktop is closed (DR-110's exception): a handed-off chain is open
+/// again, so the next continuing step resumes it instead of forking.
+#[must_use]
+pub fn desktop_closed(chains: &[Chain], chain: Uuid) -> Vec<Chain> {
+    let id = chain.hyphenated().to_string();
+    chains
+        .iter()
+        .cloned()
+        .map(|mut c| {
+            if c.id == id && c.status == ChainStatus::HandedOff {
+                c.status = ChainStatus::Open;
+            }
+            c
+        })
+        .collect()
+}
+
 /// DR-118: `claude --desktop --resume <id>` marks the chain handed off.
 #[must_use]
 pub fn mark_handed_off(chains: &[Chain], chain: Uuid) -> Vec<Chain> {

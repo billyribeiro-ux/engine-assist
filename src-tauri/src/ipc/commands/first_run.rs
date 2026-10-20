@@ -11,9 +11,11 @@ use foreman_sys::lock::{StateError, blueprint_state};
 
 use crate::ipc::IpcError;
 use crate::ipc::dto::app::{BlueprintRepoInfo, ConditionSpec, TemplateHealthSummary, VariableSpec};
-use crate::ipc::dto::doctor::{Counts, Diagnostic, StageHealth, StageHealthStatus, TemplateHealth};
+use crate::ipc::dto::doctor::{
+    Counts, Diagnostic, StageHealth, StageHealthStatus, StepHealth, TemplateHealth,
+};
 use crate::ipc::dto::requests::{BlueprintPickRepoReq, PickMode, TemplateHealthReq};
-use crate::ipc::types::{ConditionId, ToolKind};
+use crate::ipc::types::{ConditionId, Stage, StepKey, ToolKind};
 use crate::os::Pick;
 use crate::state::App;
 use crate::text;
@@ -284,6 +286,42 @@ fn stage_health(t: &Template) -> Vec<StageHealth> {
         .collect()
 }
 
+/// Whether a diagnostic belongs to a step: same stage, and either at the step's annotation line
+/// or naming the step's ID first (`5.3: RUN WITH says …`, the lint message form).
+fn step_owns(s: &template::Step, d: &foreman_core::diagnostic::Diagnostic) -> bool {
+    if d.stage != Some(s.stage) {
+        return false;
+    }
+    let at = s.annotation.as_ref().map(|a| a.pos.line);
+    at == Some(d.line) || d.message.starts_with(&format!("{}:", s.id))
+}
+
+/// AC-F003-05: every runnable template step with its annotation, lint warnings and outputs.
+fn step_health(t: &Template) -> Vec<StepHealth> {
+    t.steps
+        .iter()
+        .filter(|s| s.template_id.is_none() && s.runnable())
+        .map(|s| StepHealth {
+            key: StepKey::from_trusted(s.key.as_str()),
+            stage: Stage(s.stage),
+            number: s.id.clone(),
+            title: s.title.clone(),
+            annotation: s
+                .annotation
+                .as_ref()
+                .map(|a| format!("fm:step {}", template::render::render_step(a)))
+                .unwrap_or_default(),
+            warnings: t
+                .diagnostics
+                .iter()
+                .filter(|d| !d.is_error() && step_owns(s, d))
+                .map(Diagnostic::from)
+                .collect(),
+            outs: s.out.clone(),
+        })
+        .collect()
+}
+
 /// The full health of a template.
 #[must_use]
 pub fn health(t: &Template, commit: &str) -> TemplateHealth {
@@ -308,6 +346,7 @@ pub fn health(t: &Template, commit: &str) -> TemplateHealth {
         diagnostics: t.diagnostics.iter().map(Diagnostic::from).collect(),
         commit: commit.chars().take(7).collect(),
         file: BLUEPRINT_FILE.to_owned(),
+        steps: step_health(t),
     }
 }
 

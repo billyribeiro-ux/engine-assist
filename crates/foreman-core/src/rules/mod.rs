@@ -10,6 +10,7 @@ use crate::schema::overlay::{OverlayFile, Skip};
 use crate::schema::project::{ConditionAudit, Conditions, ProjectFile};
 use crate::template::{Expr, Step, StepKind, StepStatus, Tag, Template};
 
+pub mod evidence;
 pub mod overlay;
 
 pub use crate::template::expr::{ExprError, parse_expr};

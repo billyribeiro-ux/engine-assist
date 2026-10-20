@@ -16,4 +16,6 @@ pub enum Preview {
     Sign(Box<crate::signing::HeldSign>),
     /// `doctor_capture_login_path` → `doctor_login_path_apply`.
     LoginPath(Box<crate::ipc::commands::doctor::HeldLoginPath>),
+    /// `assembler_paste_preview` → `assembler_paste_apply` (M4-28).
+    Assembler(Box<crate::ipc::commands::assembler::HeldAssembler>),
 }

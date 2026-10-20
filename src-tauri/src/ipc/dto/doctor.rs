@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::app::response;
-use crate::ipc::types::{DoctorLevel, PreviewId, Stage, TextSpan, Timestamp};
+use crate::ipc::types::{DoctorLevel, PreviewId, Stage, StepKey, TextSpan, Timestamp};
 
 /// §2.4 a Doctor check's group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,7 +203,22 @@ impl From<&foreman_core::lock::AnnotationProblem> for AnnotationProblem {
 }
 
 response!(
-    /// `TemplateHealth` (§4.2) with `commit` and `file` (§2.4).
+    /// (M4-06, AC-F003-05) One runnable step on Template health: its `fm:step` annotation as the
+    /// canonical one-line text, its lint warnings and its declared outputs (`out=`).
+    StepHealth {
+        key: StepKey,
+        stage: Stage,
+        number: String,
+        title: String,
+        annotation: String,
+        warnings: Vec<Diagnostic>,
+        outs: Vec<String>,
+    }
+);
+
+response!(
+    /// `TemplateHealth` (§4.2) with `commit` and `file` (§2.4), and (M4-06) `steps`: every
+    /// runnable step in template order.
     TemplateHealth {
         version: String,
         grammar_version: u32,
@@ -212,5 +227,6 @@ response!(
         diagnostics: Vec<Diagnostic>,
         commit: String,
         file: String,
+        steps: Vec<StepHealth>,
     }
 );
