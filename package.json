@@ -31,6 +31,7 @@
 		"bindings": "cargo test -p foreman-app --features ts",
 		"verify": "node scripts/verify.mjs",
 		"verify:fast": "node scripts/verify.mjs --fast",
+		"fixtures:hostile": "node scripts/make-hostile-repo.mjs",
 		"release": "scripts/build-release",
 		"test:flows": "playwright test"
 	},
