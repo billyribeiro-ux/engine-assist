@@ -22,6 +22,32 @@ Tools `pnpm verify` expects on PATH: `cargo-deny` 0.20.2 and `cargo-audit` 0.22.
 
 For browser-mode Vitest and Playwright without Playwright's own browser download, set `PLAYWRIGHT_CHROMIUM_PATH` to a Chromium binary. On the Mac, `pnpm exec playwright install chromium webkit` once is enough.
 
+## Dependency freshness
+
+- **Check:** `pnpm outdated` skips versions still inside the 7-day window. On 2026-10-20 it listed only `typescript` and `@types/node`, hiding six newer dev-tool releases. For the true latest, run `npm view <pkg> version`, and `npm view <pkg> time --json` for publish dates.
+- **Drop the exceptions:** on or after 2026-10-21, delete the 14 `minimumReleaseAgeExclude` entries in `pnpm-workspace.yaml` (kit 3.1.0, `@tauri-apps/api` 2.12.4, `@tauri-apps/cli` 2.12.3 and its 11 binaries), run `pnpm verify`, and log the removal in ADR-024. The pinned versions don't change.
+- **Pins vs latest (2026-10-20):**
+
+| Package | Pinned | Latest | Status |
+|---|---|---|---|
+| `svelte` | 5.57.2 | 5.57.2 | current |
+| `@sveltejs/kit` | 3.1.0 | 3.1.0 | current; exemption until 2026-10-21 |
+| `@sveltejs/adapter-static` | 4.0.0 | 4.0.0 | current |
+| `vite` | 8.3.4 | 8.3.4 | current |
+| `@tauri-apps/api` | 2.12.4 | 2.12.4 | current; exemption until 2026-10-21 |
+| `@tauri-apps/cli` | 2.12.3 | 2.12.3 | current; exemption until 2026-10-21 |
+| `typescript` | 6.0.3 | 7.0.2 | held at 6.0.3 (ADR-019); TS 7 breaks svelte-check and typescript-eslint |
+| `vitest` | 5.0.4 | 5.0.5 | one patch behind; eligible 2026-10-22 |
+| `eslint` | 10.12.0 | 10.13.0 | one patch behind; eligible 2026-10-23 |
+| `playwright` | 1.64.0 | 1.64.1 | one patch behind; eligible 2026-10-21 |
+| `svelte-check` | 4.7.6 | 4.7.7 | one patch behind; eligible 2026-10-23 |
+| `typescript-eslint` | 8.71.2 | 8.72.0 | one patch behind; eligible 2026-10-26 |
+| `@axe-core/playwright` | 4.13.0 | 4.14.0 | one patch behind; eligible 2026-10-22 |
+
+- **Paired packages move together:** `@playwright/test` with `playwright`; `@vitest/browser-playwright` with `vitest` (ADR-024 log).
+- **Re-pin** a one-patch-behind package on or after its eligible date: change the version in `package.json`, run `pnpm install`, run `pnpm verify`, and note it in ADR-024.
+- `@types/node` (pinned 22.20.5) is not in this table; `pnpm outdated` reports 26.6.5.
+
 ## Layout added in M0
 
 - `Cargo.toml` workspace (resolver 3, edition 2024, shared `[workspace.lints]`), `clippy.toml` (`disallowed-methods`: `Command::new`/`CommandBuilder::new` and `std::fs` + `tokio::fs`), `rustfmt.toml`, `rust-toolchain.toml` (1.99.1), `deny.toml`, `deny-e2e.toml`, `.cargo/config.toml` (`TS_RS_EXPORT_DIR`), `.cargo/audit.toml`.
@@ -65,7 +91,7 @@ Also run here:
 
 ## Deviations and decisions to review
 
-- **Pins stepped back** for the strict 7-day `minimumReleaseAge` (full table in ADR-024's log): kit 3.1.0 → 3.0.1, `@tauri-apps/api` 2.12.4 → 2.12.3, `@tauri-apps/cli` 2.12.3 → 2.12.2, vitest 5.0.5 → 5.0.4, playwright 1.64.1 → 1.64.0, `@axe-core/playwright` 4.14.0 → 4.13.0, eslint 10.13.0 → 10.12.0, typescript-eslint 8.72.0 → 8.71.2, svelte-check 4.7.7 → 4.7.6. CLAUDE.md's stack line still says SvelteKit 3.1.0; it is unchanged here (CLAUDE.md edits are Billy's call).
+- **Pins stepped back** at M0 for the strict 7-day `minimumReleaseAge` (full table in ADR-024's log). Since 2026-10-20, `@sveltejs/kit` 3.1.0, `@tauri-apps/api` 2.12.4 and `@tauri-apps/cli` 2.12.3 are at their latest releases under the exemption list (ADR-024 log; "Dependency freshness" above). Six dev tools remain one patch behind: vitest, playwright, `@axe-core/playwright`, eslint, typescript-eslint, svelte-check.
 - **`allowBuilds: {}`**: nothing in the tree needs a build script. **`trustPolicyExclude: [undici-types@6.21.0]`**, reason in ADR-024's log.
 - **`app_bootstrap` is an M0 skeleton.** It returns first-run state. The contract's `interrupted: Vec<RunSummary>` and `capabilities: Capabilities` fields are left out because `docs/contracts/ipc.md` never defines `RunSummary` or `Capabilities`. **Contract gap**: define both in ipc.md (M2-01) before adding them. `ProjectId` is a string newtype without UUID validation until a command takes one.
 - **Bindings path** is `src/lib/ipc/bindings/` (ADR-004, ipc.md §7, design doc §3.3), not `generated/`.
@@ -89,4 +115,4 @@ Also run here:
 6. **M0-05 leftovers**: the WDIO real-app smoke (`@wdio/tauri-service` 1.5.0, `wdio.conf.ts`, `tests/e2e/smoke.e2e.ts`) isn't written, because WKWebView WebDriver only runs on the Mac. The `e2e` cargo feature and plugin wiring exist. Playwright's WebKit project also only runs on the Mac/CI.
 7. **Spikes M0-12…M0-18 and the baseline M0-19**: by hand, per the tickets.
 8. **CI first run**: push the branch and check every job on `macos-latest`. Likely first-run fixes: `pnpm why` / Playwright browser install time, the `cargo cyclonedx` output file location, and Semgrep registry packs needing network.
-9. **Re-pin** the stepped-back JS versions once they're 7 days old (ADR-024 log).
+9. **Re-pin** the six one-patch-behind dev tools on their eligible dates, and drop the exemptions after 2026-10-21 (see "Dependency freshness").
