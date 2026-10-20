@@ -95,14 +95,18 @@ pub fn display_state(p: &StepProgress, ctx: &StepCtx) -> StepState {
         Applicability::Skipped(r) => return StepState::Skipped(r.clone()),
         Applicability::NotApplicable(r) => return StepState::NotApplicable(r.clone()),
         Applicability::Undecided(_) => return StepState::Undecided,
-        Applicability::NeedsAnnotation | Applicability::Invalid => return StepState::NeedsAnnotation,
+        Applicability::NeedsAnnotation | Applicability::Invalid => {
+            return StepState::NeedsAnnotation;
+        }
         Applicability::NeedsNewerForeman => return StepState::NeedsNewerForeman,
         Applicability::Applicable | Applicability::Skippable => {}
     }
-    if let Some(d) = ctx.wait_until {
-        if ctx.kind == StepKind::Wait && p.state != StoredState::Done && ctx.today < d {
-            return StepState::WaitingUntil(d.to_string());
-        }
+    if let Some(d) = ctx.wait_until
+        && ctx.kind == StepKind::Wait
+        && p.state != StoredState::Done
+        && ctx.today < d
+    {
+        return StepState::WaitingUntil(d.to_string());
     }
     match p.state {
         StoredState::NotStarted => StepState::NotStarted,
@@ -124,8 +128,15 @@ fn with(p: &StepProgress, state: StoredState) -> StepProgress {
 ///
 /// # Errors
 /// [`Rejected`] with the reason.
-#[allow(clippy::too_many_lines, reason = "the whole transition table in one place (DR-065)")]
-pub fn transition(p: &StepProgress, ctx: &StepCtx, e: &StepEvent) -> Result<StepProgress, Rejected> {
+#[allow(
+    clippy::too_many_lines,
+    reason = "the whole transition table in one place (DR-065)"
+)]
+pub fn transition(
+    p: &StepProgress,
+    ctx: &StepCtx,
+    e: &StepEvent,
+) -> Result<StepProgress, Rejected> {
     let shown = display_state(p, ctx);
     let reject = |why: &str| Err(Rejected(why.to_owned()));
     match &shown {
@@ -148,40 +159,64 @@ pub fn transition(p: &StepProgress, ctx: &StepCtx, e: &StepEvent) -> Result<Step
             }
             StoredState::Running => reject("already running"),
         },
-        (StepKind::Followup, StepEvent::Copy) => match s {
-            StoredState::Running => reject("already running"),
-            _ => {
+        (StepKind::Followup, StepEvent::Copy) => {
+            if s == StoredState::Running {
+                reject("already running")
+            } else {
                 let mut n = with(p, StoredState::Copied);
                 n.copied_at = Some(ctx.at.clone());
                 Ok(n)
             }
-        },
-        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::MarkDone | StepEvent::PasteBackValid) if !cli(ctx) => match s {
+        }
+        (
+            StepKind::Prompt | StepKind::Followup | StepKind::Repeatable,
+            StepEvent::MarkDone | StepEvent::PasteBackValid,
+        ) if !cli(ctx) => match s {
             StoredState::Copied => Ok(with(p, StoredState::Done)),
             StoredState::NotStarted => reject("copy the prompt first"),
             StoredState::Done => reject("already done"),
             StoredState::Running => reject("still running"),
         },
-        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::MarkDone) => reject("a CLI step finishes when its run exits; it can't be marked done by hand"),
+        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::MarkDone) => {
+            reject("a CLI step finishes when its run exits; it can't be marked done by hand")
+        }
         // CLI runs.
-        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::Spawn) if cli(ctx) => match s {
-            StoredState::Running => reject("already running"),
-            StoredState::Done if ctx.kind == StepKind::Repeatable => unreachable_done(),
-            _ => {
-                let mut n = with(p, StoredState::Running);
-                n.started_at = Some(ctx.at.clone());
-                Ok(n)
+        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::Spawn)
+            if cli(ctx) =>
+        {
+            match s {
+                StoredState::Running => reject("already running"),
+                StoredState::Done if ctx.kind == StepKind::Repeatable => unreachable_done(),
+                _ => {
+                    let mut n = with(p, StoredState::Running);
+                    n.started_at = Some(ctx.at.clone());
+                    Ok(n)
+                }
             }
-        },
-        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::Exited(_)) if cli(ctx) => match s {
-            StoredState::Running => {
-                let mut n = with(p, if ctx.kind == StepKind::Repeatable { StoredState::NotStarted } else { StoredState::Done });
-                n.run_count = p.run_count.saturating_add(1);
-                Ok(n)
+        }
+        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::Exited(_))
+            if cli(ctx) =>
+        {
+            match s {
+                StoredState::Running => {
+                    let mut n = with(
+                        p,
+                        if ctx.kind == StepKind::Repeatable {
+                            StoredState::NotStarted
+                        } else {
+                            StoredState::Done
+                        },
+                    );
+                    n.run_count = p.run_count.saturating_add(1);
+                    Ok(n)
+                }
+                _ => reject("no run is running"),
             }
-            _ => reject("no run is running"),
-        },
-        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::Errored | StepEvent::Interrupted) if cli(ctx) => match s {
+        }
+        (
+            StepKind::Prompt | StepKind::Followup | StepKind::Repeatable,
+            StepEvent::Errored | StepEvent::Interrupted,
+        ) if cli(ctx) => match s {
             StoredState::Running => Ok(with(p, StoredState::NotStarted)),
             _ => reject("no run is running"),
         },
@@ -221,7 +256,10 @@ pub fn transition(p: &StepProgress, ctx: &StepCtx, e: &StepEvent) -> Result<Step
             StoredState::NotStarted | StoredState::Done => Ok(with(p, StoredState::Done)),
             _ => reject("not available"),
         },
-        (kind, ev) => Err(Rejected(format!("{ev:?} doesn't apply to a {} step in state {s:?}", kind.as_str()))),
+        (kind, ev) => Err(Rejected(format!(
+            "{ev:?} doesn't apply to a {} step in state {s:?}",
+            kind.as_str()
+        ))),
     }
 }
 
@@ -242,12 +280,21 @@ pub enum FollowupAction {
 /// DR-068: copy into the live session, or relaunch when the chain's process has exited.
 #[must_use]
 pub fn followup_action(chain_process_live: bool) -> FollowupAction {
-    if chain_process_live { FollowupAction::CopyAndFocus } else { FollowupAction::Relaunch }
+    if chain_process_live {
+        FollowupAction::CopyAndFocus
+    } else {
+        FollowupAction::Relaunch
+    }
 }
 
 /// DR-067: the step after a waiting step is blocked until the date ("Waiting until …").
 #[must_use]
-pub fn blocked_by_wait(prev_kind: StepKind, prev_wait: Option<Date>, prev_done: bool, today: Date) -> Option<String> {
+pub fn blocked_by_wait(
+    prev_kind: StepKind,
+    prev_wait: Option<Date>,
+    prev_done: bool,
+    today: Date,
+) -> Option<String> {
     match (prev_kind, prev_wait) {
         (StepKind::Wait, Some(d)) if !prev_done && today < d => Some(format!("Waiting until {d}")),
         _ => None,
@@ -257,5 +304,11 @@ pub fn blocked_by_wait(prev_kind: StepKind, prev_wait: Option<Date>, prev_done: 
 /// A fresh progress entry.
 #[must_use]
 pub fn fresh() -> StepProgress {
-    StepProgress { state: StoredState::NotStarted, run_count: 0, last_run_id: None, started_at: None, copied_at: None }
+    StepProgress {
+        state: StoredState::NotStarted,
+        run_count: 0,
+        last_run_id: None,
+        started_at: None,
+        copied_at: None,
+    }
 }
