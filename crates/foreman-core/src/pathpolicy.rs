@@ -323,7 +323,9 @@ pub fn check_write(rel: &str, purpose: WritePurpose) -> Result<RepoPath, PolicyV
     let keys = exact_key_path(&comps);
     let exempt = match purpose {
         WritePurpose::CouncilSetup(i) => COUNCIL_AGENTS.get(i).and_then(|agent| {
-            (keys == ["spec", ".claude", "agents", &format!("{agent}.md")] && comps[1] == ".claude" && comps[2] == "agents")
+            (keys == ["spec", ".claude", "agents", &format!("{agent}.md")]
+                && comps[1] == ".claude"
+                && comps[2] == "agents")
                 .then_some(".claude")
         }),
         WritePurpose::DecisionFile(d) => (rel == d.path()).then_some(".foreman"),
@@ -344,9 +346,9 @@ pub fn check_write(rel: &str, purpose: WritePurpose) -> Result<RepoPath, PolicyV
         return Ok(RepoPath(rel.to_owned()));
     }
     match purpose {
-        WritePurpose::CouncilSetup(_) | WritePurpose::DecisionFile(_) | WritePurpose::AssemblerClaudeMd => {
-            Err(PolicyViolation::NotAllowlisted)
-        }
+        WritePurpose::CouncilSetup(_)
+        | WritePurpose::DecisionFile(_)
+        | WritePurpose::AssemblerClaudeMd => Err(PolicyViolation::NotAllowlisted),
         WritePurpose::Repo | WritePurpose::TemplateOut => {
             if comps.len() >= 2 && (comps[0] == "docs" || comps[0] == "spec") {
                 Ok(RepoPath(rel.to_owned()))
@@ -358,7 +360,10 @@ pub fn check_write(rel: &str, purpose: WritePurpose) -> Result<RepoPath, PolicyV
 }
 
 /// The secret-file patterns (SR-50, DR-161) on folded keys.
-#[allow(clippy::case_sensitive_file_extension_comparisons, reason = "keys are already case-folded")]
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "keys are already case-folded"
+)]
 fn secret(comps: &[&str]) -> Option<String> {
     let keys = exact_key_path(comps);
     for (i, k) in keys.iter().enumerate() {
@@ -423,11 +428,38 @@ mod tests {
 
     #[test]
     fn exceptions() {
-        assert!(check_write("spec/.claude/agents/red-team.md", WritePurpose::CouncilSetup(5)).is_ok());
-        assert!(check_write("spec/.claude/agents/red-team.md", WritePurpose::CouncilSetup(0)).is_err());
-        assert!(check_write(".foreman/project.json", WritePurpose::DecisionFile(DecisionPath::Project)).is_ok());
-        assert!(check_write(".foreman/overlay.json", WritePurpose::DecisionFile(DecisionPath::Project)).is_err());
+        assert!(
+            check_write(
+                "spec/.claude/agents/red-team.md",
+                WritePurpose::CouncilSetup(5)
+            )
+            .is_ok()
+        );
+        assert!(
+            check_write(
+                "spec/.claude/agents/red-team.md",
+                WritePurpose::CouncilSetup(0)
+            )
+            .is_err()
+        );
+        assert!(
+            check_write(
+                ".foreman/project.json",
+                WritePurpose::DecisionFile(DecisionPath::Project)
+            )
+            .is_ok()
+        );
+        assert!(
+            check_write(
+                ".foreman/overlay.json",
+                WritePurpose::DecisionFile(DecisionPath::Project)
+            )
+            .is_err()
+        );
         assert!(check_write("CLAUDE.md", WritePurpose::AssemblerClaudeMd).is_ok());
-        assert_eq!(check_write("CLAUDE.md", WritePurpose::Repo), Err(PolicyViolation::ClaudeMd));
+        assert_eq!(
+            check_write("CLAUDE.md", WritePurpose::Repo),
+            Err(PolicyViolation::ClaudeMd)
+        );
     }
 }

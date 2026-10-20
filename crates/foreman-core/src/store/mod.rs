@@ -193,7 +193,11 @@ impl Root {
     pub fn open_app_data(abs: &Path) -> Result<Self, StoreError> {
         use std::os::unix::fs::DirBuilderExt as _;
         let name = abs.display().to_string();
-        if let Err(e) = std::fs::DirBuilder::new().recursive(true).mode(0o700).create(abs) {
+        if let Err(e) = std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(abs)
+        {
             return Err(StoreError::Io {
                 name,
                 message: e.to_string(),
@@ -201,7 +205,8 @@ impl Root {
             });
         }
         let root = Self::open(abs, RootKind::AppData)?;
-        rustix::fs::fchmod(&root.fd, Mode::from_raw_mode(0o700)).map_err(|e| StoreError::io(&name, e))?;
+        rustix::fs::fchmod(&root.fd, Mode::from_raw_mode(0o700))
+            .map_err(|e| StoreError::io(&name, e))?;
         Ok(root)
     }
 
@@ -235,7 +240,11 @@ impl Root {
 
     pub(crate) fn opts<'a>(&self, create: bool, exempt: Option<&'a str>) -> walk::WalkOpts<'a> {
         walk::WalkOpts {
-            create: create.then_some(if self.kind == RootKind::AppData { 0o700 } else { 0o755 }),
+            create: create.then_some(if self.kind == RootKind::AppData {
+                0o700
+            } else {
+                0o755
+            }),
             exempt,
             names: match self.kind {
                 RootKind::Project | RootKind::Blueprint => walk::NameCheck::Deny,
@@ -257,12 +266,17 @@ impl Root {
 
     /// Opens the final component for reading, refusing symlinks, non-regular files and hard
     /// links; returns the open file and its stat.
-    fn open_final(&self, p: &RepoPath, class: ReadClass) -> Result<(OwnedFd, rustix::fs::Stat), StoreError> {
+    fn open_final(
+        &self,
+        p: &RepoPath,
+        class: ReadClass,
+    ) -> Result<(OwnedFd, rustix::fs::Stat), StoreError> {
         let (parents, name) = p.split_last();
         let exempt = Self::exempt_for(p);
         let dir = walk::walk(&self.fd, &parents, self.opts(false, exempt))?;
         let flags = OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK;
-        let fd = rustix::fs::openat(&dir, name, flags, Mode::empty()).map_err(|e| walk::classify(&dir, name, e))?;
+        let fd = rustix::fs::openat(&dir, name, flags, Mode::empty())
+            .map_err(|e| walk::classify(&dir, name, e))?;
         let st = rustix::fs::fstat(&fd).map_err(|e| StoreError::io(name, e))?;
         if FileType::from_raw_mode(stat_mode(&st)) != FileType::RegularFile {
             return Err(StoreError::NotRegular(p.to_string()));
@@ -320,7 +334,11 @@ impl Root {
     ///
     /// # Errors
     /// See [`StoreError`] (other than not-found).
-    pub fn read_opt(&self, p: &RepoPath, class: ReadClass) -> Result<(Option<Vec<u8>>, ReadStamp), StoreError> {
+    pub fn read_opt(
+        &self,
+        p: &RepoPath,
+        class: ReadClass,
+    ) -> Result<(Option<Vec<u8>>, ReadStamp), StoreError> {
         match self.read(p, class) {
             Ok((b, s)) => Ok((Some(b), s)),
             Err(StoreError::NotFound(_)) => Ok((None, ReadStamp::Absent)),
@@ -333,16 +351,23 @@ impl Root {
     #[must_use]
     pub fn exists(&self, p: &RepoPath) -> bool {
         let (parents, name) = p.split_last();
-        walk::walk(&self.fd, &parents, self.opts(false, None))
-            .is_ok_and(|dir| rustix::fs::statat(&dir, name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW).is_ok())
+        walk::walk(&self.fd, &parents, self.opts(false, None)).is_ok_and(|dir| {
+            rustix::fs::statat(&dir, name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW).is_ok()
+        })
     }
 
     /// Writes `bytes` atomically and durably if the file still matches `expect` (ADR-010).
     ///
     /// # Errors
     /// [`StoreError::Conflict`] when the file changed; others as named.
-    pub fn write(&self, p: &RepoPath, bytes: &[u8], expect: &ReadStamp) -> Result<ReadStamp, StoreError> {
-        self.write_with(p, bytes, expect, &WriteOptions::default()).map(|o| o.stamp)
+    pub fn write(
+        &self,
+        p: &RepoPath,
+        bytes: &[u8],
+        expect: &ReadStamp,
+    ) -> Result<ReadStamp, StoreError> {
+        self.write_with(p, bytes, expect, &WriteOptions::default())
+            .map(|o| o.stamp)
     }
 
     /// [`Root::write`] with options (fault injection and fallbacks for tests; recovery notices).
@@ -382,27 +407,42 @@ pub fn canonical(p: &Path) -> PathBuf {
     std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
 }
 
-#[allow(clippy::useless_conversion, reason = "stat field types differ per platform")]
+#[allow(
+    clippy::useless_conversion,
+    reason = "stat field types differ per platform"
+)]
 pub(crate) fn stat_nlink(st: &rustix::fs::Stat) -> u64 {
     u64::try_from(st.st_nlink).unwrap_or(u64::MAX)
 }
 
-#[allow(clippy::useless_conversion, reason = "stat field types differ per platform")]
+#[allow(
+    clippy::useless_conversion,
+    reason = "stat field types differ per platform"
+)]
 pub(crate) fn stat_mode(st: &rustix::fs::Stat) -> u32 {
     u32::try_from(st.st_mode).unwrap_or(0)
 }
 
-#[allow(clippy::useless_conversion, reason = "stat field types differ per platform")]
+#[allow(
+    clippy::useless_conversion,
+    reason = "stat field types differ per platform"
+)]
 pub(crate) fn stat_mtime_secs(st: &rustix::fs::Stat) -> u64 {
     u64::try_from(st.st_mtime).unwrap_or(0)
 }
 
-#[allow(clippy::useless_conversion, reason = "stat field types differ per platform")]
+#[allow(
+    clippy::useless_conversion,
+    reason = "stat field types differ per platform"
+)]
 pub(crate) fn stat_ino(st: &rustix::fs::Stat) -> u64 {
     u64::try_from(st.st_ino).unwrap_or(0)
 }
 
-#[allow(clippy::useless_conversion, reason = "stat field types differ per platform")]
+#[allow(
+    clippy::useless_conversion,
+    reason = "stat field types differ per platform"
+)]
 pub(crate) fn stamp_from(st: &rustix::fs::Stat, bytes: &[u8]) -> ReadStamp {
     let mtime_ns = i64::try_from(st.st_mtime)
         .unwrap_or(0)

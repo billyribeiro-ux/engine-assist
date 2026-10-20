@@ -75,7 +75,11 @@ fn single(name: &str) -> Result<&str, StoreError> {
 ///
 /// # Errors
 /// When a dynamic name isn't a single safe component.
-pub fn location(r: &OutsideRead, home: &Path, claude_config_dir: Option<&Path>) -> Result<(PathBuf, String), StoreError> {
+pub fn location(
+    r: &OutsideRead,
+    home: &Path,
+    claude_config_dir: Option<&Path>,
+) -> Result<(PathBuf, String), StoreError> {
     let cfg = claude_config_dir.map_or_else(|| home.join(".claude"), Path::to_path_buf);
     Ok(match r {
         OutsideRead::UserSettings => (cfg, "settings.json".into()),
@@ -94,12 +98,19 @@ pub fn location(r: &OutsideRead, home: &Path, claude_config_dir: Option<&Path>) 
                 UserClaudeEntry::Rules => "rules",
                 UserClaudeEntry::OutputStyles => "output-styles",
             };
-            let f = f.as_deref().ok_or_else(|| StoreError::NotFound(dir.into()))?;
+            let f = f
+                .as_deref()
+                .ok_or_else(|| StoreError::NotFound(dir.into()))?;
             (cfg, format!("{dir}/{}", single(f)?))
         }
         OutsideRead::AncestorClaudeMd { dir, local } => (
             dir.clone(),
-            if *local { "CLAUDE.local.md" } else { "CLAUDE.md" }.into(),
+            if *local {
+                "CLAUDE.local.md"
+            } else {
+                "CLAUDE.md"
+            }
+            .into(),
         ),
         OutsideRead::EtcPaths => (PathBuf::from("/etc"), "paths".into()),
         OutsideRead::EtcPathsD(n) => (PathBuf::from("/etc"), format!("paths.d/{}", single(n)?)),
@@ -119,7 +130,11 @@ pub fn location(r: &OutsideRead, home: &Path, claude_config_dir: Option<&Path>) 
 ///
 /// # Errors
 /// See [`StoreError`].
-pub fn read(r: &OutsideRead, home: &Path, claude_config_dir: Option<&Path>) -> Result<Vec<u8>, StoreError> {
+pub fn read(
+    r: &OutsideRead,
+    home: &Path,
+    claude_config_dir: Option<&Path>,
+) -> Result<Vec<u8>, StoreError> {
     let (base, rel) = location(r, home, claude_config_dir)?;
     let root = Root::open(&base, RootKind::Outside)?;
     // Lexically: the syntax rules and the secret patterns (never `.ssh`, `.env`, …).

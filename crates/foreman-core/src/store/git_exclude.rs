@@ -34,7 +34,9 @@ pub enum ExcludeError {
 }
 
 fn plain(p: &Path) -> bool {
-    p.is_absolute() && p.components().all(|c| matches!(c, Component::RootDir | Component::Normal(_)))
+    p.is_absolute()
+        && p.components()
+            .all(|c| matches!(c, Component::RootDir | Component::Normal(_)))
 }
 
 /// Appends [`PATTERN`] to `exclude_path` (from `--git-path info/exclude`; relative paths are
@@ -42,7 +44,11 @@ fn plain(p: &Path) -> bool {
 ///
 /// # Errors
 /// See [`ExcludeError`].
-pub fn ensure(project: &Root, exclude_path: &Path, common_dir: &Path) -> Result<Ensured, ExcludeError> {
+pub fn ensure(
+    project: &Root,
+    exclude_path: &Path,
+    common_dir: &Path,
+) -> Result<Ensured, ExcludeError> {
     let abs: PathBuf = if exclude_path.is_absolute() {
         exclude_path.to_path_buf()
     } else {
@@ -63,13 +69,19 @@ pub fn ensure(project: &Root, exclude_path: &Path, common_dir: &Path) -> Result<
         (project.path().to_path_buf(), r.to_path_buf())
     } else {
         let canon_common = super::canonical(&common);
-        if let Ok(r) = abs.strip_prefix(&canon_common).or_else(|_| abs.strip_prefix(&common)) {
+        if let Ok(r) = abs
+            .strip_prefix(&canon_common)
+            .or_else(|_| abs.strip_prefix(&common))
+        {
             (canon_common, r.to_path_buf())
         } else {
             return Err(ExcludeError::OutsideScope(shown));
         }
     };
-    let rel = rel.to_str().ok_or_else(|| ExcludeError::NotPlain(shown.clone()))?.to_owned();
+    let rel = rel
+        .to_str()
+        .ok_or_else(|| ExcludeError::NotPlain(shown.clone()))?
+        .to_owned();
     // Syntax only: this purpose is exempt from the `.git` deny rule by its type (SR-32).
     let rp = pathpolicy::check_app_data(&rel).map_err(|e| ExcludeError::Store(e.into()))?;
     if !rel.ends_with("info/exclude") {
@@ -77,7 +89,9 @@ pub fn ensure(project: &Root, exclude_path: &Path, common_dir: &Path) -> Result<
     }
     let root = Root::open(&base, RootKind::GitDir)?;
     let (bytes, stamp) = root.read_opt(&rp, ReadClass::Decision)?;
-    let mut text = bytes.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+    let mut text = bytes
+        .map(|b| String::from_utf8_lossy(&b).into_owned())
+        .unwrap_or_default();
     if text.lines().any(|l| l.trim() == PATTERN) {
         return Ok(Ensured::AlreadyPresent);
     }
@@ -88,7 +102,9 @@ pub fn ensure(project: &Root, exclude_path: &Path, common_dir: &Path) -> Result<
     text.push('\n');
     match root.write(&rp, text.as_bytes(), &stamp) {
         Ok(_) => Ok(Ensured::Appended),
-        Err(StoreError::Policy(PolicyViolation::Symlink(c))) => Err(StoreError::Policy(PolicyViolation::Symlink(c)).into()),
+        Err(StoreError::Policy(PolicyViolation::Symlink(c))) => {
+            Err(StoreError::Policy(PolicyViolation::Symlink(c)).into())
+        }
         Err(e) => Err(e.into()),
     }
 }

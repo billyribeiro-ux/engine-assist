@@ -1,7 +1,15 @@
 //! M1-03, M1-04, M1-06: the lexical path policy, the no-symlink walk and read policy, reads outside
 //! projects and the secret-file exclusion (ADR-011, SR-30, SR-31, SR-31a, SR-50, SR-53).
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "test code")]
-#![allow(clippy::disallowed_methods, reason = "test code may use std::fs (design doc §3.2)")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test code may use std::fs (design doc §3.2)"
+)]
 
 mod common;
 
@@ -57,7 +65,10 @@ mod fs_policy {
             let path = c["path"].as_str().unwrap();
             let got = rule(check_write(path, purpose(c["purpose"].as_str().unwrap())));
             if got != c["expect"].as_str().unwrap() {
-                failures.push(format!("{path:?} ({}) → {got}, expected {}", c["purpose"], c["expect"]));
+                failures.push(format!(
+                    "{path:?} ({}) → {got}, expected {}",
+                    c["purpose"], c["expect"]
+                ));
             }
         }
         assert!(failures.is_empty(), "{failures:#?}");
@@ -90,7 +101,10 @@ mod fs_policy {
         let root = Root::open(d.path(), RootKind::Project).unwrap();
         let p = check_write("docs/handoff/stage-02.md", WritePurpose::Repo).unwrap();
         let e = root.write(&p, b"x", &ReadStamp::Absent).unwrap_err();
-        assert_eq!(e, StoreError::Policy(PolicyViolation::Symlink("handoff".into())));
+        assert_eq!(
+            e,
+            StoreError::Policy(PolicyViolation::Symlink("handoff".into()))
+        );
         assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 0);
         // Symlinked final file.
         std::fs::create_dir_all(d.path().join("spec")).unwrap();
@@ -98,8 +112,14 @@ mod fs_policy {
         symlink(outside.path().join("target.md"), d.path().join("spec/x.md")).unwrap();
         let p = check_write("spec/x.md", WritePurpose::Repo).unwrap();
         let e = root.write(&p, b"x", &ReadStamp::Absent).unwrap_err();
-        assert!(matches!(e, StoreError::Policy(PolicyViolation::Symlink(_))), "{e:?}");
-        assert_eq!(std::fs::read_to_string(outside.path().join("target.md")).unwrap(), "secret");
+        assert!(
+            matches!(e, StoreError::Policy(PolicyViolation::Symlink(_))),
+            "{e:?}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(outside.path().join("target.md")).unwrap(),
+            "secret"
+        );
     }
 
     /// AC-F021-03: the only exceptions to the deny rules are the council-setup destinations and the
@@ -113,14 +133,42 @@ mod fs_policy {
             assert!(check_write(&p, WritePurpose::TemplateOut).is_err());
         }
         assert!(check_write("spec/.claude/agents/x.md", WritePurpose::CouncilSetup(7)).is_err());
-        assert!(check_write("docs/.claude/agents/red-team.md", WritePurpose::CouncilSetup(5)).is_err());
-        for d in [DecisionPath::Project, DecisionPath::Overlay, DecisionPath::Lock, DecisionPath::StageRecord(5)] {
+        assert!(
+            check_write(
+                "docs/.claude/agents/red-team.md",
+                WritePurpose::CouncilSetup(5)
+            )
+            .is_err()
+        );
+        for d in [
+            DecisionPath::Project,
+            DecisionPath::Overlay,
+            DecisionPath::Lock,
+            DecisionPath::StageRecord(5),
+        ] {
             assert!(check_write(&d.path(), WritePurpose::DecisionFile(d)).is_ok());
             assert!(check_write(&d.path(), WritePurpose::Repo).is_err());
         }
-        assert!(check_write(".foreman/other.json", WritePurpose::DecisionFile(DecisionPath::Project)).is_err());
-        for top in ["src/x.rs", "package.json", "Cargo.toml", "README.md", "docs", "spec"] {
-            assert_eq!(rule(check_write(top, WritePurpose::Repo)), "path.not-allowlisted", "{top}");
+        assert!(
+            check_write(
+                ".foreman/other.json",
+                WritePurpose::DecisionFile(DecisionPath::Project)
+            )
+            .is_err()
+        );
+        for top in [
+            "src/x.rs",
+            "package.json",
+            "Cargo.toml",
+            "README.md",
+            "docs",
+            "spec",
+        ] {
+            assert_eq!(
+                rule(check_write(top, WritePurpose::Repo)),
+                "path.not-allowlisted",
+                "{top}"
+            );
         }
     }
 
@@ -129,32 +177,79 @@ mod fs_policy {
         let ok = format!("docs/{}", "a".repeat(255));
         assert!(check_write(&ok, WritePurpose::Repo).is_ok());
         let long_comp = format!("docs/{}", "a".repeat(256));
-        assert_eq!(check_write(&long_comp, WritePurpose::Repo), Err(PolicyViolation::ComponentTooLong(256)));
+        assert_eq!(
+            check_write(&long_comp, WritePurpose::Repo),
+            Err(PolicyViolation::ComponentTooLong(256))
+        );
         let mut long = String::from("docs");
         while long.len() <= 1024 {
             long.push_str("/abcdefgh");
         }
-        assert!(matches!(check_write(&long, WritePurpose::Repo), Err(PolicyViolation::TooLong(_))));
-        assert!(matches!(check_read(&long, ReadClass::Decision), Err(PolicyViolation::TooLong(_))));
+        assert!(matches!(
+            check_write(&long, WritePurpose::Repo),
+            Err(PolicyViolation::TooLong(_))
+        ));
+        assert!(matches!(
+            check_read(&long, ReadClass::Decision),
+            Err(PolicyViolation::TooLong(_))
+        ));
     }
 
     /// AC-F021-08 (lexical part, and the store on this volume): NFC + full case folding.
     #[test]
     fn case_and_normalization_variants() {
         let variants = [
-            ".GIT", ".Git", ".gIT", ".CLAUDE", ".Claude", ".HUSKY", ".hus\u{212a}y", ".VSCode", ".IDEA",
-            ".GitHub", ".FOREMAN", ".Foreman",
+            ".GIT",
+            ".Git",
+            ".gIT",
+            ".CLAUDE",
+            ".Claude",
+            ".HUSKY",
+            ".hus\u{212a}y",
+            ".VSCode",
+            ".IDEA",
+            ".GitHub",
+            ".FOREMAN",
+            ".Foreman",
         ];
         for v in variants {
-            for p in [format!("{v}/x"), format!("docs/{v}/x"), format!("spec/a/{v}/b.md")] {
-                assert!(matches!(check_write(&p, WritePurpose::Repo), Err(PolicyViolation::DeniedComponent(_))), "{p}");
+            for p in [
+                format!("{v}/x"),
+                format!("docs/{v}/x"),
+                format!("spec/a/{v}/b.md"),
+            ] {
+                assert!(
+                    matches!(
+                        check_write(&p, WritePurpose::Repo),
+                        Err(PolicyViolation::DeniedComponent(_))
+                    ),
+                    "{p}"
+                );
             }
         }
-        for n in [".MCP.json", ".Mcp.Json", "claude.LOCAL.md", ".ENVRC", ".GitModules", ".GITATTRIBUTES", ".NPMRC"] {
-            assert!(matches!(check_write(&format!("docs/{n}"), WritePurpose::Repo), Err(PolicyViolation::DeniedName(_))), "{n}");
+        for n in [
+            ".MCP.json",
+            ".Mcp.Json",
+            "claude.LOCAL.md",
+            ".ENVRC",
+            ".GitModules",
+            ".GITATTRIBUTES",
+            ".NPMRC",
+        ] {
+            assert!(
+                matches!(
+                    check_write(&format!("docs/{n}"), WritePurpose::Repo),
+                    Err(PolicyViolation::DeniedName(_))
+                ),
+                "{n}"
+            );
         }
         for n in ["CLAUDE.MD", "Claude.md", "claude.md", "CLAUDE.md"] {
-            assert_eq!(check_write(&format!("docs/{n}"), WritePurpose::Repo), Err(PolicyViolation::ClaudeMd), "{n}");
+            assert_eq!(
+                check_write(&format!("docs/{n}"), WritePurpose::Repo),
+                Err(PolicyViolation::ClaudeMd),
+                "{n}"
+            );
         }
         // NFD forms fold like NFC: a decomposed name equals its composed form.
         assert_eq!(pathpolicy::key("e\u{301}"), pathpolicy::key("\u{e9}"));
@@ -162,7 +257,10 @@ mod fs_policy {
         let (d, root) = project();
         std::fs::create_dir_all(d.path().join("docs/.Git")).unwrap();
         let p = check_read("docs/.Git/x", ReadClass::Decision).unwrap();
-        assert!(matches!(root.write(&p, b"x", &ReadStamp::Absent), Err(StoreError::Policy(PolicyViolation::DeniedComponent(_)))));
+        assert!(matches!(
+            root.write(&p, b"x", &ReadStamp::Absent),
+            Err(StoreError::Policy(PolicyViolation::DeniedComponent(_)))
+        ));
         case_insensitive_volume();
     }
 
@@ -180,20 +278,25 @@ mod fs_policy {
         assert!(ok);
         let mnt = d.path().join("mnt");
         std::fs::create_dir(&mnt).unwrap();
-        assert!(std::process::Command::new("/usr/bin/hdiutil")
-            .args(["attach", "-nobrowse", "-mountpoint"])
-            .arg(&mnt)
-            .arg(&img)
-            .status()
-            .unwrap()
-            .success());
+        assert!(
+            std::process::Command::new("/usr/bin/hdiutil")
+                .args(["attach", "-nobrowse", "-mountpoint"])
+                .arg(&mnt)
+                .arg(&img)
+                .status()
+                .unwrap()
+                .success()
+        );
         std::fs::create_dir_all(mnt.join("docs/.Git")).unwrap();
         let root = Root::open(&mnt, RootKind::Project).unwrap();
         // `docs/xgit` doesn't exist; the variant `docs/.gIt` is denied lexically, and the reported
         // name check catches the existing `.Git` reached as `.git` would be (both refused).
         let p = check_read("docs/.gIt/x", ReadClass::Decision).unwrap();
         assert!(root.write(&p, b"x", &ReadStamp::Absent).is_err());
-        let _ = std::process::Command::new("/usr/bin/hdiutil").args(["detach"]).arg(&mnt).status();
+        let _ = std::process::Command::new("/usr/bin/hdiutil")
+            .args(["detach"])
+            .arg(&mnt)
+            .status();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -211,9 +314,15 @@ mod fs_policy {
         std::fs::create_dir_all(d.path().join("docs/notes")).unwrap();
         std::fs::write(d.path().join("docs/notes/a.md"), "x").unwrap();
         fn as_if_insensitive(n: &str) -> String {
-            if n == "notes" { ".Git".into() } else { n.into() }
+            if n == "notes" {
+                ".Git".into()
+            } else {
+                n.into()
+            }
         }
-        let root = Root::open(d.path(), RootKind::Project).unwrap().with_name_reporter(as_if_insensitive);
+        let root = Root::open(d.path(), RootKind::Project)
+            .unwrap()
+            .with_name_reporter(as_if_insensitive);
         let p = rp("docs/notes/a.md");
         assert_eq!(
             root.read(&p, ReadClass::Decision).unwrap_err(),
@@ -222,10 +331,19 @@ mod fs_policy {
         assert!(root.write(&p, b"y", &ReadStamp::Absent).is_err());
         // A reported final name is checked as well.
         fn final_name(n: &str) -> String {
-            if n == "a.md" { ".MCP.json".into() } else { n.into() }
+            if n == "a.md" {
+                ".MCP.json".into()
+            } else {
+                n.into()
+            }
         }
-        let root = Root::open(d.path(), RootKind::Project).unwrap().with_name_reporter(final_name);
-        assert!(matches!(root.read(&p, ReadClass::Decision), Err(StoreError::Policy(PolicyViolation::DeniedName(_)))));
+        let root = Root::open(d.path(), RootKind::Project)
+            .unwrap()
+            .with_name_reporter(final_name);
+        assert!(matches!(
+            root.read(&p, ReadClass::Decision),
+            Err(StoreError::Policy(PolicyViolation::DeniedName(_)))
+        ));
     }
 
     /// AC-XC-10: `~/.claude/settings.json`, `~/.claude.json` and `.claude/settings*.json` are never
@@ -268,7 +386,11 @@ mod fs_policy {
         symlink(outside.path().join("b"), d.path().join("docs/a/b")).unwrap();
         symlink(outside.path().join("f.md"), d.path().join("docs/f.md")).unwrap();
         let root = Root::open(d.path(), RootKind::Project).unwrap();
-        for (p, comp) in [("spec/f.md", "spec"), ("docs/a/b/c/stage-01.md", "b"), ("docs/f.md", "f.md")] {
+        for (p, comp) in [
+            ("spec/f.md", "spec"),
+            ("docs/a/b/c/stage-01.md", "b"),
+            ("docs/f.md", "f.md"),
+        ] {
             assert_eq!(
                 root.read(&rp(p), ReadClass::Decision).unwrap_err(),
                 StoreError::Policy(PolicyViolation::Symlink(comp.into())),
@@ -284,38 +406,75 @@ mod fs_policy {
         std::fs::write(outside.path().join("id_ed25519"), "key").unwrap();
         // Same filesystem is needed for a hard link: link inside the project.
         std::fs::write(d.path().join("docs/real.md"), "x").unwrap();
-        std::fs::hard_link(d.path().join("docs/real.md"), d.path().join("docs/handoff/stage-01.md")).unwrap();
+        std::fs::hard_link(
+            d.path().join("docs/real.md"),
+            d.path().join("docs/handoff/stage-01.md"),
+        )
+        .unwrap();
         assert_eq!(
-            root.read(&rp("docs/handoff/stage-01.md"), ReadClass::Decision).unwrap_err(),
+            root.read(&rp("docs/handoff/stage-01.md"), ReadClass::Decision)
+                .unwrap_err(),
             StoreError::HardLink("docs/handoff/stage-01.md".into(), 2)
         );
         let p = check_write("docs/handoff/stage-01.md", WritePurpose::Repo).unwrap();
         let stamp = ReadStamp::Absent;
-        assert!(matches!(root.write(&p, b"y", &stamp), Err(StoreError::HardLink(_, 2))));
-        assert_eq!(std::fs::read_to_string(d.path().join("docs/real.md")).unwrap(), "x");
+        assert!(matches!(
+            root.write(&p, b"y", &stamp),
+            Err(StoreError::HardLink(_, 2))
+        ));
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("docs/real.md")).unwrap(),
+            "x"
+        );
     }
 
     /// AC-F013-16: larger than 1 MB, not a regular file, more than one link → refused with why.
     #[test]
     fn read_size_cap() {
         let (d, root) = project();
-        std::fs::write(d.path().join("docs/handoff/stage-02.md"), vec![b'a'; 1024 * 1024 + 1]).unwrap();
-        let e = root.read(&rp("docs/handoff/stage-02.md"), ReadClass::Decision).unwrap_err();
+        std::fs::write(
+            d.path().join("docs/handoff/stage-02.md"),
+            vec![b'a'; 1024 * 1024 + 1],
+        )
+        .unwrap();
+        let e = root
+            .read(&rp("docs/handoff/stage-02.md"), ReadClass::Decision)
+            .unwrap_err();
         assert!(e.to_string().contains("over the 1048576-byte limit"), "{e}");
         std::fs::write(d.path().join("docs/lessons.md"), vec![b'a'; 1024 * 1024]).unwrap();
-        assert!(root.read(&rp("docs/lessons.md"), ReadClass::Decision).is_ok());
+        assert!(
+            root.read(&rp("docs/lessons.md"), ReadClass::Decision)
+                .is_ok()
+        );
         std::fs::create_dir_all(d.path().join("spec")).unwrap();
-        std::fs::write(d.path().join("spec/settings.json"), vec![b' '; 256 * 1024 + 1]).unwrap();
-        assert!(matches!(root.read(&rp("spec/settings.json"), ReadClass::ClaudeConfig), Err(StoreError::TooLarge { .. })));
+        std::fs::write(
+            d.path().join("spec/settings.json"),
+            vec![b' '; 256 * 1024 + 1],
+        )
+        .unwrap();
+        assert!(matches!(
+            root.read(&rp("spec/settings.json"), ReadClass::ClaudeConfig),
+            Err(StoreError::TooLarge { .. })
+        ));
         // A FIFO doesn't block and is refused.
         let fifo = d.path().join("docs/handoff/stage-03.md");
-        assert!(std::process::Command::new("mkfifo").arg(&fifo).status().unwrap().success());
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&fifo)
+                .status()
+                .unwrap()
+                .success()
+        );
         assert_eq!(
-            root.read(&rp("docs/handoff/stage-03.md"), ReadClass::Decision).unwrap_err(),
+            root.read(&rp("docs/handoff/stage-03.md"), ReadClass::Decision)
+                .unwrap_err(),
             StoreError::NotRegular("docs/handoff/stage-03.md".into())
         );
         // A directory is not a regular file.
-        assert!(matches!(root.read(&rp("docs/handoff"), ReadClass::Decision), Err(StoreError::NotRegular(_))));
+        assert!(matches!(
+            root.read(&rp("docs/handoff"), ReadClass::Decision),
+            Err(StoreError::NotRegular(_))
+        ));
     }
 
     /// AC-XC-30: outside reads are a fixed list in one module; everything else is unreachable.
@@ -334,18 +493,36 @@ mod fs_policy {
             r#"{"oauthAccount":{"email":"x"},"mcpServers":{"a":{"command":"x"}},"projects":{"/p":{"history":["secret"],"mcpServers":{}}}}"#,
         )
         .unwrap();
-        assert_eq!(outside::read(&OutsideRead::UserSettings, h, None).unwrap(), br#"{"env":{"A":"1"}}"#);
         assert_eq!(
-            outside::read(&OutsideRead::UserClaude(UserClaudeEntry::Agents, Some("x.md".into())), h, None).unwrap(),
+            outside::read(&OutsideRead::UserSettings, h, None).unwrap(),
+            br#"{"env":{"A":"1"}}"#
+        );
+        assert_eq!(
+            outside::read(
+                &OutsideRead::UserClaude(UserClaudeEntry::Agents, Some("x.md".into())),
+                h,
+                None
+            )
+            .unwrap(),
             b"agent"
         );
         // ~/.claude.json: only mcpServers survives the read.
-        let j = String::from_utf8(outside::read(&OutsideRead::ClaudeJsonMcpServers, h, None).unwrap()).unwrap();
-        assert!(j.contains("mcpServers") && !j.contains("oauthAccount") && !j.contains("history"), "{j}");
+        let j =
+            String::from_utf8(outside::read(&OutsideRead::ClaudeJsonMcpServers, h, None).unwrap())
+                .unwrap();
+        assert!(
+            j.contains("mcpServers") && !j.contains("oauthAccount") && !j.contains("history"),
+            "{j}"
+        );
         // Dynamic names can't climb or reach secrets.
         for bad in ["../../.ssh/id_ed25519", ".env", "a/b.md", "id_rsa"] {
             assert!(
-                outside::read(&OutsideRead::UserClaude(UserClaudeEntry::Agents, Some(bad.into())), h, None).is_err(),
+                outside::read(
+                    &OutsideRead::UserClaude(UserClaudeEntry::Agents, Some(bad.into())),
+                    h,
+                    None
+                )
+                .is_err(),
                 "{bad}"
             );
         }
@@ -356,7 +533,10 @@ mod fs_policy {
             OutsideRead::ManagedDropIn("a.json".into()),
             OutsideRead::ClaudeJsonMcpServers,
             OutsideRead::UserClaude(UserClaudeEntry::ClaudeMd, None),
-            OutsideRead::AncestorClaudeMd { dir: "/Users/billy/dev".into(), local: true },
+            OutsideRead::AncestorClaudeMd {
+                dir: "/Users/billy/dev".into(),
+                local: true,
+            },
             OutsideRead::EtcPaths,
             OutsideRead::EtcPathsD("homebrew".into()),
             OutsideRead::EtcShells,
@@ -426,30 +606,64 @@ mod secrets {
     #[test]
     fn excluded_from_views_and_watcher() {
         let secrets = [
-            ".env", ".env.local", ".ENV.production", "docs/.Env", "server.pem", "docs/tls.PEM",
-            "spec/private.key", "id_rsa", "docs/ID_ED25519.pub", "cert.p12", "docs/.npmrc", ".NETRC",
-            ".ssh/config", "docs/.SSH/known_hosts", ".aws/credentials", "docs/.Aws/config",
-            ".config/gcloud/creds.json", "docs/.Config/GCloud/x",
+            ".env",
+            ".env.local",
+            ".ENV.production",
+            "docs/.Env",
+            "server.pem",
+            "docs/tls.PEM",
+            "spec/private.key",
+            "id_rsa",
+            "docs/ID_ED25519.pub",
+            "cert.p12",
+            "docs/.npmrc",
+            ".NETRC",
+            ".ssh/config",
+            "docs/.SSH/known_hosts",
+            ".aws/credentials",
+            "docs/.Aws/config",
+            ".config/gcloud/creds.json",
+            "docs/.Config/GCloud/x",
         ];
         let (d, root) = project();
         for s in secrets {
             assert!(pathpolicy::is_secret(s), "{s} (watcher filter)");
-            assert!(matches!(check_read(s, ReadClass::Decision), Err(PolicyViolation::Secret(_))), "{s}");
+            assert!(
+                matches!(
+                    check_read(s, ReadClass::Decision),
+                    Err(PolicyViolation::Secret(_))
+                ),
+                "{s}"
+            );
             let full = d.path().join(s);
             std::fs::create_dir_all(full.parent().unwrap()).unwrap();
             std::fs::write(&full, "TOKEN").unwrap();
         }
-        for ok in ["docs/environment.md", "docs/keys.md", "docs/handoff/stage-01.md", "spec/identity.md"] {
+        for ok in [
+            "docs/environment.md",
+            "docs/keys.md",
+            "docs/handoff/stage-01.md",
+            "spec/identity.md",
+        ] {
             assert!(!pathpolicy::is_secret(ok), "{ok}");
             assert!(check_read(ok, ReadClass::Decision).is_ok(), "{ok}");
         }
         // Even a reported name matching a secret pattern is refused by the store.
         std::fs::write(d.path().join("docs/notes.md"), "x").unwrap();
         fn as_env(n: &str) -> String {
-            if n == "notes.md" { ".env".into() } else { n.into() }
+            if n == "notes.md" {
+                ".env".into()
+            } else {
+                n.into()
+            }
         }
-        let r = Root::open(d.path(), RootKind::Project).unwrap().with_name_reporter(as_env);
-        assert!(matches!(r.read(&rp("docs/notes.md"), ReadClass::Decision), Err(StoreError::Policy(PolicyViolation::Secret(_)))));
+        let r = Root::open(d.path(), RootKind::Project)
+            .unwrap()
+            .with_name_reporter(as_env);
+        assert!(matches!(
+            r.read(&rp("docs/notes.md"), ReadClass::Decision),
+            Err(StoreError::Policy(PolicyViolation::Secret(_)))
+        ));
         drop(root);
     }
 
@@ -459,17 +673,36 @@ mod secrets {
         let home = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(home.path().join(".ssh")).unwrap();
         std::fs::write(home.path().join(".ssh/id_ed25519"), "PRIVATE KEY").unwrap();
-        symlink(home.path().join(".ssh/id_ed25519"), d.path().join("docs/handoff/stage-02.md")).unwrap();
+        symlink(
+            home.path().join(".ssh/id_ed25519"),
+            d.path().join("docs/handoff/stage-02.md"),
+        )
+        .unwrap();
         symlink(home.path().join(".ssh"), d.path().join("docs/keys")).unwrap();
-        let e = root.read(&rp("docs/handoff/stage-02.md"), ReadClass::Decision).unwrap_err();
+        let e = root
+            .read(&rp("docs/handoff/stage-02.md"), ReadClass::Decision)
+            .unwrap_err();
         assert!(matches!(e, StoreError::Policy(PolicyViolation::Symlink(_))));
-        let e = root.read(&rp("docs/keys/config"), ReadClass::Decision).unwrap_err();
+        let e = root
+            .read(&rp("docs/keys/config"), ReadClass::Decision)
+            .unwrap_err();
         assert!(matches!(e, StoreError::Policy(PolicyViolation::Symlink(_))));
         // Outside reads refuse it too.
         let h = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(h.path().join(".claude")).unwrap();
-        symlink(home.path().join(".ssh/id_ed25519"), h.path().join(".claude/settings.json")).unwrap();
-        assert!(foreman_core::store::outside::read(&foreman_core::store::outside::OutsideRead::UserSettings, h.path(), None).is_err());
+        symlink(
+            home.path().join(".ssh/id_ed25519"),
+            h.path().join(".claude/settings.json"),
+        )
+        .unwrap();
+        assert!(
+            foreman_core::store::outside::read(
+                &foreman_core::store::outside::OutsideRead::UserSettings,
+                h.path(),
+                None
+            )
+            .is_err()
+        );
     }
 }
 
@@ -480,7 +713,11 @@ mod fs {
         for e in std::fs::read_dir(dir).unwrap() {
             let e = e.unwrap();
             let md = std::fs::symlink_metadata(e.path()).unwrap();
-            out.push((e.path().display().to_string(), md.permissions().mode() & 0o777, md.is_dir()));
+            out.push((
+                e.path().display().to_string(),
+                md.permissions().mode() & 0o777,
+                md.is_dir(),
+            ));
             if md.is_dir() {
                 walk(&e.path(), out);
             }
@@ -493,11 +730,28 @@ mod fs {
         let base = tempfile::tempdir().unwrap();
         let app = base.path().join("Application Support/dev.foreman");
         let root = Root::open_app_data(&app).unwrap();
-        assert_eq!(std::fs::metadata(&app).unwrap().permissions().mode() & 0o777, 0o700);
-        for p in ["settings.json", "projects/abc/progress.json", "runs/r1/run.json", "approvals/abc/project.json"] {
-            root.write(&pathpolicy::check_app_data(p).unwrap(), b"{}\n", &ReadStamp::Absent).unwrap();
+        assert_eq!(
+            std::fs::metadata(&app).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        for p in [
+            "settings.json",
+            "projects/abc/progress.json",
+            "runs/r1/run.json",
+            "approvals/abc/project.json",
+        ] {
+            root.write(
+                &pathpolicy::check_app_data(p).unwrap(),
+                b"{}\n",
+                &ReadStamp::Absent,
+            )
+            .unwrap();
         }
-        root.append_line(&pathpolicy::check_app_data("runs/index-2026-10.jsonl").unwrap(), b"{}\n").unwrap();
+        root.append_line(
+            &pathpolicy::check_app_data("runs/index-2026-10.jsonl").unwrap(),
+            b"{}\n",
+        )
+        .unwrap();
         let mut all = Vec::new();
         walk(&app, &mut all);
         assert!(all.len() >= 9);

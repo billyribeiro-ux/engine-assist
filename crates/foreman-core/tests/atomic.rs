@@ -1,7 +1,15 @@
 //! M1-05, M1-09: atomic durable writes that never clobber a newer file (ADR-010, SR-32, SR-33),
 //! and the `info/exclude` writer.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "test code")]
-#![allow(clippy::disallowed_methods, reason = "test code may use std::fs and run git (design doc §3.2)")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test code may use std::fs and run git (design doc §3.2)"
+)]
 
 mod common;
 
@@ -10,7 +18,9 @@ use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use foreman_core::pathpolicy::{self, PolicyViolation, ReadClass, WritePurpose, check_write};
-use foreman_core::store::{FaultPoint, ReadStamp, Root, RootKind, StoreError, WriteOptions, is_temp_name};
+use foreman_core::store::{
+    FaultPoint, ReadStamp, Root, RootKind, StoreError, WriteOptions, is_temp_name,
+};
 
 fn project() -> (tempfile::TempDir, Root) {
     let d = tempfile::tempdir().unwrap();
@@ -122,12 +132,25 @@ mod atomic {
         let (_, stamp) = root.read(&path, ReadClass::Decision).unwrap();
         std::fs::write(d.path().join("docs/lessons.md"), "theirs").unwrap();
         for no_swap in [false, true] {
-            let opts = WriteOptions { force_no_swap: no_swap, ..WriteOptions::default() };
-            let e = root.write_with(&path, b"foreman", &stamp, &opts).unwrap_err();
-            let StoreError::Conflict { name, current } = e else { panic!() };
+            let opts = WriteOptions {
+                force_no_swap: no_swap,
+                ..WriteOptions::default()
+            };
+            let e = root
+                .write_with(&path, b"foreman", &stamp, &opts)
+                .unwrap_err();
+            let StoreError::Conflict { name, current } = e else {
+                panic!()
+            };
             assert_eq!(name, "docs/lessons.md");
-            assert_eq!(current.sha256(), Some(foreman_core::store::sha256_hex(b"theirs").as_str()));
-            assert_eq!(std::fs::read_to_string(d.path().join("docs/lessons.md")).unwrap(), "theirs");
+            assert_eq!(
+                current.sha256(),
+                Some(foreman_core::store::sha256_hex(b"theirs").as_str())
+            );
+            assert_eq!(
+                std::fs::read_to_string(d.path().join("docs/lessons.md")).unwrap(),
+                "theirs"
+            );
         }
         assert!(temps(&d.path().join("docs")).is_empty());
     }
@@ -141,18 +164,35 @@ mod atomic {
         let zshrc = victim.path().join(".zshrc");
         std::fs::write(&zshrc, "safe").unwrap();
         let suffix = "0123456789abcdef";
-        let tmp = d.path().join(format!("docs/handoff/.stage-02.md.{suffix}.foreman-tmp"));
+        let tmp = d
+            .path()
+            .join(format!("docs/handoff/.stage-02.md.{suffix}.foreman-tmp"));
         symlink(&zshrc, &tmp).unwrap();
-        let opts = WriteOptions { temp_suffix: Some(suffix.into()), ..WriteOptions::default() };
-        let e = root.write_with(&p("docs/handoff/stage-02.md"), b"pwn", &ReadStamp::Absent, &opts).unwrap_err();
+        let opts = WriteOptions {
+            temp_suffix: Some(suffix.into()),
+            ..WriteOptions::default()
+        };
+        let e = root
+            .write_with(
+                &p("docs/handoff/stage-02.md"),
+                b"pwn",
+                &ReadStamp::Absent,
+                &opts,
+            )
+            .unwrap_err();
         assert!(matches!(e, StoreError::Io { .. }), "{e:?}");
         assert_eq!(std::fs::read_to_string(&zshrc).unwrap(), "safe");
         assert!(!d.path().join("docs/handoff/stage-02.md").exists());
         // A normal write: random temp name, gone afterwards, mode 0644 for a new repo file.
-        root.write(&p("docs/handoff/stage-02.md"), b"ok", &ReadStamp::Absent).unwrap();
+        root.write(&p("docs/handoff/stage-02.md"), b"ok", &ReadStamp::Absent)
+            .unwrap();
         let md = std::fs::metadata(d.path().join("docs/handoff/stage-02.md")).unwrap();
         assert_eq!(md.permissions().mode() & 0o777, 0o644);
-        assert_eq!(temps(&d.path().join("docs/handoff")).len(), 1, "only the planted symlink remains");
+        assert_eq!(
+            temps(&d.path().join("docs/handoff")).len(),
+            1,
+            "only the planted symlink remains"
+        );
     }
 
     /// `NOREPLACE` for new files: someone creating the file meanwhile is a conflict.
@@ -160,19 +200,36 @@ mod atomic {
     fn noreplace_conflict() {
         let (d, root) = project();
         let path = p("docs/handoff/stage-01.md");
-        std::fs::write(d.path().join("docs/handoff/stage-01.md"), "claude wrote this").unwrap();
-        let e = root.write(&path, b"foreman", &ReadStamp::Absent).unwrap_err();
+        std::fs::write(
+            d.path().join("docs/handoff/stage-01.md"),
+            "claude wrote this",
+        )
+        .unwrap();
+        let e = root
+            .write(&path, b"foreman", &ReadStamp::Absent)
+            .unwrap_err();
         assert!(matches!(e, StoreError::Conflict { .. }));
-        assert_eq!(std::fs::read_to_string(d.path().join("docs/handoff/stage-01.md")).unwrap(), "claude wrote this");
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("docs/handoff/stage-01.md")).unwrap(),
+            "claude wrote this"
+        );
         // A file that vanished after Foreman read it is a conflict too.
         let (_, stamp) = root.read(&path, ReadClass::Decision).unwrap();
         std::fs::remove_file(d.path().join("docs/handoff/stage-01.md")).unwrap();
-        assert!(matches!(root.write(&path, b"x", &stamp), Err(StoreError::Conflict { .. })));
+        assert!(matches!(
+            root.write(&path, b"x", &stamp),
+            Err(StoreError::Conflict { .. })
+        ));
         // AC-F020-04: an OS error names the file and leaves the original intact.
         std::fs::write(d.path().join("docs/blocker"), "a file, not a folder").unwrap();
-        let e = root.write(&p("docs/blocker/x.md"), b"x", &ReadStamp::Absent).unwrap_err();
+        let e = root
+            .write(&p("docs/blocker/x.md"), b"x", &ReadStamp::Absent)
+            .unwrap_err();
         assert!(e.to_string().contains("blocker"), "{e}");
-        assert_eq!(std::fs::read_to_string(d.path().join("docs/blocker")).unwrap(), "a file, not a folder");
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("docs/blocker")).unwrap(),
+            "a file, not a folder"
+        );
         assert!(temps(&d.path().join("docs/handoff")).is_empty());
     }
 
@@ -183,17 +240,28 @@ mod atomic {
         let path = p("docs/lessons.md");
         std::fs::write(d.path().join("docs/lessons.md"), "v1").unwrap();
         let (_, stamp) = root.read(&path, ReadClass::Decision).unwrap();
-        let opts = WriteOptions { force_no_swap: true, ..WriteOptions::default() };
+        let opts = WriteOptions {
+            force_no_swap: true,
+            ..WriteOptions::default()
+        };
         let out = root.write_with(&path, b"v2", &stamp, &opts).unwrap();
         assert!(out.degraded_cas);
-        assert_eq!(std::fs::read_to_string(d.path().join("docs/lessons.md")).unwrap(), "v2");
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("docs/lessons.md")).unwrap(),
+            "v2"
+        );
         // Stale stamp is still refused in the fallback.
         let e = root.write_with(&path, b"v3", &stamp, &opts).unwrap_err();
         assert!(matches!(e, StoreError::Conflict { .. }));
         // With swap support (this volume), the normal path isn't degraded.
         let (_, s) = root.read(&path, ReadClass::Decision).unwrap();
-        let out = root.write_with(&path, b"v4", &s, &WriteOptions::default()).unwrap();
-        assert_eq!(std::fs::read_to_string(d.path().join("docs/lessons.md")).unwrap(), "v4");
+        let out = root
+            .write_with(&path, b"v4", &s, &WriteOptions::default())
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("docs/lessons.md")).unwrap(),
+            "v4"
+        );
         let _ = out.degraded_cas; // false on APFS/ext4/tmpfs; overlayfs may lack EXCHANGE.
     }
 
@@ -201,12 +269,27 @@ mod atomic {
     #[test]
     fn dir_sync_fallback() {
         let (d, root) = project();
-        let opts = WriteOptions { force_no_dir_sync: true, ..WriteOptions::default() };
-        let out = root.write_with(&p("docs/a.md"), b"x", &ReadStamp::Absent, &opts).unwrap();
+        let opts = WriteOptions {
+            force_no_dir_sync: true,
+            ..WriteOptions::default()
+        };
+        let out = root
+            .write_with(&p("docs/a.md"), b"x", &ReadStamp::Absent, &opts)
+            .unwrap();
         assert!(out.dir_sync_fallback);
-        let out = root.write_with(&p("docs/b.md"), b"x", &ReadStamp::Absent, &WriteOptions::default()).unwrap();
+        let out = root
+            .write_with(
+                &p("docs/b.md"),
+                b"x",
+                &ReadStamp::Absent,
+                &WriteOptions::default(),
+            )
+            .unwrap();
         assert!(!out.dir_sync_fallback);
-        assert_eq!(std::fs::read_to_string(d.path().join("docs/a.md")).unwrap(), "x");
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("docs/a.md")).unwrap(),
+            "x"
+        );
     }
 
     /// ADR-010: a stale `.foreman-tmp` that differs from its target goes to `<app-data>/recovered/`
@@ -223,35 +306,72 @@ mod atomic {
         let old = SystemTime::now() - Duration::from_secs(7200);
         let differ = dir.join(".stage-02.md.aaaaaaaaaaaaaaaa.foreman-tmp");
         std::fs::write(&differ, "newer external edit").unwrap();
-        std::fs::File::options().write(true).open(&differ).unwrap().set_modified(old).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&differ)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
         let same = dir.join(".stage-02.md.bbbbbbbbbbbbbbbb.foreman-tmp");
         std::fs::write(&same, "current").unwrap();
-        std::fs::File::options().write(true).open(&same).unwrap().set_modified(old).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&same)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
         let fresh = dir.join(".stage-02.md.cccccccccccccccc.foreman-tmp");
         std::fs::write(&fresh, "being written right now").unwrap();
 
         let path = p("docs/handoff/stage-02.md");
         let (_, stamp) = root.read(&path, ReadClass::Decision).unwrap();
-        let out = root.write_with(&path, b"new", &stamp, &WriteOptions::default()).unwrap();
+        let out = root
+            .write_with(&path, b"new", &stamp, &WriteOptions::default())
+            .unwrap();
         assert_eq!(out.recovered.len(), 1);
         assert_eq!(out.removed_stale.len(), 1);
-        assert!(out.recovered[0].starts_with("recovered/") && out.recovered[0].ends_with("-3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b-stage-02.md"));
+        assert!(
+            out.recovered[0].starts_with("recovered/")
+                && out.recovered[0].ends_with("-3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b-stage-02.md")
+        );
         let rec = app.path().join(&out.recovered[0]);
-        assert_eq!(std::fs::read_to_string(&rec).unwrap(), "newer external edit");
-        assert_eq!(std::fs::metadata(&rec).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            std::fs::read_to_string(&rec).unwrap(),
+            "newer external edit"
+        );
+        assert_eq!(
+            std::fs::metadata(&rec).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
         assert!(!differ.exists() && !same.exists() && fresh.exists());
         // Without a recovery target, a differing temp is left in place (never discarded).
         let root2 = Root::open(d.path(), RootKind::Project).unwrap();
         let lone = dir.join(".x.md.dddddddddddddddd.foreman-tmp");
         std::fs::write(&lone, "keep").unwrap();
-        std::fs::File::options().write(true).open(&lone).unwrap().set_modified(old).unwrap();
-        root2.write(&p("docs/handoff/x.md"), b"y", &ReadStamp::Absent).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&lone)
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        root2
+            .write(&p("docs/handoff/x.md"), b"y", &ReadStamp::Absent)
+            .unwrap();
         assert!(lone.exists());
     }
 
     fn git(dir: &Path, args: &[&str]) -> String {
-        let out = std::process::Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
-        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         String::from_utf8(out.stdout).unwrap().trim_end().to_owned()
     }
 
@@ -261,7 +381,12 @@ mod atomic {
         git(dir, &["config", "user.name", "T"]);
     }
 
-    fn ensure(dir: &Path) -> Result<foreman_core::store::git_exclude::Ensured, foreman_core::store::git_exclude::ExcludeError> {
+    fn ensure(
+        dir: &Path,
+    ) -> Result<
+        foreman_core::store::git_exclude::Ensured,
+        foreman_core::store::git_exclude::ExcludeError,
+    > {
         let root = Root::open(dir, RootKind::Project).unwrap();
         let ex = git(dir, &["rev-parse", "--git-path", "info/exclude"]);
         let common = git(dir, &["rev-parse", "--git-common-dir"]);
@@ -291,25 +416,48 @@ mod atomic {
         git(d.path(), &["worktree", "add", "-q", wt.to_str().unwrap()]);
         std::fs::write(d.path().join(".git/info/exclude"), "# fresh\n").unwrap();
         assert_eq!(ensure(&wt).unwrap(), Ensured::Appended);
-        assert_eq!(std::fs::read_to_string(d.path().join(".git/info/exclude")).unwrap(), "# fresh\n.*.foreman-tmp\n");
+        assert_eq!(
+            std::fs::read_to_string(d.path().join(".git/info/exclude")).unwrap(),
+            "# fresh\n.*.foreman-tmp\n"
+        );
 
         // A path git reports outside the project and its common dir is refused.
         let outside = tempfile::tempdir().unwrap();
         let root = Root::open(d.path(), RootKind::Project).unwrap();
-        let e = foreman_core::store::git_exclude::ensure(&root, &outside.path().join("info/exclude"), &d.path().join(".git")).unwrap_err();
+        let e = foreman_core::store::git_exclude::ensure(
+            &root,
+            &outside.path().join("info/exclude"),
+            &d.path().join(".git"),
+        )
+        .unwrap_err();
         assert!(matches!(e, ExcludeError::OutsideScope(_)), "{e:?}");
         // A `.git` file pointing outside the project: the common dir is elsewhere, and the writer
         // accepts only that common dir's info/exclude (never a third location).
         let gitfile = tempfile::tempdir().unwrap();
         let real_git = outside.path().join("real.git");
-        let o = std::process::Command::new("git").args(["init", "-q", "--separate-git-dir"]).arg(&real_git).arg(gitfile.path()).output().unwrap();
+        let o = std::process::Command::new("git")
+            .args(["init", "-q", "--separate-git-dir"])
+            .arg(&real_git)
+            .arg(gitfile.path())
+            .output()
+            .unwrap();
         assert!(o.status.success());
         assert_eq!(ensure(gitfile.path()).unwrap(), Ensured::Appended);
         let root = Root::open(gitfile.path(), RootKind::Project).unwrap();
-        let e = foreman_core::store::git_exclude::ensure(&root, &outside.path().join("elsewhere/info/exclude"), &real_git).unwrap_err();
+        let e = foreman_core::store::git_exclude::ensure(
+            &root,
+            &outside.path().join("elsewhere/info/exclude"),
+            &real_git,
+        )
+        .unwrap_err();
         assert!(matches!(e, ExcludeError::OutsideScope(_)));
         // Not info/exclude → refused even inside the git dir (it's the only write under .git).
-        let e = foreman_core::store::git_exclude::ensure(&root, &real_git.join("hooks/pre-commit"), &real_git).unwrap_err();
+        let e = foreman_core::store::git_exclude::ensure(
+            &root,
+            &real_git.join("hooks/pre-commit"),
+            &real_git,
+        )
+        .unwrap_err();
         assert!(matches!(e, ExcludeError::OutsideScope(_)));
 
         // A symlinked info/exclude or info/ is refused.
@@ -320,12 +468,22 @@ mod atomic {
         std::fs::remove_file(s.path().join(".git/info/exclude")).ok();
         symlink(&target, s.path().join(".git/info/exclude")).unwrap();
         let e = ensure(s.path()).unwrap_err();
-        assert!(matches!(e, ExcludeError::Store(StoreError::Policy(PolicyViolation::Symlink(_)))), "{e:?}");
+        assert!(
+            matches!(
+                e,
+                ExcludeError::Store(StoreError::Policy(PolicyViolation::Symlink(_)))
+            ),
+            "{e:?}"
+        );
         assert_eq!(std::fs::read_to_string(&target).unwrap(), "x");
         // Relative `..` from git is refused as not plain.
         let root = Root::open(s.path(), RootKind::Project).unwrap();
         assert!(matches!(
-            foreman_core::store::git_exclude::ensure(&root, Path::new(".git/../../x/info/exclude"), Path::new(".git")),
+            foreman_core::store::git_exclude::ensure(
+                &root,
+                Path::new(".git/../../x/info/exclude"),
+                Path::new(".git")
+            ),
             Err(ExcludeError::NotPlain(_))
         ));
     }
@@ -337,7 +495,12 @@ mod atomic {
         init(d.path());
         ensure(d.path()).unwrap();
         std::fs::create_dir_all(d.path().join("docs")).unwrap();
-        std::fs::write(d.path().join("docs/.lessons.md.0123456789abcdef.foreman-tmp"), "x").unwrap();
+        std::fs::write(
+            d.path()
+                .join("docs/.lessons.md.0123456789abcdef.foreman-tmp"),
+            "x",
+        )
+        .unwrap();
         std::fs::write(d.path().join("docs/lessons.md"), "y").unwrap();
         let st = git(d.path(), &["ls-files", "--others", "--exclude-standard"]);
         assert!(st.contains("docs/lessons.md"), "{st}");

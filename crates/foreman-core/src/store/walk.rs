@@ -32,7 +32,11 @@ pub enum NameCheck {
 ///
 /// # Errors
 /// The violated rule.
-pub fn check_name(name: &str, exempt: Option<&str>, mode: NameCheck) -> Result<(), PolicyViolation> {
+pub fn check_name(
+    name: &str,
+    exempt: Option<&str>,
+    mode: NameCheck,
+) -> Result<(), PolicyViolation> {
     match mode {
         NameCheck::None => Ok(()),
         NameCheck::Deny => check_reported(name, exempt),
@@ -90,14 +94,21 @@ pub fn check_reported(name: &str, exempt: Option<&str>) -> Result<(), PolicyViol
     Ok(())
 }
 
-#[allow(clippy::useless_conversion, reason = "st_ino's type differs per platform")]
+#[allow(
+    clippy::useless_conversion,
+    reason = "st_ino's type differs per platform"
+)]
 fn ino_of(fd: &OwnedFd) -> Result<u64, Errno> {
     let st = rustix::fs::fstat(fd)?;
     Ok(u64::try_from(st.st_ino).unwrap_or(0))
 }
 
 /// Opens one directory component under `parent`, refusing symlinks.
-pub(crate) fn open_dir(parent: &OwnedFd, comp: &str, opts: WalkOpts<'_>) -> Result<OwnedFd, StoreError> {
+pub(crate) fn open_dir(
+    parent: &OwnedFd,
+    comp: &str,
+    opts: WalkOpts<'_>,
+) -> Result<OwnedFd, StoreError> {
     let flags = OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::RDONLY;
     let fd = match rustix::fs::openat(parent, comp, flags, Mode::empty()) {
         Ok(fd) => fd,
@@ -109,14 +120,16 @@ pub(crate) fn open_dir(parent: &OwnedFd, comp: &str, opts: WalkOpts<'_>) -> Resu
                 Ok(()) | Err(Errno::EXIST) => {}
                 Err(e) => return Err(StoreError::io(comp, e)),
             }
-            rustix::fs::openat(parent, comp, flags, Mode::empty()).map_err(|e| classify(parent, comp, e))?
+            rustix::fs::openat(parent, comp, flags, Mode::empty())
+                .map_err(|e| classify(parent, comp, e))?
         }
         Err(e) => return Err(classify(parent, comp, e)),
     };
     if opts.names != NameCheck::None {
         let ino = ino_of(&fd).map_err(|e| StoreError::io(comp, e))?;
         if let Some(name) = reported_name(parent, ino) {
-            check_name(&(opts.reporter)(&name), opts.exempt, opts.names).map_err(StoreError::Policy)?;
+            check_name(&(opts.reporter)(&name), opts.exempt, opts.names)
+                .map_err(StoreError::Policy)?;
         }
     }
     Ok(fd)
@@ -137,7 +150,11 @@ pub(crate) fn classify(parent: &OwnedFd, comp: &str, e: Errno) -> StoreError {
 }
 
 /// Walks the parent components of a path from `root`.
-pub(crate) fn walk(root: &OwnedFd, comps: &[&str], opts: WalkOpts<'_>) -> Result<OwnedFd, StoreError> {
+pub(crate) fn walk(
+    root: &OwnedFd,
+    comps: &[&str],
+    opts: WalkOpts<'_>,
+) -> Result<OwnedFd, StoreError> {
     let mut cur = rustix::io::dup(root).map_err(|e| StoreError::io(".", e))?;
     for c in comps {
         cur = open_dir(&cur, c, opts)?;

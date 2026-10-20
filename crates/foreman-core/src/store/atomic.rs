@@ -100,7 +100,12 @@ fn unsupported(e: Errno) -> bool {
 }
 
 fn read_at(dir: &OwnedFd, name: &str) -> Result<(Vec<u8>, rustix::fs::Stat), Errno> {
-    let fd = rustix::fs::openat(dir, name, OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK, Mode::empty())?;
+    let fd = rustix::fs::openat(
+        dir,
+        name,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK,
+        Mode::empty(),
+    )?;
     let st = rustix::fs::fstat(&fd)?;
     if FileType::from_raw_mode(super::stat_mode(&st)) != FileType::RegularFile {
         return Err(Errno::INVAL);
@@ -141,7 +146,8 @@ fn temp_suffix() -> String {
 fn temp_target(file: &str) -> Option<&str> {
     let inner = file.strip_prefix('.')?.strip_suffix(".foreman-tmp")?;
     let (target, hex) = inner.rsplit_once('.')?;
-    (hex.len() == 16 && hex.bytes().all(|b| b.is_ascii_hexdigit()) && !target.is_empty()).then_some(target)
+    (hex.len() == 16 && hex.bytes().all(|b| b.is_ascii_hexdigit()) && !target.is_empty())
+        .then_some(target)
 }
 
 /// True for Foreman's temp-file names (the watcher and listings ignore them).
@@ -173,8 +179,12 @@ fn handle_stale(root: &Root, dir: &OwnedFd, opts: &WriteOptions, out: &mut Write
         if now.duration_since(mtime).unwrap_or_default() < opts.stale_after {
             continue;
         }
-        let Some(target) = temp_target(&t) else { continue };
-        let Ok((tbytes, _)) = read_at(dir, &t) else { continue };
+        let Some(target) = temp_target(&t) else {
+            continue;
+        };
+        let Ok((tbytes, _)) = read_at(dir, &t) else {
+            continue;
+        };
         let same = read_at(dir, target).is_ok_and(|(b, _)| b == tbytes);
         if same {
             if rustix::fs::unlinkat(dir, t.as_str(), AtFlags::empty()).is_ok() {
@@ -183,11 +193,19 @@ fn handle_stale(root: &Root, dir: &OwnedFd, opts: &WriteOptions, out: &mut Write
             continue;
         }
         // Never discard: it may hold a newer external edit swapped out just before a crash.
-        let Some((app_data, label)) = root.recovery() else { continue };
-        let Ok(app) = Root::open_app_data(app_data) else { continue };
-        let stamp = jiff::Timestamp::now().strftime("%Y%m%dT%H%M%S%.fZ").to_string();
+        let Some((app_data, label)) = root.recovery() else {
+            continue;
+        };
+        let Ok(app) = Root::open_app_data(app_data) else {
+            continue;
+        };
+        let stamp = jiff::Timestamp::now()
+            .strftime("%Y%m%dT%H%M%S%.fZ")
+            .to_string();
         let rel = format!("recovered/{stamp}-{label}-{target}");
-        let Ok(rp) = pathpolicy::check_app_data(&rel) else { continue };
+        let Ok(rp) = pathpolicy::check_app_data(&rel) else {
+            continue;
+        };
         if app.write(&rp, &tbytes, &ReadStamp::Absent).is_ok()
             && rustix::fs::unlinkat(dir, t.as_str(), AtFlags::empty()).is_ok()
         {
@@ -205,7 +223,12 @@ fn exempt(p: &RepoPath) -> Option<&'static str> {
     }
 }
 
-fn dir_sync(dir: &OwnedFd, opts: &WriteOptions, out: &mut WriteOutcome, name: &str) -> Result<(), StoreError> {
+fn dir_sync(
+    dir: &OwnedFd,
+    opts: &WriteOptions,
+    out: &mut WriteOutcome,
+    name: &str,
+) -> Result<(), StoreError> {
     let full = if opts.force_no_dir_sync {
         Err(Errno::NOTSUP)
     } else {
@@ -224,7 +247,10 @@ fn dir_sync(dir: &OwnedFd, opts: &WriteOptions, out: &mut WriteOutcome, name: &s
     }
 }
 
-#[allow(clippy::too_many_lines, reason = "one linear sequence of ADR-010 steps, kept together for review")]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one linear sequence of ADR-010 steps, kept together for review"
+)]
 pub(super) fn write(
     root: &Root,
     p: &RepoPath,
@@ -249,7 +275,9 @@ pub(super) fn write(
         Ok(st) => {
             match FileType::from_raw_mode(super::stat_mode(&st)) {
                 FileType::RegularFile => {}
-                FileType::Symlink => return Err(pathpolicy::PolicyViolation::Symlink(name.to_owned()).into()),
+                FileType::Symlink => {
+                    return Err(pathpolicy::PolicyViolation::Symlink(name.to_owned()).into());
+                }
                 _ => return Err(StoreError::NotRegular(p.to_string())),
             }
             let nlink = super::stat_nlink(&st);
@@ -311,7 +339,8 @@ pub(super) fn write(
 
     match expect {
         ReadStamp::Absent => {
-            match rustix::fs::renameat_with(&dir, tmp.as_str(), &dir, name, RenameFlags::NOREPLACE) {
+            match rustix::fs::renameat_with(&dir, tmp.as_str(), &dir, name, RenameFlags::NOREPLACE)
+            {
                 Ok(()) => {}
                 Err(e) if e == Errno::EXIST => {
                     cleanup(&dir);
@@ -323,7 +352,8 @@ pub(super) fn write(
                         cleanup(&dir);
                         return Err(conflict(&dir, p, name));
                     }
-                    rustix::fs::renameat(&dir, tmp.as_str(), &dir, name).map_err(|e| StoreError::io(&p.to_string(), e))?;
+                    rustix::fs::renameat(&dir, tmp.as_str(), &dir, name)
+                        .map_err(|e| StoreError::io(&p.to_string(), e))?;
                 }
                 Err(e) => {
                     cleanup(&dir);
@@ -345,7 +375,13 @@ pub(super) fn write(
                     let old = read_at(&dir, &tmp).map(|(b, _)| sha256_hex(&b));
                     if old.as_deref().ok() != Some(sha256.as_str()) {
                         // Someone wrote in between: put their file back and report.
-                        let _ = rustix::fs::renameat_with(&dir, tmp.as_str(), &dir, name, RenameFlags::EXCHANGE);
+                        let _ = rustix::fs::renameat_with(
+                            &dir,
+                            tmp.as_str(),
+                            &dir,
+                            name,
+                            RenameFlags::EXCHANGE,
+                        );
                         cleanup(&dir);
                         return Err(conflict(&dir, p, name));
                     }
@@ -359,7 +395,8 @@ pub(super) fn write(
                         cleanup(&dir);
                         return Err(conflict(&dir, p, name));
                     }
-                    rustix::fs::renameat(&dir, tmp.as_str(), &dir, name).map_err(|e| StoreError::io(&p.to_string(), e))?;
+                    rustix::fs::renameat(&dir, tmp.as_str(), &dir, name)
+                        .map_err(|e| StoreError::io(&p.to_string(), e))?;
                     fault(opts, FaultPoint::AfterSwap)?;
                     fault(opts, FaultPoint::BeforeUnlink)?;
                 }
@@ -417,7 +454,10 @@ mod tests {
 
     #[test]
     fn temp_names() {
-        assert_eq!(temp_target(".stage-02.md.0123456789abcdef.foreman-tmp"), Some("stage-02.md"));
+        assert_eq!(
+            temp_target(".stage-02.md.0123456789abcdef.foreman-tmp"),
+            Some("stage-02.md")
+        );
         assert_eq!(temp_target(".x.0123.foreman-tmp"), None);
         assert!(!is_temp_name("stage-02.md"));
     }
