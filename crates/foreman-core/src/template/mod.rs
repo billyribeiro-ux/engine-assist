@@ -363,9 +363,14 @@ fn expand_tabs(s: &str) -> String {
     out
 }
 
-/// `sourceSha256` (DR-001): over the normalized text with tabs expanded.
+/// `sourceSha256` (DR-001): over the normalized text with tabs expanded. Text that needs no
+/// normalization is hashed in place (NFR-03's cached-load budget).
 #[must_use]
 pub fn source_sha256(src: &str) -> String {
+    let clean = !src.starts_with('\u{feff}') && !src.contains(['\r', '\t']);
+    if clean {
+        return crate::store::sha256_hex(src.as_bytes());
+    }
     crate::store::sha256_hex(expand_tabs(&normalize_source(src)).as_bytes())
 }
 

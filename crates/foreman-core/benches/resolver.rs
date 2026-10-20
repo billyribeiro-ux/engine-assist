@@ -18,8 +18,12 @@ use foreman_core::schema::project::ProjectFile;
 use foreman_core::template::parse_template;
 
 fn fixture(rel: &str) -> String {
-    std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(rel))
-        .unwrap()
+    std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures")
+            .join(rel),
+    )
+    .unwrap()
 }
 
 fn resolution(c: &mut Criterion) {
@@ -32,8 +36,12 @@ fn resolution(c: &mut Criterion) {
             (n, PacketText { text, signed: true })
         })
         .collect();
-    let (inputs, remembered, optional, attested) =
-        (BTreeMap::new(), BTreeMap::new(), BTreeMap::new(), BTreeSet::new());
+    let (inputs, remembered, optional, attested) = (
+        BTreeMap::new(),
+        BTreeMap::new(),
+        BTreeMap::new(),
+        BTreeSet::new(),
+    );
     let added = Vec::new();
     for key in ["2.2", "5.1"] {
         let ctx = ResolveCtx {
