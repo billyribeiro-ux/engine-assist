@@ -24,6 +24,20 @@ describe('RunLog', () => {
 		await expect.element(s.getByText('p95, all steps (target 10 s)')).toBeVisible();
 	});
 
+	it('metrics (AC-F026-09): active time per step, stages run, edits by stage and the baseline', async () => {
+		fresh('happy');
+		const s = await render(RunLog);
+		await expect.element(s.getByText('Median active time per step, CLI')).toBeVisible();
+		await expect.element(s.getByText('23.0 min')).toBeVisible();
+		await expect.element(s.getByText('16.0 min')).toBeVisible();
+		await expect.element(s.getByText('Stages run through Foreman')).toBeVisible();
+		await expect.element(s.getByText('6.2 s vs 94.0 s')).toBeVisible();
+		await expect
+			.element(s.getByText('Manual prompt edits by stage: Stage 1 · 0, Stage 2 · 0'))
+			.toBeVisible();
+		await expect.element(s.getByText('Median time to start, CLI (p95 9.1 s)')).toBeVisible();
+	});
+
 	it('empty: a search with no match says so', async () => {
 		fresh('happy');
 		const s = await render(RunLog);
