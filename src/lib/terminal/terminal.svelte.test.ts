@@ -17,6 +17,7 @@ import { IDS, fresh } from '#lib/test/screen.ts';
 import packageJson from '../../../package.json';
 import { archiveOf, findNext } from './archive.ts';
 import { routeKey, xtermHandles } from './keys.ts';
+import { styleNonce, withStyleNonce } from './style-nonce.ts';
 import {
 	SCROLLBACK_DEFAULT,
 	WINDOW_OPTIONS,
@@ -347,5 +348,41 @@ describe('terminal', () => {
 		await summary.click();
 		await expect.element(archived).toHaveTextContent('<script>x</script> earlier output');
 		expect(document.querySelector('.archive-text script')).toBeNull();
+	});
+	it('terminal::style_nonce_propagation', () => {
+		// Without Tauri's carrier nothing changes.
+		expect(styleNonce()).toBe('');
+		expect(withStyleNonce(() => document.createElement('style').nonce)).toBe('');
+		// With it, xterm's runtime <style> elements get the page's nonce while it opens, and only then.
+		const carrier = document.createElement('style');
+		carrier.id = 'fm-style-nonce';
+		carrier.nonce = '8128';
+		document.head.append(carrier);
+		try {
+			expect(styleNonce()).toBe('8128');
+			const made = withStyleNonce(() => [
+				document.createElement('style').nonce,
+				document.createElement('div') instanceof HTMLDivElement
+			]);
+			expect(made).toEqual(['8128', true]);
+			expect(document.createElement('style').nonce).toBe('');
+			expect(Object.hasOwn(document, 'createElement')).toBe(false);
+			const { t, host } = mounted();
+			t.dispose();
+			host.remove();
+			const opened = document.createElement('div');
+			document.body.append(opened);
+			const term = new Terminal(terminalOptions(prefs));
+			withStyleNonce(() => {
+				term.open(opened);
+			});
+			const styles = [...opened.querySelectorAll('style')];
+			expect(styles.length).toBeGreaterThan(0);
+			expect(styles.every((x) => x.nonce === '8128')).toBe(true);
+			term.dispose();
+			opened.remove();
+		} finally {
+			carrier.remove();
+		}
 	});
 });

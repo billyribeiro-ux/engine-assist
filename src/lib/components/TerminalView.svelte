@@ -19,6 +19,7 @@
 	import { bufferText, findNext, type Match } from '#lib/terminal/archive.ts';
 	import { routeKey, xtermHandles } from '#lib/terminal/keys.ts';
 	import { SCROLLBACK_DEFAULT, terminalOptions } from '#lib/terminal/options.ts';
+	import { withStyleNonce } from '#lib/terminal/style-nonce.ts';
 
 	let {
 		runId,
@@ -189,7 +190,10 @@
 			}
 			return xtermHandles(route);
 		});
-		t.open(host);
+		// xterm's runtime style elements carry the page's style nonce (style-src 'self', ADR-014).
+		withStyleNonce(() => {
+			t.open(host);
+		});
 		fit();
 		const data = t.onData((d) => {
 			if (live)

@@ -5,6 +5,8 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="color-scheme" content="light dark" />
 		<title>Foreman</title>
+		<!-- Carries Tauri's style nonce (ADR-014): runtime style elements (xterm) take it from here. -->
+		<style id="fm-style-nonce"></style>
 		%sveltekit.head%
 	</head>
 	<!-- No inline style attributes: style-src is 'self' (SR-20). -->

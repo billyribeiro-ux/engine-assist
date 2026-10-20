@@ -11,7 +11,7 @@ import { after, before, describe, it } from 'node:test';
 import { type RunningApp, startApp } from '../app.ts';
 import { productionCsp } from '../helpers/app.ts';
 import { compareServedCsp } from '../helpers/csp.ts';
-import { INJECT_INLINE_SCRIPT, TODAY_HEADING } from '../helpers/scripts.ts';
+import { INJECT_INLINE_SCRIPT, READ_STYLE_NONCE, TODAY_HEADING } from '../helpers/scripts.ts';
 
 interface Violation {
 	effectiveDirective: string;
@@ -58,6 +58,15 @@ describe('content security policy (SR-20)', () => {
 		);
 		assert.equal(violation.blockedURI, 'inline');
 		assert.equal(violation.disposition, 'enforce');
+	});
+
+	it('gives the style-nonce carrier a nonce the served policy lists (xterm styles, M3-08)', async () => {
+		const carrier = await app.driver.execute<{ present: boolean; nonce: string }>(READ_STYLE_NONCE);
+		assert.equal(carrier.present, true, 'app.html has #fm-style-nonce');
+		assert.notEqual(carrier.nonce, '', 'Tauri gave it a nonce');
+		const violation = result.violations.find((v) => v.effectiveDirective.startsWith('script-src'));
+		assert.ok(violation, 'no violation event to read the served policy from');
+		assert.match(violation.originalPolicy, new RegExp(`'nonce-${carrier.nonce}'`));
 	});
 
 	it('serves exactly the production policy (plus Tauri hashes and nonces)', () => {

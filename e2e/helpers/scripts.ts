@@ -92,3 +92,12 @@ export const RELOAD_SAME_ORIGIN = `
 	setTimeout(function () { location.assign(target); }, 100);
 	return 'scheduled';
 `;
+
+/**
+ * ADR-014 (M3-08): Tauri gave app.html's `#fm-style-nonce` carrier a style nonce, and the served
+ * policy lists it, so xterm's runtime style elements (which take that nonce) are allowed.
+ */
+export const READ_STYLE_NONCE = `
+	var el = document.getElementById('fm-style-nonce');
+	return { present: !!el, nonce: el ? (el.nonce || el.getAttribute('nonce') || '') : '' };
+`;
