@@ -446,7 +446,7 @@ pub fn resolve(ctx: &ResolveCtx<'_>) -> Result<ResolvedPrompt, Vec<Unresolved>> 
             Some(TokenClass::Literal) => o.lit(&t.text),
             Some(TokenClass::ProjectVariable) => match ctx.project.variables.get(&t.inner) {
                 Some(v) if !is_placeholder(&t.text, v) => {
-                    o.resolved(&t.text, TokenClass::ProjectVariable, v.clone(), None)
+                    o.resolved(&t.text, TokenClass::ProjectVariable, v.clone(), None);
                 }
                 _ => o.missing.push(Unresolved::Variable {
                     token: t.text.clone(),

@@ -97,7 +97,7 @@ pub struct Span {
     pub label: String,
 }
 
-/// Default_Ignorable_Code_Point (Unicode DerivedCoreProperties), as ranges.
+/// `Default_Ignorable_Code_Point` (Unicode `DerivedCoreProperties`), as ranges.
 pub const DEFAULT_IGNORABLE: [(u32, u32); 17] = [
     (0x00AD, 0x00AD),
     (0x034F, 0x034F),
@@ -134,7 +134,7 @@ fn label(cp: u32) -> Option<&'static str> {
     })
 }
 
-/// SR-26: every bidi control, zero-width, tag character, other Default_Ignorable code point and
+/// SR-26: every bidi control, zero-width, tag character, other `Default_Ignorable` code point and
 /// control (except TAB, LF, CR) as a span to show visibly.
 #[must_use]
 pub fn visible_escapes(text: &str) -> Vec<Span> {
