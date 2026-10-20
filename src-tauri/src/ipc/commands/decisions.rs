@@ -257,12 +257,13 @@ pub fn pending_change_reject(
     project::reopen_view(app, req.project_id.as_str())
 }
 
-/// `item_kind_confirm`: not built yet (M4-17; IPC-R12).
+/// `item_kind_confirm` (M4-17, DR-157, AC-F001-17): re-confirms a drifted item's kind in a native
+/// dialog; built with the gate commands.
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M4-17`).
-pub fn item_kind_confirm(_app: &App, _req: ItemKindConfirmReq) -> Result<GateView, IpcError> {
-    Err(IpcError::not_yet_available("item_kind_confirm", "M4-17"))
+/// As [`crate::ipc::commands::gates::item_kind_confirm`].
+pub fn item_kind_confirm(app: &App, req: ItemKindConfirmReq) -> Result<GateView, IpcError> {
+    crate::ipc::commands::gates::item_kind_confirm(app, req)
 }
 
 /// `progress_rebuild_preview`: not built yet (M3-16; IPC-R12).

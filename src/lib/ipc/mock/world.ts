@@ -774,6 +774,13 @@ function stage2Packet(): MPacket {
 }
 
 // ---------------------------------------------------------------- gates
+/** A stable 64-hex stand-in for an item's text hash (the mock has no SHA-256). */
+export function mockSha(text: string): string {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+	return h.toString(16).padStart(8, '0').repeat(8);
+}
+
 function gateItem(id: string, text: string, extra: Partial<GateItemView> = {}): GateItemView {
 	return {
 		id,
@@ -789,6 +796,8 @@ function gateItem(id: string, text: string, extra: Partial<GateItemView> = {}): 
 		failures: 0,
 		needsReconfirm: false,
 		session: null,
+		textSha256: mockSha(text),
+		previousText: null,
 		...extra
 	};
 }

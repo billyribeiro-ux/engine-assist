@@ -15,12 +15,12 @@ use crate::ipc::dto::requests::{
 use crate::ipc::dto::steps::PastePreview;
 use crate::state::App;
 
-/// `lessons_status`: not built yet (M4-18; IPC-R12).
+/// `lessons_status` (M4-18): built in [`crate::ipc::commands::lessons`].
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M4-18`).
-pub fn lessons_status(_app: &App, _req: LessonsStatusReq) -> Result<LessonsStatus, IpcError> {
-    Err(IpcError::not_yet_available("lessons_status", "M4-18"))
+/// As [`crate::ipc::commands::lessons::lessons_status`].
+pub fn lessons_status(app: &App, req: LessonsStatusReq) -> Result<LessonsStatus, IpcError> {
+    crate::ipc::commands::lessons::lessons_status(app, req)
 }
 
 /// `manifest_view`: not built yet (M4-27; IPC-R12).

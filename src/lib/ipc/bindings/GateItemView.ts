@@ -4,9 +4,10 @@ import type { ItemId } from "./ItemId";
 import type { ItemKind } from "./ItemKind";
 import type { ItemStatus } from "./ItemStatus";
 import type { Proposed } from "./Proposed";
+import type { Sha256 } from "./Sha256";
 import type { TextSpan } from "./TextSpan";
 
 /**
  * §2.4 `GateItemView`.
  */
-export type GateItemView = { id: ItemId, text: string, kind: ItemKind, how: string | null, status: ItemStatus, evidence: Array<TextSpan> | null, proposed: Proposed | null, note: string | null, waitsFor: string | null, artifacts: Array<GateArtifact>, failures: number, needsReconfirm: boolean, session: string | null, };
+export type GateItemView = { id: ItemId, text: string, kind: ItemKind, how: string | null, status: ItemStatus, evidence: Array<TextSpan> | null, proposed: Proposed | null, note: string | null, waitsFor: string | null, artifacts: Array<GateArtifact>, failures: number, needsReconfirm: boolean, session: string | null, textSha256: Sha256, previousText: string | null, };

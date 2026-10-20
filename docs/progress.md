@@ -141,3 +141,12 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 - The launch's own environment takes `HOME` from the app's home folder (`App::own_env`), so the transcript check and the child agree on `~/.claude` (tests no longer write to the real `~/.claude/projects`).
 - `sensor::hash_checked_per_run` (M4-08) waits for the P2 sensor hooks; the app passes `sensor: None`.
 - Item 4 above: the `OutsidePending` refusal maps to `Conflict` with the file's path (ipc.md §2.4).
+
+## M4 gate, lessons and signing tickets (branch `stage/05-signing`)
+
+| Ticket | Status | Notes |
+| ------ | ------ | ----- |
+| M4-15 | done | `foreman-core::gate` (state machine, attest rules, order, signable). Tests `gate::signable_requires_all` (property), `steps::attest_note_rules`, `steps::gate_item_order`, plus `gate::state_machine_rejects_out_of_order`, `gate::never_signable_with_unresolved_items`. |
+| M4-16 | done | `gate_view`, `gate_import_results` (proposals only), `gate_import_confirm`, `gate_fix_start` (a detached new chain, `launch::prepare_custom`; F.4 on the third FAIL). `sensor::events_only_update_state` (app). Import results answers `Unsupported` for runs without a sensor token, which is every run until the P2 sensor hooks land (M4-08/M4-09). |
+| M4-17 | done | `gate_item_attest`, `item_kind_confirm` (native dialog, `approvals.itemKinds`). `GateItemView` gained `textSha256` and `previousText` (ipc.md §2.4, bindings, mock, fixtures). Gate screen sends the real hash and shows the pinned and new text. `template::swapped_bullets_reconfirm` and `ipc::security_confirmations_are_native` (app, `src-tauri/tests/gates.rs`). |
+| M4-18 | in-progress | `foreman-core::lessons` (entries, the stage requirement, next ID, the header's entry format, the CAS append with renumbering) and `lessons_status` (`commands/lessons.rs`). The F.2 prompt gets the header's format appended (`steps::resolve`). Tests `lessons::append_numbering`, `steps::lessons_entry_detected`, `lessons::f2_prompt_gets_header_format`, `lessons::status_through_ipc`. **Left:** `paste_back_preview/apply { kind: "lessons" }` (chat.rs, chat agent) must call `lessons::read` for the diff and `lessons::append(root, seen_stamp, text)` to write (AC-F016-02…-04 at IPC level). |

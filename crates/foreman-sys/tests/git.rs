@@ -30,6 +30,7 @@ fn all_ops() -> Vec<GitOp> {
         GitOp::RevParse(RevParse::GitPath("info/exclude".into())),
         GitOp::RevParse(RevParse::GitCommonDir),
         GitOp::RevParse(RevParse::VerifyHead),
+        GitOp::RevParse(RevParse::VerifyBranch("refs/heads/handoff/stage-05".into())),
         GitOp::RevParse(RevParse::BlobAt {
             rev: "HEAD".into(),
             path: "docs/handoff/stage-02.md".into(),

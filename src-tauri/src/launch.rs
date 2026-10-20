@@ -71,6 +71,24 @@ pub struct HeldPlan {
     pub over: bool,
     /// When preparation began (timings).
     pub started: Instant,
+    /// A run outside the step's chain bookkeeping (Fix this, M4-16): the step and its chains
+    /// aren't updated when it starts.
+    pub detached: bool,
+}
+
+/// A launch whose prompt and run config come from Foreman, not the step's template text: a gate
+/// item's Fix this (a new chain, AC-F015-07) or a packet repair (a re-arm of the stage's chain,
+/// AC-F013-11). The prompt goes through the same `check_prompt` and sanitizing as any other.
+#[derive(Debug, Clone)]
+pub struct Custom {
+    /// The prompt (Foreman-written; repo text in it was already escaped by the caller).
+    pub prompt: String,
+    /// The run config.
+    pub start: foreman_core::ids::Start,
+    /// `None`: a new session. `Some(chain)`: continue that chain.
+    pub resume: Option<Uuid>,
+    /// Leave the step's state and chains alone when it starts.
+    pub detached: bool,
 }
 
 /// Launch state behind the app's mutex.
@@ -204,6 +222,47 @@ pub fn prepare(
     resume: Option<Uuid>,
     progress: &dyn Fn(crate::ipc::dto::launch::LaunchProgress),
 ) -> Result<Prepared, IpcError> {
+    prepare_inner(app, p, key, entry, mode, resume, None, progress)
+}
+
+/// [`prepare`] for a [`Custom`] launch on `key`'s cwd and project.
+///
+/// # Errors
+/// As [`prepare`].
+pub fn prepare_custom(
+    app: &App,
+    p: &mut Opened,
+    key: &str,
+    custom: &Custom,
+    progress: &dyn Fn(crate::ipc::dto::launch::LaunchProgress),
+) -> Result<Prepared, IpcError> {
+    prepare_inner(
+        app,
+        p,
+        key,
+        EntryPoint::StageView,
+        PrepareMode::Normal,
+        None,
+        Some(custom),
+        progress,
+    )
+}
+
+#[allow(
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    reason = "one fact-gathering pass in DR-120's order feeding prepare_launch"
+)]
+fn prepare_inner(
+    app: &App,
+    p: &mut Opened,
+    key: &str,
+    entry: EntryPoint,
+    mode: PrepareMode,
+    resume: Option<Uuid>,
+    custom: Option<&Custom>,
+    progress: &dyn Fn(crate::ipc::dto::launch::LaunchProgress),
+) -> Result<Prepared, IpcError> {
     let started = Instant::now();
     if let Some(ro) = &p.read_only {
         return Ok(Prepared {
@@ -226,11 +285,30 @@ pub fn prepare(
         effort: o.effort,
         mode: o.mode,
     });
-    let policy_start = policy::policy_start(&s, &project.model_policy).ok();
-    let effective = policy::effective_start(&s, &project.model_policy, core_over.as_ref()).ok();
+    let (policy_start, effective) = match custom {
+        Some(c) => (
+            Some(policy::Explained {
+                value: c.start,
+                origin: policy::ValueOrigin::Template,
+                from: None,
+            }),
+            Some(policy::Explained {
+                value: c.start,
+                origin: policy::ValueOrigin::Template,
+                from: None,
+            }),
+        ),
+        None => (
+            policy::policy_start(&s, &project.model_policy).ok(),
+            policy::effective_start(&s, &project.model_policy, core_over.as_ref()).ok(),
+        ),
+    };
     let mut not_run = not_runnable(p, app, &s);
-    if resume.is_some() && matches!(not_run, Some(cl::NotRunnableReason::Done)) {
-        // Resuming a chain re-opens its last step; "done" doesn't block a resume.
+    if (resume.is_some() || custom.is_some())
+        && matches!(not_run, Some(cl::NotRunnableReason::Done))
+    {
+        // Resuming a chain re-opens its last step, and a fix or repair runs after the step is
+        // done; "done" doesn't block either.
         not_run = None;
     }
     let (Some(policy_start), Some(effective)) = (policy_start, effective) else {
@@ -249,8 +327,8 @@ pub fn prepare(
     let mut input_blockers = Vec::new();
     let mut run_input_blockers = Vec::new();
     let mut warnings = Vec::new();
-    let mut prompt = None;
-    if resume.is_none() && s.prompt.is_some() {
+    let mut prompt = custom.map(|c| c.prompt.clone());
+    if resume.is_none() && custom.is_none() && s.prompt.is_some() {
         let r = crate::ipc::commands::steps::resolve(p, &s)?;
         match &r.result {
             Ok(ok) => {
@@ -275,10 +353,14 @@ pub fn prepare(
         }
     }
     let new_id = Uuid::new_v4();
-    let session = match (resume, mode) {
-        (Some(chain), _) => SessionPlan::Continue { chain },
-        (None, PrepareMode::FreshWithContext) => SessionPlan::FreshWithContext { id: new_id },
-        (None, PrepareMode::Normal) => chain::plan_session(
+    let session = match (custom, resume, mode) {
+        (Some(c), _, _) => match c.resume {
+            Some(chain) => SessionPlan::Continue { chain },
+            None => SessionPlan::New { id: new_id },
+        },
+        (None, Some(chain), _) => SessionPlan::Continue { chain },
+        (None, None, PrepareMode::FreshWithContext) => SessionPlan::FreshWithContext { id: new_id },
+        (None, None, PrepareMode::Normal) => chain::plan_session(
             &s,
             &p.progress.chains,
             new_id,
@@ -397,10 +479,15 @@ pub fn prepare(
                 plan: *plan,
                 rearm,
                 intended: effective.value,
-                over: over.is_some(),
+                over: over.is_some() && custom.is_none(),
                 started,
+                detached: custom.is_some_and(|c| c.detached),
             };
-            let segments = if held.resume.is_some() {
+            let segments = if let Some(c) = custom {
+                vec![crate::ipc::types::PromptSegment::Text {
+                    spans: crate::render::spans(&c.prompt),
+                }]
+            } else if held.resume.is_some() {
                 Vec::new()
             } else {
                 crate::ipc::commands::steps::view_of(app, p, key)
@@ -560,15 +647,18 @@ pub fn start(
         config_changed: AtomicBool::new(false),
         started: held.started,
     }));
-    // The chain, the step and the first-launch flag (DR-065, DR-110).
-    p.progress.chains =
-        chain::apply_launch(&p.progress.chains, &s, &held.plan.session, held.intended);
-    let ctx_step = p.step_ctx(app, &s);
-    let cur = p.step_progress(&held.step);
-    if let Ok(mut next) = foreman_core::steps::transition(&cur, &ctx_step, &StepEvent::Spawn) {
-        next.last_run_id = Some(run_id.clone());
-        next.started_at = Some(app.now());
-        p.progress.steps.insert(s.key.clone(), next);
+    // The chain, the step and the first-launch flag (DR-065, DR-110). A detached run (Fix this)
+    // leaves the step and its chains as they were.
+    if !held.detached {
+        p.progress.chains =
+            chain::apply_launch(&p.progress.chains, &s, &held.plan.session, held.intended);
+        let ctx_step = p.step_ctx(app, &s);
+        let cur = p.step_progress(&held.step);
+        if let Ok(mut next) = foreman_core::steps::transition(&cur, &ctx_step, &StepEvent::Spawn) {
+            next.last_run_id = Some(run_id.clone());
+            next.started_at = Some(app.now());
+            p.progress.steps.insert(s.key.clone(), next);
+        }
     }
     p.progress.first_launch_done = true;
     p.save_progress(app)?;

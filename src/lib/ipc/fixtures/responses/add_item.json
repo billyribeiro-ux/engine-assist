@@ -15,7 +15,9 @@
 			"artifacts": [],
 			"failures": 0,
 			"needsReconfirm": false,
-			"session": null
+			"session": null,
+			"textSha256": "96378d0c96378d0c96378d0c96378d0c96378d0c96378d0c96378d0c96378d0c",
+			"previousText": null
 		},
 		{
 			"id": "beats-competitor",
@@ -30,7 +32,9 @@
 			"artifacts": [],
 			"failures": 0,
 			"needsReconfirm": false,
-			"session": null
+			"session": null,
+			"textSha256": "9c6a15869c6a15869c6a15869c6a15869c6a15869c6a15869c6a15869c6a1586",
+			"previousText": null
 		},
 		{
 			"id": "red-team",
@@ -45,7 +49,9 @@
 			"artifacts": [],
 			"failures": 0,
 			"needsReconfirm": false,
-			"session": null
+			"session": null,
+			"textSha256": "bb52d0eabb52d0eabb52d0eabb52d0eabb52d0eabb52d0eabb52d0eabb52d0ea",
+			"previousText": null
 		},
 		{
 			"id": "stack",
@@ -60,7 +66,9 @@
 			"artifacts": [],
 			"failures": 0,
 			"needsReconfirm": false,
-			"session": null
+			"session": null,
+			"textSha256": "a2902614a2902614a2902614a2902614a2902614a2902614a2902614a2902614",
+			"previousText": null
 		},
 		{
 			"id": "frozen",
@@ -75,7 +83,9 @@
 			"artifacts": [],
 			"failures": 0,
 			"needsReconfirm": false,
-			"session": null
+			"session": null,
+			"textSha256": "c3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2b",
+			"previousText": null
 		},
 		{
 			"id": "xi-2-6",
@@ -90,7 +100,9 @@
 			"artifacts": [],
 			"failures": 0,
 			"needsReconfirm": false,
-			"session": null
+			"session": null,
+			"textSha256": "d059c046d059c046d059c046d059c046d059c046d059c046d059c046d059c046",
+			"previousText": null
 		}
 	],
 	"closeout": [
