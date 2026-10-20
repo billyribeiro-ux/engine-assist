@@ -15,14 +15,14 @@ prompt Some(Chat) Done Copy → Copied
 prompt Some(Cli) NotStarted Spawn → Running
 prompt Some(Cli) Copied Spawn → Running
 prompt Some(Cli) Running Exited(0) → Done
-prompt Some(Cli) Running Exited(1) → Done
+prompt Some(Cli) Running Exited(1) → NotStarted
 prompt Some(Cli) Running Errored → NotStarted
 prompt Some(Cli) Running Interrupted → NotStarted
 prompt Some(Cli) Done Spawn → Running
 prompt Some(Cli) NotStarted Spawn → Running
 prompt Some(Cli) Copied Spawn → Running
 prompt Some(Cli) Running Exited(0) → Done
-prompt Some(Cli) Running Exited(1) → Done
+prompt Some(Cli) Running Exited(1) → NotStarted
 prompt Some(Cli) Running Errored → NotStarted
 prompt Some(Cli) Running Interrupted → NotStarted
 prompt Some(Cli) Done Spawn → Running
@@ -51,7 +51,7 @@ followup Some(Cli) NotStarted Spawn → Running
 followup Some(Cli) Copied Copy → Copied
 followup Some(Cli) Copied Spawn → Running
 followup Some(Cli) Running Exited(0) → Done
-followup Some(Cli) Running Exited(1) → Done
+followup Some(Cli) Running Exited(1) → NotStarted
 followup Some(Cli) Running Errored → NotStarted
 followup Some(Cli) Running Interrupted → NotStarted
 followup Some(Cli) Done Copy → Copied
@@ -61,7 +61,7 @@ followup Some(Cli) NotStarted Spawn → Running
 followup Some(Cli) Copied Copy → Copied
 followup Some(Cli) Copied Spawn → Running
 followup Some(Cli) Running Exited(0) → Done
-followup Some(Cli) Running Exited(1) → Done
+followup Some(Cli) Running Exited(1) → NotStarted
 followup Some(Cli) Running Errored → NotStarted
 followup Some(Cli) Running Interrupted → NotStarted
 followup Some(Cli) Done Copy → Copied

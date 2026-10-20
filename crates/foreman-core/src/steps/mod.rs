@@ -46,7 +46,8 @@ pub enum StepEvent {
     Copy,
     /// A CLI/Desktop launch (or a followup's relaunch).
     Spawn,
-    /// The run exited with a code (recorded; DR-066).
+    /// The run exited with a code. The code is recorded in the run record (DR-066); exit 0 makes
+    /// a prompt step done, any other code returns it to `notStarted` (DR-065).
     Exited(i32),
     /// The run failed to start or crashed.
     Errored,
@@ -195,25 +196,25 @@ pub fn transition(
                 }
             }
         }
-        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::Exited(_))
-            if cli(ctx) =>
-        {
-            match s {
-                StoredState::Running => {
-                    let mut n = with(
-                        p,
-                        if ctx.kind == StepKind::Repeatable {
-                            StoredState::NotStarted
-                        } else {
-                            StoredState::Done
-                        },
-                    );
-                    n.run_count = p.run_count.saturating_add(1);
-                    Ok(n)
-                }
-                _ => reject("no run is running"),
+        // DR-066: the run ends on any exit code (the code is recorded in the run record).
+        // DR-065: only exit 0 of a prompt step makes it done; any other exit returns it to
+        // notStarted (run again). A repeatable step is never done (DR-069).
+        (
+            StepKind::Prompt | StepKind::Followup | StepKind::Repeatable,
+            StepEvent::Exited(code),
+        ) if cli(ctx) => match s {
+            StoredState::Running => {
+                let next = if *code == 0 && ctx.kind != StepKind::Repeatable {
+                    StoredState::Done
+                } else {
+                    StoredState::NotStarted
+                };
+                let mut n = with(p, next);
+                n.run_count = p.run_count.saturating_add(1);
+                Ok(n)
             }
-        }
+            _ => reject("no run is running"),
+        },
         (
             StepKind::Prompt | StepKind::Followup | StepKind::Repeatable,
             StepEvent::Errored | StepEvent::Interrupted,
