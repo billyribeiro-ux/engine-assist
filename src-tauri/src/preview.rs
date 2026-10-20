@@ -8,4 +8,6 @@ pub enum Preview {
     Setup(Box<crate::ipc::commands::projects::SetupPlan>),
     /// `action_preview` → `action_apply`.
     Action(Box<crate::ipc::commands::steps::HeldAction>),
+    /// `progress_rebuild_preview` → `progress_rebuild_apply`.
+    Rebuild(Box<crate::ipc::commands::decisions::RebuildPlan>),
 }

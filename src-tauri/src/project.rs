@@ -81,6 +81,11 @@ pub struct Opened {
     pub packets: BTreeMap<u8, PacketFile>,
     /// Pending outside changes found by this open (already merged into `progress`).
     pub new_pending: usize,
+    /// `progress.json` couldn't be read (only in [`OpenMode::Rebuild`]).
+    pub progress_unreadable: bool,
+    /// `progress.json` was rebuilt from the repo on this open because it didn't exist
+    /// (AC-F020-11).
+    pub rebuilt: bool,
 }
 
 /// How much `open` does beyond reading.
@@ -90,6 +95,9 @@ pub enum OpenMode {
     Read,
     /// `project_open`: also the idempotent `info/exclude` append (SR-32).
     Full,
+    /// `progress_rebuild_*`: an unreadable `progress.json` opens with fresh progress (recorded in
+    /// [`Opened::progress_unreadable`]) and nothing is written (AC-F020-12: the file is kept).
+    Rebuild,
 }
 
 fn ro(reason: ReadOnlyReason, detail: impl Into<String>) -> ReadOnly {
@@ -130,9 +138,10 @@ pub fn read_progress(app_root: &Root, id: &str) -> Result<(ProgressFile, ReadSta
     match schema::load::<ProgressFile>(&bytes) {
         Ok(Loaded::Current(p) | Loaded::Migrated { value: p, .. }) => Ok((p, stamp)),
         Ok(Loaded::NewerReadOnly(h)) => Err(IpcError::io(schema::newer_message(h.schema_version))),
-        Err(_) => Err(IpcError::io(
-            "This project's progress file is unreadable. Rebuild it from the packets.",
-        )),
+        Err(e) => Err(IpcError::io(format!(
+            "Foreman's progress file for this project (app data: {rel}) is unreadable: {}. It's kept as it is. Rebuild from repo replaces it after you review what the rebuild finds.",
+            escape_visible(&e.to_string())
+        ))),
     }
 }
 
@@ -151,7 +160,18 @@ fn decision_kind_name(k: CoreKind) -> &'static str {
 pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError> {
     let entry = entry(app, id)?;
     let app_root = app.app_root()?;
-    let (mut progress, progress_stamp) = read_progress(&app_root, id)?;
+    let (mut progress, progress_stamp, unreadable) = match read_progress(&app_root, id) {
+        Ok((p, s)) => (p, s, false),
+        Err(_) if mode == OpenMode::Rebuild => {
+            let rel = pathpolicy::check_app_data(&progress_path(id))?;
+            let stamp = app_root
+                .read_opt(&rel, ReadClass::AppState)
+                .map_or(ReadStamp::Absent, |(_, s)| s);
+            (ProgressFile::new(id), stamp, true)
+        }
+        Err(e) => return Err(e),
+    };
+    let missing = progress_stamp == ReadStamp::Absent;
     let original = progress.clone();
     let (approvals, _) = match Root::open(Path::new(&entry.path), RootKind::Project) {
         Ok(r) => Decisions {
@@ -179,6 +199,8 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         read_only: None,
         packets: BTreeMap::new(),
         new_pending: 0,
+        progress_unreadable: unreadable,
+        rebuilt: false,
     };
     let folder = Path::new(&entry.path);
     if !folder.is_dir() {
@@ -321,8 +343,16 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         let _ = foreman_sys::git::ensure_exclude(&root, &ctx);
     }
     opened.root = Some(root);
+    // AC-F020-11, NFR-17: missing app data is rebuilt from the repo's packets on open (nothing is
+    // lost that the repo still has); an unreadable file waits for Billy's Rebuild (AC-F020-12).
+    if missing && mode != OpenMode::Rebuild && !opened.packets.is_empty() && opened.path.is_some() {
+        let pending = std::mem::take(&mut progress.pending_outside);
+        progress = opened.rebuilt_progress(app, 0);
+        progress.pending_outside = pending;
+        opened.rebuilt = true;
+    }
     opened.progress = progress;
-    if opened.progress != original {
+    if mode != OpenMode::Rebuild && opened.progress != original {
         opened.save_progress(app)?;
     }
     if opened.new_pending > 0 {
@@ -335,6 +365,64 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         .summaries
         .insert(id.to_owned(), opened.summary(app));
     Ok(opened)
+}
+
+/// Re-classifies a project's decision files after a watcher hint or a re-stat (DR-151, ADR-013,
+/// AC-F022-04): a new outside change becomes a pending review without a restart and emits
+/// `decision:pending`; a variables-only change is reloaded. It changes only what [`open`] would
+/// (the pending list and the approved copies of variables-only changes), never the repo, and acts
+/// on nothing else (SR-18). Returns the number of new pending changes.
+///
+/// # Errors
+/// `NotFound`, `Io` (an unreadable `progress.json` is left for the rebuild path).
+pub fn refresh_decisions(app: &App, id: &str) -> Result<usize, IpcError> {
+    let _w = app.writing();
+    let entry = entry(app, id)?;
+    let app_root = app.app_root()?;
+    let (mut progress, stamp) = read_progress(&app_root, id)?;
+    let root = Root::open(Path::new(&entry.path), RootKind::Project)?;
+    let d = Decisions {
+        project: &root,
+        app: &app_root,
+        project_id: id,
+    };
+    let before = progress.clone();
+    let now = app.now();
+    let mut new_pending = 0;
+    let mut reloaded = false;
+    for kind in CoreKind::ALL {
+        match d.process(kind, &uuid::Uuid::new_v4().to_string(), &now) {
+            Ok(Processed::Pending(p)) => {
+                let known = progress
+                    .pending_outside
+                    .iter()
+                    .any(|x| x.file == p.file && x.seen_sha256 == p.seen_sha256);
+                if !known {
+                    progress.pending_outside.retain(|x| x.file != p.file);
+                    progress.pending_outside.push(p);
+                    new_pending += 1;
+                }
+            }
+            Ok(Processed::VariablesReloaded) => reloaded = true,
+            // Read-only states and missing approved copies show on the next open.
+            Ok(Processed::Unchanged | Processed::ReadOnly(_)) | Err(_) => {}
+        }
+    }
+    progress.pending_outside.retain(|p| still_pending(&root, p));
+    if progress != before || reloaded {
+        progress.rev = progress.rev.wrapping_add(1);
+        let rel = pathpolicy::check_app_data(&progress_path(id))?;
+        let text = schema::to_file(&progress).map_err(|e| IpcError::io(e.to_string()))?;
+        app_root.write(&rel, text.as_bytes(), &stamp)?;
+        app.project_changed(id, progress.rev);
+    }
+    if new_pending > 0 {
+        app.emit(Event::DecisionPending(DecisionPending {
+            project_id: ProjectId::from_trusted(id),
+            count: u32::try_from(progress.pending_outside.len()).unwrap_or(u32::MAX),
+        }));
+    }
+    Ok(new_pending)
 }
 
 fn still_pending(root: &Root, p: &PendingOutside) -> bool {
@@ -418,10 +506,85 @@ fn signed_from_progress(p: &ProgressFile) -> BTreeSet<u8> {
 }
 
 impl Opened {
+    /// The stamp `progress.json` had when this open read it.
+    #[must_use]
+    pub fn progress_stamp(&self) -> &ReadStamp {
+        &self.progress_stamp
+    }
+
     /// The project ID.
     #[must_use]
     pub fn id(&self) -> &str {
         &self.entry.project_id
+    }
+
+    /// Progress rebuilt from the repo (NFR-17, AC-F020-11, files.md §4.3 "Rebuild"): every step on
+    /// the path of a signed stage is done, and so is the step that writes a stage's packet when
+    /// the packet exists. Foreman's own pending decision changes are recomputed from the approvals.
+    /// Chains, run inputs, overrides, optional parts, waits, gate runs and the run log are lost
+    /// (they exist only in app data); from M4, stage records add the signing entries.
+    #[must_use]
+    pub fn rebuilt_progress(&self, app: &App, rev: u32) -> ProgressFile {
+        let mut out = ProgressFile::new(self.id());
+        out.rev = rev;
+        let signed = self.signed();
+        let now = app.now();
+        if let (Some(t), Some(path)) = (&self.template, &self.path) {
+            for s in &t.steps {
+                if !path.step(s.key.as_str()).is_some_and(CoreApp::on_path) {
+                    continue;
+                }
+                let writes_packet = self.packets.contains_key(&s.stage)
+                    && s.out.iter().any(|o| *o == packet::file_name(s.stage));
+                if signed.contains(&s.stage) || writes_packet {
+                    out.steps.insert(
+                        s.key.clone(),
+                        StepProgress {
+                            state: schema::progress::StoredState::Done,
+                            ..steps::fresh()
+                        },
+                    );
+                }
+            }
+        }
+        for (kind, f) in [
+            (CoreKind::Project, &self.approvals.files.project),
+            (CoreKind::Overlay, &self.approvals.files.overlay),
+            (
+                CoreKind::BlueprintLock,
+                &self.approvals.files.blueprint_lock,
+            ),
+        ] {
+            if let (Some(a), Some(c)) = (&f.approved_sha256, &f.committed_sha256)
+                && a != c
+            {
+                out.pending_own.push(schema::progress::PendingOwn {
+                    file: kind,
+                    sha256: a.clone(),
+                    at: now.clone(),
+                });
+            }
+        }
+        out.first_launch_done = !out.steps.is_empty();
+        out
+    }
+
+    /// The declared `out` paths of every step on the applicable path (the watcher's interest set,
+    /// ADR-013), sorted.
+    #[must_use]
+    pub fn watch_outs(&self) -> Vec<String> {
+        let (Some(t), Some(path)) = (&self.template, &self.path) else {
+            return Vec::new();
+        };
+        let mut v: Vec<String> = t
+            .steps
+            .iter()
+            .filter(|s| path.step(s.key.as_str()).is_some_and(CoreApp::on_path))
+            .flat_map(|s| s.out.iter().cloned())
+            .collect();
+        v.sort();
+        v.dedup();
+        v
     }
 
     /// The read-only reason, or `BlueprintMissing` when the template isn't available.

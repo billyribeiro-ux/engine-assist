@@ -540,7 +540,7 @@ pub fn setup_apply(app: &App, req: SetupApplyReq) -> Result<ProjectSummary, IpcE
     let _w = app.writing();
     let plan = match app.inner().previews.take(req.preview_id.as_str())? {
         Preview::Setup(p) => p,
-        Preview::Action(_) => return Err(IpcError::expired()),
+        _ => return Err(IpcError::expired()),
     };
     let id = plan.project.project_id.clone();
     if plan.adopt.is_some() {
@@ -647,6 +647,9 @@ pub fn setup_apply(app: &App, req: SetupApplyReq) -> Result<ProjectSummary, IpcE
 /// `NotFound`, `Io`.
 pub fn project_open(app: &App, req: ProjectOpenReq) -> Result<ProjectView, IpcError> {
     let p = project::open_with(app, req.project_id.as_str(), OpenMode::Full)?;
+    // ADR-013: watch the project from now on, and re-stat its interest set.
+    crate::watch::ensure_project(app, &p);
+    crate::watch::restat_project(app, &p);
     let b = p
         .root
         .as_ref()
@@ -803,6 +806,7 @@ pub fn project_remove(app: &App, req: ProjectRemoveReq) -> Result<Vec<ProjectSum
     }
     reg.projects.retain(|p| p.project_id != e.project_id);
     app.save_registry(&mut reg, &stamp)?;
+    crate::watch::stop_project(app, req.project_id.as_str());
     app.inner().summaries.remove(&e.project_id);
     summaries(app)
 }

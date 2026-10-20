@@ -6,7 +6,8 @@
 use foreman_core::decisions::{Decisions, OwnChange};
 use foreman_core::pathpolicy::{self, ReadClass, WritePurpose};
 use foreman_core::schema::progress::{DecisionFileKind, PendingOutside};
-use foreman_core::store::sha256_hex;
+use foreman_core::schema::{self, progress::ProgressFile};
+use foreman_core::store::{ReadStamp, sha256_hex};
 
 use crate::ipc::IpcError;
 use crate::ipc::dto::app::ProjectView;
@@ -19,11 +20,13 @@ use crate::ipc::dto::requests::{
     ProgressRebuildApplyReq, ProgressRebuildPreviewReq,
 };
 use crate::ipc::error::StaleWhat;
-use crate::ipc::types::{ChangeId, RedactedDiff, RedactedEntry, Sha256, Timestamp};
+use crate::ipc::types::{ChangeId, PreviewId, RedactedDiff, RedactedEntry, Sha256, Timestamp};
 use crate::os::Confirm;
-use crate::project::{self, Opened};
+use crate::preview::Preview;
+use crate::project::{self, OpenMode, Opened};
 use crate::render::escape_visible;
 use crate::state::App;
+use crate::state::PREVIEW_TTL;
 
 fn effect(p: &PendingOutside) -> ChangeEffect {
     let path_keys = [
@@ -119,7 +122,7 @@ fn current(
     p: &Opened,
     id: &str,
     seen: &str,
-) -> Result<(PendingOutside, Vec<u8>, foreman_core::store::ReadStamp), IpcError> {
+) -> Result<(PendingOutside, Vec<u8>, ReadStamp), IpcError> {
     let x = p
         .progress
         .pending_outside
@@ -265,30 +268,108 @@ pub fn item_kind_confirm(_app: &App, _req: ItemKindConfirmReq) -> Result<GateVie
     Err(IpcError::not_yet_available("item_kind_confirm", "M4-17"))
 }
 
-/// `progress_rebuild_preview`: not built yet (M3-16; IPC-R12).
-///
-/// # Errors
-/// `Unsupported` (`notYetAvailable:M3-16`).
-pub fn progress_rebuild_preview(
-    _app: &App,
-    _req: ProgressRebuildPreviewReq,
-) -> Result<RebuildPreview, IpcError> {
-    Err(IpcError::not_yet_available(
-        "progress_rebuild_preview",
-        "M3-16",
-    ))
+/// What `progress_rebuild_apply` writes, fixed at preview time (IPC-R7).
+#[derive(Debug, Clone)]
+pub struct RebuildPlan {
+    /// The project.
+    pub project_id: String,
+    /// The rebuilt `progress.json`.
+    pub progress: ProgressFile,
+    /// The stamp of `progress.json` the preview read (`Absent` when there was none).
+    pub stamp: ReadStamp,
+    /// The file couldn't be read: it is kept as `progress.json.corrupt-<timestamp>`.
+    pub unreadable: bool,
 }
 
-/// `progress_rebuild_apply`: not built yet (M3-16; IPC-R12).
+/// What a rebuild can't recover: it exists only in app data (files.md §4.3 "Rebuild").
+const LOST: [&str; 6] = [
+    "Session chains: earlier Claude Code sessions can't be resumed from Foreman (their transcripts stay where Claude Code keeps them).",
+    "Run inputs and remembered values.",
+    "Model, effort and mode overrides, and optional parts you turned off.",
+    "Started and copied markers on steps of stages that aren't signed, and waits.",
+    "Signature confirmations stay (they're in approvals); a stage signed outside Foreman whose confirmation is gone asks again.",
+    "The run log is kept as it is.",
+];
+
+/// `progress_rebuild_preview` (P1): what Rebuild from repo would make of this project's state
+/// (NFR-17, AC-F020-11, AC-F020-12). Works on an unreadable `progress.json` and on a read-only
+/// project (IPC-R9); writes nothing.
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M3-16`).
+/// `NotFound`, `Io`.
+pub fn progress_rebuild_preview(
+    app: &App,
+    req: ProgressRebuildPreviewReq,
+) -> Result<RebuildPreview, IpcError> {
+    let id = req.project_id.as_str();
+    let mut p = project::open_with(app, id, OpenMode::Rebuild)?;
+    let seen = app.inner().summaries.get(id).map_or(0, |s| s.rev.0);
+    let rev = p.progress.rev.max(seen).wrapping_add(1);
+    let mut rebuilt = p.rebuilt_progress(app, rev);
+    rebuilt
+        .pending_outside
+        .clone_from(&p.progress.pending_outside);
+    let stamp = p.progress_stamp().clone();
+    let unreadable = p.progress_unreadable;
+    p.progress = rebuilt.clone();
+    let stages = p.stage_views(app);
+    let mut lost: Vec<String> = LOST.iter().map(|s| (*s).to_owned()).collect();
+    if unreadable {
+        lost.insert(
+            0,
+            "The unreadable progress file isn't deleted: it's kept next to the new one as progress.json.corrupt-<time>.".to_owned(),
+        );
+    }
+    let preview_id = app.inner().previews.hold(
+        Preview::Rebuild(Box::new(RebuildPlan {
+            project_id: id.to_owned(),
+            progress: rebuilt,
+            stamp,
+            unreadable,
+        })),
+        PREVIEW_TTL,
+    );
+    Ok(RebuildPreview {
+        preview_id: PreviewId::from_trusted(preview_id),
+        stages,
+        lost,
+    })
+}
+
+/// `progress_rebuild_apply` (P1): writes the previewed state after Billy reviewed it (AC-F020-12).
+/// An unreadable file is first kept as `progress.json.corrupt-<timestamp>`; the new file replaces
+/// it by compare-and-swap against the stamp the preview read, so a change in between is a
+/// conflict (SR-33).
+///
+/// # Errors
+/// `Expired`, `Conflict`, `Io`.
 pub fn progress_rebuild_apply(
-    _app: &App,
-    _req: ProgressRebuildApplyReq,
+    app: &App,
+    req: ProgressRebuildApplyReq,
 ) -> Result<ProjectView, IpcError> {
-    Err(IpcError::not_yet_available(
-        "progress_rebuild_apply",
-        "M3-16",
-    ))
+    let _w = app.writing();
+    let plan = match app.inner().previews.take(req.preview_id.as_str())? {
+        Preview::Rebuild(p) => p,
+        _ => return Err(IpcError::expired()),
+    };
+    let root = app.app_root()?;
+    let rel = pathpolicy::check_app_data(&project::progress_path(&plan.project_id))?;
+    let (bytes, now_stamp) = root.read_opt(&rel, ReadClass::AppState)?;
+    if now_stamp != plan.stamp {
+        return Err(IpcError::conflict(rel.as_str(), Vec::new()));
+    }
+    if plan.unreadable
+        && let Some(bytes) = bytes
+    {
+        let ts = jiff::Timestamp::from_second(app.os().now().as_second()).map_or_else(
+            |_| "unknown".to_owned(),
+            |t| t.strftime("%Y%m%dT%H%M%SZ").to_string(),
+        );
+        let keep = pathpolicy::check_app_data(&format!("{rel}.corrupt-{ts}"))?;
+        root.write(&keep, &bytes, &ReadStamp::Absent)?;
+    }
+    let text = schema::to_file(&plan.progress).map_err(|e| IpcError::io(e.to_string()))?;
+    root.write(&rel, text.as_bytes(), &plan.stamp)?;
+    app.project_changed(&plan.project_id, plan.progress.rev);
+    project::reopen_view(app, &plan.project_id)
 }
