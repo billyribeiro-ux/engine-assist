@@ -12,7 +12,9 @@ pub mod ids;
 pub mod json;
 pub mod pathpolicy;
 pub mod schema;
+pub mod resolver;
 pub mod store;
+pub mod template;
 
 /// The crate version, as built.
 #[must_use]
