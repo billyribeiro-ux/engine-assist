@@ -13,10 +13,17 @@ foreman-core = { path = "../foreman-core" }
 rustix = { version = "=1.1.5", features = ["fs", "process"] }
 thiserror = "=2.0.21"
 uuid = { version = "=1.28.0", features = ["v4"] }
+# M3 runners (design doc §3.2: Sys = portable-pty 0.9.0; ADR-013: notify 8.2.0 + debouncer-full 0.7.0,
+# hosted here without Tauri so foreman-app only adapts the hints to events).
+portable-pty = "=0.9.0"
+notify = "=8.2.0"
+notify-debouncer-full = "=0.7.0"
+semver = "=1.0.28"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
 
 [dev-dependencies]
 insta = "=1.49.0"
-serde_json = "=1.0.154"
 tempfile = "=3.27.0"
 
 [lints]

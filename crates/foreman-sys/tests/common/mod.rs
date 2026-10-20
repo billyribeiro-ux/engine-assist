@@ -232,3 +232,110 @@ pub fn markers_fired(markers: &Path) -> Vec<String> {
         .filter(|n| !n.ends_with(".sh"))
         .collect()
 }
+
+/// A PTY sink that collects output and the exit (M3 tests).
+#[derive(Default)]
+pub struct Collect {
+    pub buf: std::sync::Mutex<Vec<u8>>,
+    pub exit: std::sync::Mutex<Option<foreman_sys::pty::ExitInfo>>,
+}
+
+impl foreman_sys::pty::Sink for Collect {
+    fn chunk(&self, bytes: &[u8]) {
+        self.buf.lock().unwrap().extend_from_slice(bytes);
+    }
+    fn exited(&self, info: foreman_sys::pty::ExitInfo) {
+        *self.exit.lock().unwrap() = Some(info);
+    }
+}
+
+impl Collect {
+    pub fn text(&self) -> String {
+        String::from_utf8_lossy(&self.buf.lock().unwrap()).into_owned()
+    }
+
+    pub fn len(&self) -> usize {
+        self.buf.lock().unwrap().len()
+    }
+
+    /// Waits until the output contains `needle` (panics after `secs`).
+    pub fn wait_for(&self, needle: &str, secs: u64) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(secs);
+        while std::time::Instant::now() < deadline {
+            if self.text().contains(needle) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        panic!(
+            "timed out waiting for {needle:?}; output so far:\n{}",
+            self.text()
+        );
+    }
+}
+
+/// Foreman's own environment for tests: a private HOME, a real shell, a plain PATH.
+pub fn own_env(home: &Path) -> Vec<(String, String)> {
+    vec![
+        ("HOME".into(), home.display().to_string()),
+        ("USER".into(), "billy".into()),
+        ("LOGNAME".into(), "billy".into()),
+        ("SHELL".into(), "/bin/sh".into()),
+        ("LANG".into(), "en_US.UTF-8".into()),
+        ("ANTHROPIC_API_KEY".into(), "sk-ant-must-not-pass".into()),
+    ]
+}
+
+/// The child env for a launch with `/usr/bin:/bin` as PATH.
+pub fn child_env(home: &Path, run_id: uuid::Uuid) -> foreman_core::launch::env::ChildEnv {
+    let src = foreman_core::launch::env::PathSources {
+        etc_paths: vec!["/usr/bin".into(), "/bin".into()],
+        home: home.to_path_buf(),
+        ..Default::default()
+    };
+    foreman_sys::launch::child_env(&own_env(home), &[], &src, &[], run_id)
+}
+
+/// Reads the fake's TUI log (`<record>.tui.jsonl`).
+pub fn tui_log(record: &Path) -> Vec<serde_json::Value> {
+    let mut p = record.as_os_str().to_owned();
+    p.push(".tui.jsonl");
+    std::fs::read_to_string(PathBuf::from(p))
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| serde_json::from_str(l).ok())
+        .collect()
+}
+
+/// Canonical tempdir path (macOS `/var` → `/private/var`).
+pub fn canon(p: &Path) -> PathBuf {
+    std::fs::canonicalize(p).unwrap()
+}
+
+/// Builds the workspace's foreman-sensor and installs it as `<app>/bin/foreman-sensor-<12 hex>`.
+pub fn install_sensor(app: &Path) -> PathBuf {
+    static BIN: OnceLock<PathBuf> = OnceLock::new();
+    let built = BIN
+        .get_or_init(|| {
+            let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+            let st = Command::new(cargo)
+                .args(["build", "-q", "-p", "foreman-sensor"])
+                .current_dir(env!("CARGO_MANIFEST_DIR"))
+                .status()
+                .unwrap();
+            assert!(st.success());
+            let target = std::env::var("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target"));
+            target.join("debug/foreman-sensor")
+        })
+        .clone();
+    let bin = app.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let dst = bin.join("foreman-sensor-0123456789ab");
+    let tmp = bin.join(".sensor.tmp");
+    std::fs::copy(built, &tmp).unwrap();
+    std::fs::rename(&tmp, &dst).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    dst
+}

@@ -6,20 +6,27 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
 
+pub mod chain;
 pub mod compat;
 pub mod decisions;
 pub mod diagnostic;
+pub mod fingerprint;
 pub mod git;
 pub mod ids;
+pub mod interest;
 pub mod json;
+pub mod launch;
 pub mod lock;
 pub mod packet;
 pub mod pathpolicy;
 pub mod policy;
+pub mod probe;
+pub mod rearm;
 pub mod resolver;
 pub mod rules;
 pub mod sanitize;
 pub mod schema;
+pub mod session_state;
 pub mod steps;
 pub mod store;
 pub mod template;
