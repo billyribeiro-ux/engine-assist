@@ -773,12 +773,14 @@ pub fn blueprint_repin(app: &App, req: BlueprintRepinReq) -> Result<ProjectView,
     project::reopen_view(app, req.project_id.as_str())
 }
 
-/// `project_remove` (P1 registry): after a native confirmation naming what goes; the repo is
-/// never touched (PR-05). Deleting the project's app data (`projects/<id>/`, approvals,
-/// fingerprints) needs the store's delete, which arrives with M4-02.
+/// `project_remove` (P1 registry, P2 deletion): after a native confirmation naming what goes,
+/// forgets the project and deletes its app data: `projects/<id>/`, `approvals/<id>*` and its
+/// redacted config snapshots (`cache/fingerprints/<cwdHash>.json` for the project folder and its
+/// `spec/`). The repo is never touched (PR-05, AC-F029-06), and run history stays, so the kill-check
+/// numbers survive. A project with a live session can't be removed.
 ///
 /// # Errors
-/// `Cancelled`, `NotFound`, `Io`.
+/// `Cancelled`, `NotFound`, `NotAllowed("runs-live")`, `Io`.
 pub fn project_remove(app: &App, req: ProjectRemoveReq) -> Result<Vec<ProjectSummary>, IpcError> {
     let _w = app.writing();
     let (mut reg, stamp) = app.registry()?;
@@ -790,16 +792,41 @@ pub fn project_remove(app: &App, req: ProjectRemoveReq) -> Result<Vec<ProjectSum
     else {
         return Err(IpcError::not_found("That project isn't registered."));
     };
+    if app
+        .runs()
+        .live()
+        .iter()
+        .any(|r| r.project_id == e.project_id)
+    {
+        return Err(IpcError::not_allowed(
+            "runs-live",
+            "A Claude Code session is still running in this project. End it first.",
+        ));
+    }
     let ok = app.os().confirm(&Confirm::new(
         format!("Remove {}?", escape_visible(&e.name)),
         format!(
-            "Foreman forgets this project and its progress. The folder {} and everything in it stay as they are.",
+            "Foreman forgets this project and deletes its progress, approvals and saved configuration snapshots from this Mac. \
+             The folder {} and everything in it stay exactly as they are. Run history is kept.",
             escape_visible(&app.display(Path::new(&e.path)))
         ),
         "Remove project",
     ));
     if !ok {
         return Err(IpcError::cancelled());
+    }
+    // App data first: if a delete fails the project is still registered and Remove can be retried.
+    let root = app.app_root()?;
+    let data = foreman_core::retention::project_data(&e.project_id);
+    for t in &data.trees {
+        foreman_core::store::app_dirs::remove_tree(&root, t)?;
+    }
+    for f in &data.files {
+        foreman_core::store::app_dirs::remove_file(&root, f)?;
+    }
+    let folder = foreman_sys::spawn::canonical(Path::new(&e.path));
+    for cwd in [folder.clone(), folder.join("spec")] {
+        foreman_core::store::app_dirs::remove_file(&root, &foreman_sys::launch::cache_rel(&cwd))?;
     }
     reg.projects.retain(|p| p.project_id != e.project_id);
     app.save_registry(&mut reg, &stamp)?;

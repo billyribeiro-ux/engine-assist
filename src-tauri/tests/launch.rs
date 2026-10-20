@@ -166,6 +166,15 @@ mod runlog {
                 .any(|a| a.as_str().unwrap().contains(sha)),
             "{rec}"
         );
+        // M3-26 (AC-F026-01): the metrics fields beside the redacted argv. The CLI clock stops at
+        // the spawn, so the time to start is the spawn moment; no input was retyped and no prompt
+        // was copied.
+        assert_eq!(rec["surface"], "cli");
+        assert_eq!(rec["entryPoint"], "stageView");
+        assert!(rec["timeToStartMs"].is_u64(), "{rec}");
+        assert_eq!(rec["t"]["spawned"], rec["timeToStartMs"]);
+        assert_eq!(rec["runInputInterventions"], 0);
+        assert_eq!(rec["copyPromptOnCli"], false);
         p.t.app.runs().hangup_all();
     }
 
