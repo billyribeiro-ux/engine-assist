@@ -81,3 +81,97 @@ pub fn replace_once(s: &str, old: &str, new: &str) -> String {
     assert_eq!(s.matches(old).count(), 1, "anchor {old:?}");
     s.replacen(old, new, 1)
 }
+
+/// The TradeLog harness project (all conditions yes, the blueprint's example variables with a
+/// concrete BUDGET_TIME, DR-083).
+pub fn tradelog_project() -> foreman_core::schema::project::ProjectFile {
+    serde_json::from_str(&read_fixture("fixtures/tradelog/project.json")).unwrap()
+}
+
+/// The synthetic signed packets for Stages 1–4.
+pub fn tradelog_packets() -> std::collections::BTreeMap<u8, foreman_core::resolver::PacketText> {
+    (1..=4u8)
+        .map(|n| {
+            let text = read_fixture(&format!("fixtures/tradelog/handoff/stage-{n:02}.md"));
+            (n, foreman_core::resolver::PacketText { text, signed: true })
+        })
+        .collect()
+}
+
+/// Owned inputs for a `ResolveCtx`.
+pub struct Fixture {
+    pub template: foreman_core::template::Template,
+    pub project: foreman_core::schema::project::ProjectFile,
+    pub path: foreman_core::rules::ApplicablePath,
+    pub packets: std::collections::BTreeMap<u8, foreman_core::resolver::PacketText>,
+    pub inputs: std::collections::BTreeMap<String, String>,
+    pub remembered: std::collections::BTreeMap<String, String>,
+    pub optional: std::collections::BTreeMap<String, bool>,
+    pub attested_na: std::collections::BTreeSet<String>,
+    pub overlay_items: Vec<foreman_core::schema::overlay::AddedItem>,
+}
+
+impl Fixture {
+    /// TradeLog on the real v2.2 blueprint.
+    pub fn tradelog() -> Self {
+        let template = parse(&blueprint());
+        let project = tradelog_project();
+        Self::with(template, project)
+    }
+
+    /// Any template and project.
+    pub fn with(
+        template: foreman_core::template::Template,
+        project: foreman_core::schema::project::ProjectFile,
+    ) -> Self {
+        let path = foreman_core::rules::applicable_path(
+            &template,
+            &project.conditions,
+            &foreman_core::schema::overlay::OverlayFile::empty(),
+        );
+        Self {
+            template,
+            project,
+            path,
+            packets: tradelog_packets(),
+            inputs: std::collections::BTreeMap::new(),
+            remembered: std::collections::BTreeMap::new(),
+            optional: std::collections::BTreeMap::new(),
+            attested_na: std::collections::BTreeSet::new(),
+            overlay_items: Vec::new(),
+        }
+    }
+
+    /// Recomputes the path after a condition change.
+    pub fn repath(&mut self) {
+        self.path = foreman_core::rules::applicable_path(
+            &self.template,
+            &self.project.conditions,
+            &foreman_core::schema::overlay::OverlayFile::empty(),
+        );
+    }
+
+    /// The context for a step.
+    pub fn ctx<'a>(&'a self, key: &str) -> foreman_core::resolver::ResolveCtx<'a> {
+        foreman_core::resolver::ResolveCtx {
+            template: &self.template,
+            step: self
+                .template
+                .step(key)
+                .unwrap_or_else(|| panic!("step {key}")),
+            project: &self.project,
+            path: &self.path,
+            packets: &self.packets,
+            inputs: &self.inputs,
+            remembered: &self.remembered,
+            optional: &self.optional,
+            attested_na: &self.attested_na,
+            overlay_items: &self.overlay_items,
+        }
+    }
+
+    /// Resolves a step or panics with what's missing.
+    pub fn resolve(&self, key: &str) -> foreman_core::resolver::ResolvedPrompt {
+        foreman_core::resolver::resolve(&self.ctx(key)).unwrap_or_else(|e| panic!("{key}: {e:?}"))
+    }
+}
