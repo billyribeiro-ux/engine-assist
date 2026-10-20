@@ -5,6 +5,7 @@
 //! so `.GIT`, `Claude.MD`, a Kelvin-sign `.husKy` and NFD forms all match the denied names.
 
 use std::fmt;
+use std::path::Path;
 
 use icu_casemap::CaseMapper;
 use icu_normalizer::ComposingNormalizer;
@@ -128,6 +129,9 @@ pub enum WritePurpose {
     DecisionFile(DecisionPath),
     /// Root `CLAUDE.md`, after the native confirmation.
     AssemblerClaudeMd,
+    /// Export metrics and Export run sheet: a `.md` file at a path Billy chose in the Rust save
+    /// dialog, checked by [`check_user_export`] (ADR-011, SR-30).
+    UserExport,
 }
 
 /// What a read is for; decides the size cap (SR-31).
@@ -209,6 +213,12 @@ pub enum PolicyViolation {
     /// A symlink at a component (store walk).
     #[error("`{0}` is a symlink")]
     Symlink(String),
+    /// A user export that isn't a `.md` file.
+    #[error("exports are Markdown files; the name must end in .md")]
+    NotMarkdown,
+    /// A user export aimed at Foreman's own data folder.
+    #[error("that folder belongs to Foreman; choose another")]
+    AppDataFolder,
 }
 
 impl PolicyViolation {
@@ -233,6 +243,8 @@ impl PolicyViolation {
             Self::NotAllowlisted => "path.not-allowlisted",
             Self::Secret(_) => "path.secret",
             Self::Symlink(_) => "path.symlink",
+            Self::NotMarkdown => "path.not-markdown",
+            Self::AppDataFolder => "path.app-data",
         }
     }
 }
@@ -348,7 +360,8 @@ pub fn check_write(rel: &str, purpose: WritePurpose) -> Result<RepoPath, PolicyV
     match purpose {
         WritePurpose::CouncilSetup(_)
         | WritePurpose::DecisionFile(_)
-        | WritePurpose::AssemblerClaudeMd => Err(PolicyViolation::NotAllowlisted),
+        | WritePurpose::AssemblerClaudeMd
+        | WritePurpose::UserExport => Err(PolicyViolation::NotAllowlisted),
         WritePurpose::Repo | WritePurpose::TemplateOut => {
             if comps.len() >= 2 && (comps[0] == "docs" || comps[0] == "spec") {
                 Ok(RepoPath(rel.to_owned()))
@@ -413,6 +426,64 @@ pub fn check_read(rel: &str, _class: ReadClass) -> Result<RepoPath, PolicyViolat
 pub fn check_app_data(rel: &str) -> Result<RepoPath, PolicyViolation> {
     syntax(rel)?;
     Ok(RepoPath(rel.to_owned()))
+}
+
+/// The user-export check (`WritePurpose::UserExport`, SR-30, FILE-R9). `dir` is the canonical
+/// folder Billy chose in the Rust save dialog and `file_name` the name he typed. A `.md` name only; never in a folder named `.git`,
+/// `.claude` or `.foreman` (inside a registered project, and also anywhere else: `~/.claude` is
+/// Claude Code's configuration, SR-10); never `CLAUDE.md`, `claude.local.md` or another protected
+/// name; never inside Foreman's own app data (its templates are `.md` files). Lexical.
+///
+/// # Errors
+/// The first rule that refuses the target.
+pub fn check_user_export(
+    dir: &Path,
+    file_name: &str,
+    app_data: &Path,
+) -> Result<RepoPath, PolicyViolation> {
+    let dir_text = dir.to_string_lossy();
+    if !dir.is_absolute() {
+        return Err(PolicyViolation::Absolute);
+    }
+    let total = dir_text.len() + 1 + file_name.len();
+    if total > MAX_PATH_BYTES {
+        return Err(PolicyViolation::TooLong(total));
+    }
+    // The name is one component with the shared syntax rules.
+    if file_name.contains('/') {
+        return Err(PolicyViolation::EmptyComponent);
+    }
+    syntax(file_name)?;
+    // The folder: component sizes and control characters, then the protected names.
+    let rel_dir = dir_text.trim_start_matches('/');
+    if !rel_dir.is_empty() {
+        syntax(rel_dir)?;
+    }
+    let k = key(file_name);
+    #[allow(
+        clippy::case_sensitive_file_extension_comparisons,
+        reason = "keys are already case-folded"
+    )]
+    if !k.ends_with(".md") || k.len() <= 3 {
+        return Err(PolicyViolation::NotMarkdown);
+    }
+    check_component(file_name, None)?;
+    if k == "claude.md" {
+        return Err(PolicyViolation::ClaudeMd);
+    }
+    for c in dir.components() {
+        if let std::path::Component::Normal(c) = c {
+            let c = c.to_string_lossy();
+            let ck = key(&c);
+            if matches!(ck.as_str(), ".git" | ".claude" | ".foreman") {
+                return Err(PolicyViolation::DeniedComponent(c.into_owned()));
+            }
+        }
+    }
+    if dir.starts_with(app_data) {
+        return Err(PolicyViolation::AppDataFolder);
+    }
+    Ok(RepoPath(file_name.to_owned()))
 }
 
 #[cfg(test)]

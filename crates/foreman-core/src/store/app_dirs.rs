@@ -1,4 +1,5 @@
-//! App-data folders the runners manage (SR-53): listing (sensor events, ADR-009) and resetting
+//! App-data folders the runners manage (SR-53): listing (sensor events, ADR-009), removing
+//! (Clear run history, project removal, tail pruning; M4-02) and resetting
 //! the probe folder (SR-17: recreated `0700` with only Foreman's files before each probe run).
 //! Every path is app-data-relative and walked through the root's fd without following symlinks.
 
@@ -82,4 +83,144 @@ fn empty(dir: &std::os::fd::OwnedFd, rel: &str, depth: usize) -> Result<(), Stor
         }
     }
     Ok(())
+}
+
+/// Opens the folder that holds `rel`'s last component, without creating anything. `None` when a
+/// parent doesn't exist.
+fn parent_of(
+    root: &Root,
+    rel: &crate::pathpolicy::RepoPath,
+) -> Result<Option<(std::os::fd::OwnedFd, String)>, StoreError> {
+    if root.kind() != RootKind::AppData {
+        return Err(StoreError::NotFound(format!("{rel}: not app data")));
+    }
+    let (parents, name) = rel.split_last();
+    match super::walk::walk(root.fd(), &parents, root.opts(false, None)) {
+        Ok(dir) => Ok(Some((dir, name.to_owned()))),
+        Err(StoreError::NotFound(_)) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Removes one app-data file or symlink (the link itself, never its target). Missing is fine.
+/// Returns whether something was removed.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused, names a folder, or the removal fails.
+pub fn remove_file(root: &Root, rel: &str) -> Result<bool, StoreError> {
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Ok(false);
+    };
+    match rustix::fs::statat(&dir, name.as_str(), AtFlags::SYMLINK_NOFOLLOW) {
+        Err(e) if e == rustix::io::Errno::NOENT => return Ok(false),
+        Err(e) => return Err(StoreError::io(rel, e)),
+        Ok(st) => {
+            if rustix::fs::FileType::from_raw_mode(super::stat_mode(&st))
+                == rustix::fs::FileType::Directory
+            {
+                return Err(StoreError::NotRegular(rel.to_owned()));
+            }
+        }
+    }
+    rustix::fs::unlinkat(&dir, name.as_str(), AtFlags::empty())
+        .map_err(|e| StoreError::io(rel, e))?;
+    Ok(true)
+}
+
+/// Removes an app-data folder and everything in it, without following any symlink (a link inside
+/// is unlinked, not entered). Missing is fine. Returns whether something was removed.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused, is not a folder, or a removal fails.
+pub fn remove_tree(root: &Root, rel: &str) -> Result<bool, StoreError> {
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Ok(false);
+    };
+    match rustix::fs::statat(&dir, name.as_str(), AtFlags::SYMLINK_NOFOLLOW) {
+        Err(e) if e == rustix::io::Errno::NOENT => return Ok(false),
+        Err(e) => return Err(StoreError::io(rel, e)),
+        Ok(st) => match rustix::fs::FileType::from_raw_mode(super::stat_mode(&st)) {
+            rustix::fs::FileType::Directory => {}
+            rustix::fs::FileType::Symlink => {
+                rustix::fs::unlinkat(&dir, name.as_str(), AtFlags::empty())
+                    .map_err(|e| StoreError::io(rel, e))?;
+                return Ok(true);
+            }
+            _ => return Err(StoreError::NotRegular(rel.to_owned())),
+        },
+    }
+    let sub = rustix::fs::openat(
+        &dir,
+        name.as_str(),
+        OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::RDONLY,
+        Mode::empty(),
+    )
+    .map_err(|e| StoreError::io(rel, e))?;
+    empty(&sub, rel, 0)?;
+    drop(sub);
+    rustix::fs::unlinkat(&dir, name.as_str(), AtFlags::REMOVEDIR)
+        .map_err(|e| StoreError::io(rel, e))?;
+    Ok(true)
+}
+
+/// The total size in bytes of the regular files under an app-data folder (links are not
+/// followed). Missing is zero.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused or a folder can't be read.
+pub fn tree_size(root: &Root, rel: &str) -> Result<u64, StoreError> {
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Ok(0);
+    };
+    let sub = match rustix::fs::openat(
+        &dir,
+        name.as_str(),
+        OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::RDONLY,
+        Mode::empty(),
+    ) {
+        Ok(fd) => fd,
+        Err(e) if e == rustix::io::Errno::NOENT => return Ok(0),
+        Err(e) => return Err(StoreError::io(rel, e)),
+    };
+    size_of(&sub, rel, 0)
+}
+
+fn size_of(dir: &std::os::fd::OwnedFd, rel: &str, depth: usize) -> Result<u64, StoreError> {
+    if depth > 16 {
+        return Err(StoreError::NotFound(format!("{rel}: nested too deeply")));
+    }
+    let mut names = Vec::new();
+    let mut d = rustix::fs::Dir::read_from(dir).map_err(|e| StoreError::io(rel, e))?;
+    while let Some(e) = d.read() {
+        let e = e.map_err(|e| StoreError::io(rel, e))?;
+        let n = e.file_name().to_owned();
+        if n.to_bytes() != b"." && n.to_bytes() != b".." {
+            names.push(n);
+        }
+    }
+    let mut total = 0_u64;
+    for n in names {
+        let st = rustix::fs::statat(dir, n.as_c_str(), AtFlags::SYMLINK_NOFOLLOW)
+            .map_err(|e| StoreError::io(rel, e))?;
+        match rustix::fs::FileType::from_raw_mode(super::stat_mode(&st)) {
+            rustix::fs::FileType::Directory => {
+                let sub = rustix::fs::openat(
+                    dir,
+                    n.as_c_str(),
+                    OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::RDONLY,
+                    Mode::empty(),
+                )
+                .map_err(|e| StoreError::io(rel, e))?;
+                total = total.saturating_add(size_of(&sub, rel, depth + 1)?);
+            }
+            rustix::fs::FileType::RegularFile => {
+                total = total.saturating_add(u64::try_from(st.st_size).unwrap_or(0));
+            }
+            _ => {}
+        }
+    }
+    Ok(total)
 }

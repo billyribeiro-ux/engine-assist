@@ -22,6 +22,7 @@ pub mod app_dirs;
 mod atomic;
 pub mod config_read;
 pub mod dirs;
+pub mod export;
 pub mod git_exclude;
 pub mod outside;
 pub mod walk;
@@ -53,6 +54,8 @@ pub enum RootKind {
     GitDir,
     /// A base folder of the fixed outside-read list (SR-31a): secrets refused, nothing written.
     Outside,
+    /// The folder Billy chose in a save dialog for a user export (`export::write_user_export`).
+    Export,
 }
 
 /// What Foreman knew about a file when it read it (ADR-010).
@@ -251,7 +254,7 @@ impl Root {
             exempt,
             names: match self.kind {
                 RootKind::Project | RootKind::Blueprint => walk::NameCheck::Deny,
-                RootKind::Outside => walk::NameCheck::SecretsOnly,
+                RootKind::Outside | RootKind::Export => walk::NameCheck::SecretsOnly,
                 RootKind::AppData | RootKind::GitDir => walk::NameCheck::None,
             },
             reporter: self.reporter,
