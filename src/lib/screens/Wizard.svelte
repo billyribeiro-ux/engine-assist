@@ -56,6 +56,7 @@
 		const p = await f.create();
 		if (p) {
 			ui.toast(`Project created: ${p.name}`);
+			ui.landOnAction = true;
 			await goto(to.project(p.id));
 		} else ui.say(f.createError ?? 'Fix the fields first.');
 	}

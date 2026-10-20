@@ -4,6 +4,8 @@
 	// body: run inputs, the optional-part toggle, the actions, the resolved prompt and the exact
 	// command. Not-applicable, core, undecided and needs-annotation rows can't run and say why in one
 	// line (AC-F030-02); core rows never show Skip (AC-F004-07).
+	import { untrack } from 'svelte';
+
 	import { report, runStep } from '#lib/actions/run.ts';
 	import { blockerText, failureText, MODE_NAME, MODEL_NAME } from '#lib/actions/words.ts';
 	import { toIpcFailure } from '#lib/ipc/errors.ts';
@@ -121,6 +123,15 @@
 					? null
 					: 'Set this project’s claude.ai Project link (Project settings) so Copy and open opens a new conversation there. Until then it copies the prompt only.'
 	);
+
+	// AC-F018-08: after Create the selected step's primary action takes focus, once.
+	function landed(node: HTMLElement): void {
+		untrack(() => {
+			if (!selected || !ui.landOnAction) return;
+			ui.landOnAction = false;
+			node.focus();
+		});
+	}
 
 	let pasteTrigger: (() => Promise<true | string>) | null = null;
 	let action = $state<ActionPreview | null>(null);
@@ -487,6 +498,7 @@
 					<button
 						class="btn primary"
 						type="button"
+						{@attach landed}
 						aria-disabled={blocked || busy ? 'true' : undefined}
 						aria-describedby={reason ? `why-${sid}` : undefined}
 						onclick={() => {

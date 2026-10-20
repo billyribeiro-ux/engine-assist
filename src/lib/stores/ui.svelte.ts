@@ -46,6 +46,9 @@ class Ui {
 	drawerHeight = $state(216);
 	inspectorOpen = $state(true);
 	paletteOpen = $state(false);
+	/** One-shot: the next opened stage focuses its selected step's primary action (AC-F018-08:
+	 * Create lands on the first action with focus). */
+	landOnAction = $state(false);
 	/** Lifts toasts above a sticky footer (outside-change review). */
 	toastLift = $state(false);
 	theme = $state<Theme>('system');

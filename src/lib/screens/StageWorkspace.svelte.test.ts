@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
+import { ui } from '#lib/stores/ui.svelte.ts';
 import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
 
 import StageWorkspace from './StageWorkspace.svelte';
@@ -49,5 +50,21 @@ describe('StageWorkspace', () => {
 		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
 		await s.getByRole('button', { name: 'Copy prompt' }).click();
 		await vi.waitFor(() => expect(said()).not.toBe(''));
+	});
+
+	// AC-F018-08: after Create the stage opens with its first action focused, once.
+	it('landing: the selected step’s primary action takes focus once after Create', async () => {
+		const m = fresh('happy');
+		const p = await project(m, IDS.tradelog);
+		ui.landOnAction = true;
+		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
+		await vi.waitFor(() => expect(ui.landOnAction).toBe(false));
+		const focused = document.activeElement;
+		expect(focused?.classList.contains('primary')).toBe(true);
+		expect(focused?.closest('.actions')).not.toBeNull();
+		await s.unmount();
+		const again = await render(StageWorkspace, { project: p, stageNo: 2 });
+		await expect.element(again.getByRole('button', { name: 'Copy prompt' })).toBeVisible();
+		expect(document.activeElement?.closest('.actions')).toBeNull();
 	});
 });

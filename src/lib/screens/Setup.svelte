@@ -35,6 +35,7 @@
 		const p = await f.create();
 		if (!p) return f.createError ?? 'The project could not be created.';
 		ui.toast(`Project created: ${p.name}`);
+		ui.landOnAction = true;
 		await goto(to.project(p.id));
 		return true;
 	}
