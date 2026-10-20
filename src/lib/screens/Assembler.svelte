@@ -233,8 +233,7 @@
 										<button
 											class="btn"
 											type="button"
-											onclick={() =>
-												confirm(lc.condition, value, proposed ? lc.evidence : null)}
+											onclick={() => confirm(lc.condition, value, proposed ? lc.evidence : null)}
 											>Confirm</button
 										>
 									{:else}<span></span>{/if}

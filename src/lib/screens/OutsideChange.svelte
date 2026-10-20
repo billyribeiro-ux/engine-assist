@@ -91,6 +91,13 @@
 			.flatMap((c) => c.consequences)
 			.find((x) => x.glyph === 'check' && x.text.includes('variable')) ?? null
 	);
+	$effect(() => {
+		ui.toastLift = true;
+		return () => {
+			ui.toastLift = false;
+		};
+	});
+	const WORDS = ['no', 'one', 'two', 'three', 'four'];
 	let toasted = false;
 	$effect(() => {
 		if (variablesOnly && !toasted) {
@@ -110,8 +117,8 @@
 				<p class="page-sub">
 					Something other than Foreman edited {changes.length === 1
 						? 'a file'
-						: `${changes.length} files`} that decide how this project runs. Foreman keeps using the approved
-					versions until you accept.
+						: `${WORDS[changes.length] ?? changes.length} files`} that decide how this project runs. Foreman
+					keeps using the approved versions until you accept.
 				</p>
 				{#if notice}<p class="banner-inline" role="alert">
 						<Icon name="warn" size="glyph" tone="attention" />{notice}

@@ -22,6 +22,8 @@
 		title: string;
 		sub: string;
 		hint: string;
+		/** Extra words the search matches (the selected step's title for its actions). */
+		keywords?: string;
 		open: () => unknown;
 		run?: () => unknown;
 	}
@@ -101,6 +103,7 @@
 				icon: 'copy',
 				title: `Copy prompt for ${sel.number}`,
 				sub: '',
+				keywords: sel.title,
 				hint: '⌘⇧C',
 				open: async () => {
 					const c = await ipc();
@@ -208,7 +211,7 @@
 	const shown: Item[] = $derived.by(() => {
 		const q = query.trim().toLowerCase();
 		const list = q
-			? items.filter((i) => `${i.title} ${i.sub}`.toLowerCase().includes(q))
+			? items.filter((i) => `${i.title} ${i.sub} ${i.keywords ?? ''}`.toLowerCase().includes(q))
 			: items.filter(
 					(i) => i.group !== 'Steps' || i.sub.includes(current.project?.summary.name ?? '\u0000')
 				);
@@ -287,7 +290,8 @@
 								>{i.title}
 								{#if i.sub}<span class="sub">{i.sub}</span>{/if}</span
 							>
-							{#if i.hint}<kbd>{i.hint}</kbd>{:else}<span></span>{/if}
+							{#if i.hint && (i.group !== 'Steps' || i.id === activeId)}<kbd>{i.hint}</kbd
+								>{:else}<span></span>{/if}
 						</div>
 					{/each}
 				</div>

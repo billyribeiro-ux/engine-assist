@@ -230,7 +230,9 @@
 											><Text text={w.path} layout={false} /></code
 										>
 									</dt>
-									{#if w.reason}<dd class="why">{w.reason}</dd>{/if}
+									{#if w.reason}<dd class={['why', w.action === 'create' && 'inline']}>
+											{w.reason}
+										</dd>{/if}
 								</div>
 							{/each}
 						</dl>
@@ -348,6 +350,15 @@
 		display: block;
 		color: var(--ink-muted);
 		padding-left: 28px;
+	}
+	.writes-list > div:has(.inline) {
+		display: flex;
+		gap: var(--space-2);
+		align-items: baseline;
+	}
+	.why.inline {
+		padding-left: 0;
+		color: var(--ink);
 	}
 	.group-label {
 		font-size: var(--text-12);

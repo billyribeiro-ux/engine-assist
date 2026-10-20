@@ -57,7 +57,8 @@
 	>({});
 	$effect(() => {
 		for (const it of g?.items ?? [])
-			if (it.status === 'waiting' && !(it.id in drafts)) drafts[it.id] = { kind: 'done', note: it.note ?? '', error: null };
+			if (it.status === 'waiting' && !(it.id in drafts))
+				drafts[it.id] = { kind: 'done', note: it.note ?? '', error: null };
 	});
 	function draft(it: GateItemView) {
 		return drafts[it.id] ?? { kind: 'done' as const, note: '', error: null };
@@ -293,8 +294,7 @@
 						><Icon name="wrench" />Fix this</button
 					>
 					<span class="reason"
-						>Opens a new CLI
-						chain: Opus 5.5, high, Plan, with this item and its evidence</span
+						>Opens a new CLI chain: Opus 5.5, high, Plan, with this item and its evidence</span
 					>
 				</div>
 			{:else if d}
@@ -429,7 +429,12 @@
 			{#snippet gatePane()}
 				{#if selected}
 					<div>
-						<h2 class="insp-title">Evidence for {selected.id.split('-').map((w) => (w.length <= 3 ? w.toUpperCase() : w)).join(' ')}</h2>
+						<h2 class="insp-title">
+							Evidence for {selected.id
+								.split('-')
+								.map((w) => (w.length <= 3 ? w.toUpperCase() : w))
+								.join(' ')}
+						</h2>
 						<p class="insp-sub">
 							{selected.session
 								? "From the Gate A session's last message"
@@ -561,13 +566,23 @@
 							void previewSign();
 						}}
 						onkeydown={(e) => {
-							if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+							if (
+								e.key !== 'ArrowDown' &&
+								e.key !== 'ArrowUp' &&
+								e.key !== 'ArrowLeft' &&
+								e.key !== 'ArrowRight'
+							)
+								return;
 							e.preventDefault();
 							branchKind = i === 0 ? 'other' : 'current';
 							void previewSign();
 							const host = e.currentTarget.parentElement;
-							queueMicrotask(() => host?.querySelectorAll<HTMLElement>('[role="radio"]')[i === 0 ? 1 : 0]?.focus());
-						}}><span class={['r', branchKind === o.v && 'on']} aria-hidden="true"></span>{o.label}{#if o.code}&nbsp;<code>{o.code}</code>{/if}</button
+							queueMicrotask(() =>
+								host?.querySelectorAll<HTMLElement>('[role="radio"]')[i === 0 ? 1 : 0]?.focus()
+							);
+						}}
+						><span class={['r', branchKind === o.v && 'on']} aria-hidden="true"
+						></span>{o.label}{#if o.code}&nbsp;<code>{o.code}</code>{/if}</button
 					>
 				{/each}
 			</div>

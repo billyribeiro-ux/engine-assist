@@ -11,7 +11,9 @@
 	const applicable = $derived(
 		stage.steps.filter((s) => s.state !== 'needsAnnotation' && s.state !== 'notApplicable')
 	);
-	const done = $derived(applicable.filter((s) => s.state === 'done' || s.state === 'skipped').length);
+	const done = $derived(
+		applicable.filter((s) => s.state === 'done' || s.state === 'skipped').length
+	);
 	const status = $derived(
 		stage.signed
 			? stage.signed.merged

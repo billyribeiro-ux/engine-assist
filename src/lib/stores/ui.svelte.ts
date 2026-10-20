@@ -46,6 +46,8 @@ class Ui {
 	drawerHeight = $state(216);
 	inspectorOpen = $state(true);
 	paletteOpen = $state(false);
+	/** Lifts toasts above a sticky footer (outside-change review). */
+	toastLift = $state(false);
 	theme = $state<Theme>('system');
 	/** The stage whose stamp should play (F-014 read-back passed). */
 	stampStage = $state<{ projectId: string; stage: number } | null>(null);

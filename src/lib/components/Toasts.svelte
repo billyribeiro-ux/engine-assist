@@ -7,7 +7,7 @@
 </script>
 
 <div class="vh" role="status" aria-live="polite" aria-atomic="true">{ui.announcement}</div>
-<div class="toasts" aria-hidden="true">
+<div class={['toasts', ui.toastLift && 'lift']} aria-hidden="true">
 	{#each ui.toasts as t (t.id)}
 		<div class={['toast', t.tone === 'fail' && 'fail']}>
 			<Icon name={t.icon} /><span>{t.text}</span>
@@ -19,6 +19,9 @@
 </div>
 
 <style>
+	.lift {
+		bottom: 76px;
+	}
 	.hint > :global(.icon) {
 		color: var(--ink-muted);
 	}

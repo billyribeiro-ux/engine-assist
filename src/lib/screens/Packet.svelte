@@ -222,7 +222,9 @@
 								class={[
 									'pf',
 									fd.problems.length && 'has-problem',
-									fd.note && !fd.problems.length && 'has-note'
+									pk.normalization.some((n) => n.field === fd.key) &&
+										!fd.problems.length &&
+										'has-note'
 								]}
 							>
 								<dt>{fd.label}</dt>
@@ -231,6 +233,11 @@
 											nodes={fd.value}
 										/>{/if}
 									{#if fd.note}<span class="muted"><Text spans={fd.note} /></span>{/if}
+									{#if pk.normalization.some((n) => n.field === fd.key)}<button
+											class="btn ghost xs norm"
+											type="button"
+											onclick={() => act('normalize')}>Normalize the file</button
+										>{/if}
 									{#each fd.problems as pr, i (i)}
 										<div class="problem">
 											<p><Icon name="cross" size="sm" /><span>{pr.message}</span></p>
@@ -267,18 +274,6 @@
 					{#if noEditor}<p class="reason" id="no-editor">
 							Open in editor needs an editor: set one in Settings.
 						</p>{/if}
-					{#if pk.normalization.length}
-						<div class="actions top">
-							<button class="btn" type="button" onclick={() => act('normalize')}
-								>Apply {pk.normalization.length} normalization{pk.normalization.length === 1
-									? ''
-									: 's'}</button
-							>
-							<span class="reason"
-								>{pk.normalization.map((n) => `${n.field}: ${n.message}`).join('; ')}</span
-							>
-						</div>
-					{/if}
 					{#if problems && !isChat}
 						<p class="remap top">
 							Repair re-arms the stage's session with: "Fix only these problems in {pk.path}: … Do
@@ -461,6 +456,9 @@
 		align-items: center;
 		gap: var(--space-4);
 		justify-content: space-between;
+	}
+	.norm {
+		margin-left: var(--space-2);
 	}
 	.ink {
 		color: var(--ink);
