@@ -1,0 +1,74 @@
+# cargo-deny policy for the `e2e` feature (ADR-016 decision 2, CI job deny-e2e). Same as deny.toml,
+# except the HTTP server stack is allowed ONLY as a dependency of tauri-plugin-wdio-webdriver.
+# The graph is evaluated for the only shipped target; tauri's mobile-only reqwest path is outside it.
+
+[graph]
+targets = ["aarch64-apple-darwin"]
+all-features = false
+no-default-features = false # default features; `e2e` and `ts` are off (deny-e2e job covers e2e)
+
+[advisories]
+yanked = "deny"
+ignore = []
+
+[licenses]
+# deny.toml's list plus Apache-2.0 WITH LLVM-exception, used only by the e2e graph.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "Unicode-3.0",
+  "Zlib",
+  "MPL-2.0",
+  "CC0-1.0",
+]
+confidence-threshold = 0.93
+
+[licenses.private]
+# Foreman's own crates are `publish = false` and unlicensed (personal app).
+ignore = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+# Known duplicate versions inside Tauri's own macOS graph (2026-10-20). `multiple-versions` stays
+# "warn" (ADR-016), so any NEW duplicate still shows; re-check this list at each Stage Gate.
+skip = [
+  { crate = "base64@0.21.7", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "bitflags@1.3.2", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "getrandom@0.3.4", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "hashbrown@0.12.3", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "indexmap@1.9.3", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "miniz_oxide@0.8.9", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "png@0.17.16", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "syn@2.0.119", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "base64@0.22.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+]
+deny = [
+  { crate = "reqwest", reason = "SR-60: no HTTP client" },
+  { crate = "hyper", reason = "SR-60: e2e only, via tauri-plugin-wdio-webdriver", wrappers = ["axum", "hyper-util"] },
+  { crate = "hyper-util", reason = "SR-60: e2e only, via tauri-plugin-wdio-webdriver", wrappers = ["axum"] },
+  { crate = "ureq", reason = "SR-60" },
+  { crate = "isahc", reason = "SR-60" },
+  { crate = "curl", reason = "SR-60" },
+  { crate = "surf", reason = "SR-60" },
+  { crate = "attohttpc", reason = "SR-60" },
+  { crate = "h2", reason = "SR-60" },
+  { crate = "quinn", reason = "SR-60" },
+  { crate = "tungstenite", reason = "SR-60" },
+  { crate = "axum", reason = "SR-60: e2e only, via tauri-plugin-wdio-webdriver", wrappers = ["tauri-plugin-wdio-webdriver"] },
+  { crate = "openssl", reason = "SR-60: no TLS stack needed" },
+  { crate = "rustls", reason = "SR-60" },
+  { crate = "native-tls", reason = "SR-60" },
+  { crate = "git2", reason = "ADR-012" },
+  { crate = "keyring", reason = "SR-51" },
+  { crate = "security-framework", reason = "SR-51: no keychain access" },
+]

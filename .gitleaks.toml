@@ -1,0 +1,18 @@
+# Secret scan (SR-63, AC-M0-03/04). gitleaks 8.30.1 default rules plus path allowlist for
+# dependency/build output. `pnpm verify` runs `gitleaks dir`; CI also scans git history.
+title = "foreman"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated, vendored and build output"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)target/''',
+  '''(^|/)\.svelte-kit/''',
+  '''(^|/)build/''',
+  '''(^|/)src-tauri/gen/''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)Cargo\.lock$''',
+]

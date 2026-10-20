@@ -1,0 +1,15 @@
+# cargo-audit (SR-61). cargo-audit scans every lockfile entry regardless of target; cargo-deny
+# (deny.toml, graph target aarch64-apple-darwin) is the target-filtered advisory gate.
+# Each ignore below is for a crate that is ONLY in the Linux GTK graph of tauri/wry/tao/muda and
+# absent from `cargo tree --target aarch64-apple-darwin` (checked 2026-10-20). Re-check each
+# Stage Gate; remove an entry when upstream moves off the crate.
+[advisories]
+ignore = [
+  "RUSTSEC-2024-0370", # proc-macro-error unmaintained: via glib-macros 0.18 (Linux GTK only)
+  "RUSTSEC-2024-0429", # glib 0.18 VariantStrIter unsound: via gtk 0.18 (Linux GTK only)
+]
+informational_warnings = ["unmaintained", "unsound", "yanked"]
+
+[output]
+deny = ["warnings"]
+quiet = false
