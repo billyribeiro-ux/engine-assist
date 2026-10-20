@@ -468,7 +468,7 @@ TS    { scope: "p1" | "full" }
 Res   DoctorReport { level: DoctorLevel, checks: Vec<DoctorCheck>, capabilities: Vec<CapabilityRow> }
 Err   (none; failures are rows)
 ```
-F-019 · AC-F019-04…07, -09…-11, -14 · SR-01, SR-08, SR-17. Emits `doctor:status`.
+F-019 · AC-F019-04…07, -09…-11, -14 · SR-01, SR-08, SR-17. Emits `doctor:status`. As built (M4-13): row IDs `path`, `version`, `auth` (P1 and full), `sensor`, `probeFolder` (action `openProbeFolder`), `cleanup` (effective `cleanupPeriodDays`, managed over user, default 30, recommendation 90, never written), `hooks` (`disableAllHooks` in user or managed settings), `allow` (`Bash`, `Bash(*)`, `Bash(pnpm exec *)`, `Bash(npx *)`, `Bash(pnpm dlx *)`, `Bash(bunx *)` and interpreter rules), `appendixA` (blueprint v2.2 Appendix A: `~/.claude/settings.json`, `CLAUDE.md`, the 8 global agents) in group `claude`; `git` (P1 and full), `node`, `pnpm`, `cargo` (fixed candidates, `--version`, cwd app data), `launchPath` (the PATH a launch gets), `loginPath` (action `captureLoginPath`) in group `toolchain`. `capabilities[].blocks` names the registered projects' steps that need the missing feature. `probes` and `probeNote` come from `settings.json` `contract` (full scope only).
 
 **`doctor_capture_login_path`** · P2 (M2 if S-12 fails) · M4 · **spawn** (the single consented shell), **mem**
 ```text
@@ -477,7 +477,7 @@ TS    Record<symbol, never>
 Res   LoginPathPreview { preview_id: PreviewId, shell: String, entries: Vec<PathEntryCheck> }
 Err   NotAllowed ($SHELL not in /etc/shells) · Cancelled · ToolFailed
 ```
-F-019 · AC-F019-12, -13 · SR-02.
+F-019 · AC-F019-12, -13 · SR-02. As built (M4-14): `$SHELL` from Foreman's own environment must be an absolute path listed in `/etc/shells` (`NotAllowed("shell-not-listed")`, before any dialog); the native consent dialog names the exact command; `foreman_sys::spawn` runs `SpawnRequest::LoginShellPath` with the fixed argv `-l -c 'printf %s "$PATH"'`, cwd app data, a 10 s timeout, 64 KB output cap and an environment of `HOME`, `USER`, `LOGNAME`, `TMPDIR`, `LANG`, `LC_*`, `SHELL` and `PATH=/usr/bin:/bin:/usr/sbin:/sbin`. The output is split on `:` (≤ 200 entries) and checked as SR-05 PATH entries; each entry comes back with `ok` and `why`. Timeout or a non-zero exit is `ToolFailed`.
 
 **`doctor_login_path_apply`** · P2 · M4 · **app**
 ```text
@@ -486,7 +486,7 @@ TS    { previewId: string }
 Res   SettingsView
 Err   Expired · Cancelled (native dialog listing the entries) · Conflict
 ```
-F-019 · AC-F019-12 · SR-02, SR-05, SR-24a (entries sanitized again when PATH is built).
+F-019 · AC-F019-12 · SR-02, SR-05, SR-24a (entries sanitized again when PATH is built). As built: the dialog lists the kept entries and the number dropped; OK stores `loginPath { entries, shell, capturedAt }` by CAS.
 
 **`probe_folder_open`** · P2 · M4 · **spawn** (interactive `claude` in a PTY tab, cwd `<app-data>/probe/`, no prompt)
 ```text
@@ -495,7 +495,7 @@ TS    Record<symbol, never>
 Res   RunStarted
 Err   ToolMissing · Io
 ```
-`output: Channel<tauri::ipc::Response>` · F-019 · AC-F019-08 · SR-17. P2, M4 (moved from M3 in the Stage 4.7 fix pass, with AC-F019-08 and ticket M3-18).
+`output: Channel<tauri::ipc::Response>` · F-019 · AC-F019-08 · SR-17. P2, M4 (moved from M3 in the Stage 4.7 fix pass, with AC-F019-08 and ticket M3-18). As built (M3-18): the probe folder is reset first (`0700`, Foreman's settings file only), then `claude --name fm-probe` runs in it as an ordinary terminal tab (`pty_*` work on its `runId`; no `run.json`, no index line). Opening it records `settings.json` `probeFolderTrusted: true` (the trust step was done; Foreman can't see Billy's answer without acting on a session event, SR-18). A probe that then meets the trust prompt is inconclusive and Doctor says so.
 
 **`probe_run`** · P2 · M4 · **spawn** (`claude --init-only` probes A and B), **app** (`settings.json` `contract`)
 ```text
@@ -504,7 +504,7 @@ TS    Record<symbol, never>
 Res   ContractResult { version: String, verified_at: Timestamp, outcomes: Vec<ProbeOutcome> }
 Err   ToolMissing
 ```
-`progress: Channel<LaunchProgress>` · F-019 · AC-F019-15…17 · SR-17, NFR-44. `launch_prepare` runs the same probes automatically before the first launch on a new version (AC-F008-21).
+`progress: Channel<LaunchProgress>` · F-019 · AC-F019-15…17 · SR-17, NFR-44. `launch_prepare` runs the same probes automatically before the first launch on a new version (AC-F008-21). As built (M4-12): `contract.version` is the semver of `claude -v`. `outcomes` are probe A then probe B of this run (§2.4 rows; `fail` = flag failure). Probe A's marker needs the hash-checked sensor; without it A is inconclusive. Before a launch the probes run only when `probeFolderTrusted` is set and this build has the sensor (otherwise `Contract { outcome: skipped }` and Doctor's `probeNote` says why). The stored contract turns into launch blockers only for the features a launch needs: `launch` and `chains` (`--session-id`; every launch passes it) always, `re-arm` (`--resume`) for a continuing step; an `--effort` failure is a warning (Claude Code ignores an unknown effort and runs), `desktop-handoff` is Desktop's.
 
 ### 4.3 Projects
 
@@ -892,7 +892,7 @@ TS    { planId: string }
 Res   RearmOutcome = Relaunched(RunStarted) | EndYourself { chain: ChainId }    // "Claude didn't exit…"
 Err   Expired · Stale · Cancelled · NotAllowed ("no-rearm-needed", P2: "background-tasks-running" until Billy picks End anyway in the native dialog)
 ```
-`output: Channel<tauri::ipc::Response>`, `progress: Channel<LaunchProgress>` — the one command with two Channels; IPC-R1 allows one Channel **per role**. F-010 · AC-F010-03…-06, -10, -11, -13, -14, AC-F013-11 · SR-13, SR-14, SR-18. After the old process exits, Rust prepares again; if the new argv or prompt hash differs from the confirmed plan, it stops with `Stale` and the new preview (DR-116). (ADR-008 names the argument `stepId`; this contract takes the prepared `planId` so a re-arm always goes through the same preview and confirmation.)
+`output: Channel<tauri::ipc::Response>`, `progress: Channel<LaunchProgress>` — the one command with two Channels; IPC-R1 allows one Channel **per role**. F-010 · AC-F010-03…-06, -10, -11, -13, -14, AC-F013-11 · SR-13, SR-14, SR-18. After the old process exits, Rust prepares again; if the new argv or prompt hash differs from the confirmed plan, it stops with `Stale` and the new preview (DR-116). (ADR-008 names the argument `stepId`; this contract takes the prepared `planId` so a re-arm always goes through the same preview and confirmation.) As built (M4-10): when Billy presses Run, Rust reads the old session's sensor state: idle with nothing outstanding → no dialog (AC-F010-13); outstanding subagents, tasks or background shells → the native "N background tasks still running" dialog, where Wait answers `NotAllowed("background-tasks-running")` and End anyway re-arms (AC-F010-14); no sensor, no events, or a session working or blocked with nothing outstanding → the P1 idle dialog (AC-F011-09). The preview's `rearm` stays `idleConfirmation` (the answer that counts is read at Run); `sensorBusy` isn't sent.
 
 **`rearm_continue`** · P1 · M3 · **spawn**
 ```text
