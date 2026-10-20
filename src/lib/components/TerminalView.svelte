@@ -18,6 +18,7 @@
 	import { ui } from '#lib/stores/ui.svelte.ts';
 	import { bufferText, findNext, type Match } from '#lib/terminal/archive.ts';
 	import { routeKey, xtermHandles } from '#lib/terminal/keys.ts';
+	import { urlLinks } from '#lib/terminal/links.ts';
 	import { SCROLLBACK_DEFAULT, terminalOptions } from '#lib/terminal/options.ts';
 	import { withStyleNonce } from '#lib/terminal/style-nonce.ts';
 
@@ -105,6 +106,15 @@
 		}
 	}
 
+	/** Every terminal link goes to Rust: it opens only allowed URLs, after a native dialog. */
+	function openLink(url: string): void {
+		void ipc().then(async (c) => {
+			const r = await c.terminalLinkOpen({ runId, url });
+			if (r === 'refused')
+				ui.say('Foreman opens only https links (or http to localhost) without a user name.');
+		});
+	}
+
 	/** ⌘C: the selection only; with nothing selected nothing happens (no interrupt). */
 	function copy(): void {
 		const text = term?.getSelection() ?? '';
@@ -165,20 +175,17 @@
 				screenReaderMode,
 				live,
 				theme: theme(),
+				// OSC 8 links (SR-29): the URL goes to Rust, which checks it and asks first.
 				linkHandler: {
 					activate: (_e, text) => {
-						void ipc().then(async (c) => {
-							const r = await c.terminalLinkOpen({ runId, url: text });
-							if (r === 'refused')
-								ui.say(
-									'Foreman opens only https links (or http to localhost) without a user name.'
-								);
-						});
+						openLink(text);
 					}
 				}
 			})
 		);
 		term = t;
+		// Plain URLs in the output take the same path (AC-F009-17).
+		const links = t.registerLinkProvider(urlLinks(t, openLink));
 		t.attachCustomKeyEventHandler((ev) => {
 			const route = routeKey(ev);
 			if (ev.type === 'keydown') {
@@ -227,6 +234,7 @@
 		mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 		return () => {
 			off();
+			links.dispose();
 			data.dispose();
 			resized.dispose();
 			ro.disconnect();
