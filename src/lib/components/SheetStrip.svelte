@@ -19,7 +19,12 @@
 	}: {
 		projectId: string;
 		projectName: string;
-		stages: { stage: number; title: string; status: StageView['status']; statusWhy: string | null }[];
+		stages: {
+			stage: number;
+			title: string;
+			status: StageView['status'];
+			statusWhy: string | null;
+		}[];
 		open: number | null;
 		/** The wizard's preview strip: not links, nothing opens. */
 		preview?: boolean;
@@ -33,12 +38,6 @@
 		{ key: 'co', label: 'Occupancy', from: 16, to: 17 },
 		{ key: 'maint', label: 'Ownership', from: 18, to: 18 }
 	] as const;
-	const TITLES = [
-		'Land Survey', 'Meet the Architect', "Architect's Design Studio", 'Permits & Zoning', 'Construction Drawings',
-		'Site Prep & Excavation', 'Foundation', 'Framing', 'Roofing', 'Plumbing', 'Electrical', 'HVAC',
-		'Insulation & Drywall', 'Siding & Exterior', 'Inspections', 'Paint & Trim', 'Final Walkthrough',
-		'Certificate of Occupancy', 'Homeowner Maintenance'
-	];
 
 	const MARK: Partial<Record<StageView['status'], IconName>> = {
 		ready: 'ring',
@@ -49,7 +48,11 @@
 		undecided: 'question'
 	};
 	let focusIdx = $state<number | null>(null);
-	const tabStop = $derived(focusIdx ?? open ?? stages.findIndex((s) => s.status === 'inProgress' || s.status === 'inspecting') ?? 0);
+	const tabStop = $derived(
+		focusIdx ??
+			open ??
+			stages.findIndex((s) => s.status === 'inProgress' || s.status === 'inspecting')
+	);
 
 	function cls(s: (typeof stages)[number]): string[] {
 		const c: string[] = [];
@@ -61,12 +64,20 @@
 		return c;
 	}
 	function spoken(s: (typeof stages)[number]): string {
-		return `Stage ${s.stage}, ${s.title || TITLES[s.stage] || ''}: ${SHEET[s.status].word}${s.statusWhy ? ` (${s.statusWhy})` : ''}`;
+		return `Stage ${s.stage}, ${s.title}: ${SHEET[s.status].word}${s.statusWhy ? ` (${s.statusWhy})` : ''}`;
 	}
 	function onKey(e: KeyboardEvent, idx: number): void {
 		const last = stages.length - 1;
 		const next =
-			e.key === 'ArrowRight' ? Math.min(last, idx + 1) : e.key === 'ArrowLeft' ? Math.max(0, idx - 1) : e.key === 'Home' ? 0 : e.key === 'End' ? last : -1;
+			e.key === 'ArrowRight'
+				? Math.min(last, idx + 1)
+				: e.key === 'ArrowLeft'
+					? Math.max(0, idx - 1)
+					: e.key === 'Home'
+						? 0
+						: e.key === 'End'
+							? last
+							: -1;
 		if (next < 0) return;
 		e.preventDefault();
 		focusIdx = next;
@@ -81,7 +92,8 @@
 				<ol class="phase-sheets" aria-label="{ph.label}, stages {ph.from} to {ph.to}">
 					{#each stages.filter((s) => s.stage >= ph.from && s.stage <= ph.to) as s (s.stage)}
 						{@const mark = MARK[s.status]}
-						{@const landing = ui.stampStage?.projectId === projectId && ui.stampStage.stage === s.stage}
+						{@const landing =
+							ui.stampStage?.projectId === projectId && ui.stampStage.stage === s.stage}
 						<li>
 							<svelte:element
 								this={preview ? 'span' : 'a'}
@@ -89,7 +101,7 @@
 								id="sheet-{projectId}-{s.stage}"
 								href={preview ? undefined : to.stage(projectId, s.stage)}
 								aria-label={spoken(s)}
-								title="{s.stage} {s.title || TITLES[s.stage]}: {SHEET[s.status].word}"
+								title="{s.stage} {s.title}: {SHEET[s.status].word}"
 								aria-current={s.stage === open ? 'page' : undefined}
 								role={preview ? 'img' : undefined}
 								tabindex={preview ? undefined : s.stage === tabStop ? 0 : -1}

@@ -65,14 +65,15 @@
 
 	function fit(): void {
 		if (!term || !host.clientWidth) return;
-		const probe = document.createElement('span');
-		probe.className = 'term-probe';
-		probe.textContent = 'W'.repeat(10);
-		host.appendChild(probe);
-		const cw = probe.getBoundingClientRect().width / 10 || 7;
-		probe.remove();
-		const cols = Math.max(2, Math.min(1000, Math.floor((host.clientWidth - 8) / cw)));
-		const rows = Math.max(2, Math.min(500, Math.floor(host.clientHeight / (fontSize * 1.5))));
+		// Cell size from xterm's own screen element (its size is cols × cell width, rows × cell height).
+		const screen = host.querySelector<HTMLElement>('.xterm-screen');
+		if (!screen) return;
+		const box = screen.getBoundingClientRect();
+		const cw = box.width / term.cols;
+		const ch = box.height / term.rows;
+		if (!cw || !ch) return;
+		const cols = Math.max(2, Math.min(1000, Math.floor((host.clientWidth - 16) / cw)));
+		const rows = Math.max(2, Math.min(500, Math.floor(host.clientHeight / ch)));
 		if (cols !== term.cols || rows !== term.rows) {
 			term.resize(cols, rows);
 			if (live) void ipc().then((c) => c.ptyResize({ runId, cols, rows }).catch(() => undefined));
@@ -125,7 +126,8 @@
 		t.open(host);
 		fit();
 		const data = t.onData((d) => {
-			if (live) void terminal.write(runId, d).catch((e: unknown) => ui.say(failureText(toIpcFailure(e))));
+			if (live)
+				void terminal.write(runId, d).catch((e: unknown) => ui.say(failureText(toIpcFailure(e))));
 		});
 		const off = terminal.connect(runId, (bytes) => {
 			void terminal.track(runId, bytes.length);
@@ -160,10 +162,13 @@
 	$effect(() => {
 		if (term) term.options.disableStdin = !live;
 	});
-
-	export function focus(): void {
-		term?.focus();
-	}
+	let seenTick = terminal.focusTick;
+	$effect(() => {
+		if (terminal.focusTick !== seenTick) {
+			seenTick = terminal.focusTick;
+			term?.focus();
+		}
+	});
 </script>
 
 <div class="term-host" data-terminal bind:this={host} aria-label={label} role="group"></div>
@@ -172,16 +177,11 @@
 	.term-host {
 		height: 100%;
 		min-height: 0;
+		min-width: 0;
+		overflow: hidden;
 		padding: 0 var(--space-3);
 	}
 	.term-host :global(.xterm) {
 		height: 100%;
-	}
-	.term-host :global(.term-probe) {
-		position: absolute;
-		visibility: hidden;
-		font-family: var(--font-mono);
-		font-size: var(--text-12);
-		white-space: pre;
 	}
 </style>

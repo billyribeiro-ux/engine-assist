@@ -24,8 +24,8 @@
 <div class="nownext" role="status" aria-live="polite" aria-label="Now and next">
 	{#if now}
 		<span
-			><b>Now</b>&nbsp; <span class="seg-val">{now.mode?.value ?? 'Manual'}</span>, {now.model?.value}, {now.effort
-				?.value}</span
+			><b>Now</b>&nbsp; <span class="seg-val">{now.mode?.value ?? 'Manual'}</span>, {now.model
+				?.value}, {now.effort?.value}</span
 		>
 		<span class="sep" aria-hidden="true"></span>
 	{/if}

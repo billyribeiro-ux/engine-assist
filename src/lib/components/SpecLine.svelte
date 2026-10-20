@@ -28,7 +28,13 @@
 		line.agents.length > 2 ? `${line.agents.length} agents` : line.agents.join(', ')
 	);
 	const surfaceIcon = $derived(
-		line.surface === 'cli' ? 'terminal' : line.surface === 'chat' ? 'chat' : line.surface === 'desktop' ? 'desktop' : 'play'
+		line.surface === 'cli'
+			? 'terminal'
+			: line.surface === 'chat'
+				? 'chat'
+				: line.surface === 'desktop'
+					? 'desktop'
+					: 'play'
 	);
 </script>
 
@@ -55,14 +61,32 @@
 	{#if line.effort}{@render value('Effort', line.effort, line.model, '')}{/if}
 	{#if line.mode}{@render value('Mode', line.mode, null, '')}{/if}
 	{#if !line.model && line.note}
-		<div><dt>Writes</dt><dd class="model">{line.note}</dd></div>
-		<div><dt>Model</dt><dd>—</dd></div>
+		<div>
+			<dt>Writes</dt>
+			<dd class="model">{line.note}</dd>
+		</div>
+		<div>
+			<dt>Model</dt>
+			<dd>—</dd>
+		</div>
 	{:else if line.surface === 'chat' && !line.mode}
-		<div><dt>Mode</dt><dd>—</dd></div>
+		<div>
+			<dt>Mode</dt>
+			<dd>—</dd>
+		</div>
 	{/if}
-	{#if agents}<div><dt>Agents</dt><dd>{agents}</dd></div>{/if}
-	{#each compact ? [] : line.droppedAgents as a (a)}<div><dt>Agent dropped</dt><dd>{a} not applicable</dd></div>{/each}
-	{#if line.note && line.model}<div><dt>Note</dt><dd class="note">{line.note}</dd></div>{/if}
+	{#if agents}<div>
+			<dt>Agents</dt>
+			<dd>{agents}</dd>
+		</div>{/if}
+	{#each compact ? [] : line.droppedAgents as a (a)}<div>
+			<dt>Agent dropped</dt>
+			<dd>{a} not applicable</dd>
+		</div>{/each}
+	{#if line.note && line.model}<div>
+			<dt>Note</dt>
+			<dd class="note">{line.note}</dd>
+		</div>{/if}
 </dl>
 
 <style>

@@ -5,7 +5,7 @@
 	import { toIpcFailure } from '#lib/ipc/errors.ts';
 	import { ipc } from '#lib/ipc/index.ts';
 	import { RUN } from '#lib/nav/status.ts';
-	import { refresh } from '#lib/stores/bus.svelte.ts';
+	import { refresh } from '#lib/stores/bus.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 	import { terminal } from '#lib/stores/terminal.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
@@ -14,7 +14,12 @@
 	import NowNext from './NowNext.svelte';
 	import TerminalView from './TerminalView.svelte';
 
-	let { projectName = null, fontSize = 12, scrollback = 10000, screenReaderMode = false }: {
+	let {
+		projectName = null,
+		fontSize = 12,
+		scrollback = 10000,
+		screenReaderMode = false
+	}: {
 		projectName?: string | null;
 		fontSize?: number;
 		scrollback?: number;
@@ -24,15 +29,7 @@
 	const tabs = $derived(terminal.tabs);
 	const active = $derived(tabs.find((t) => t.runId === terminal.active) ?? tabs[0] ?? null);
 	let menuOpen = $state(false);
-	let view = $state<TerminalView | undefined>();
 	let drag: { y: number; h: number } | null = null;
-
-	export function focusTerminal(): boolean {
-		if (!active) return false;
-		if (!ui.drawerOpen) ui.toggleDrawer();
-		queueMicrotask(() => view?.focus());
-		return true;
-	}
 
 	function word(t: (typeof tabs)[number]): string {
 		if (t.status === 'exited') return `exited ${t.exitCode ?? 0}`;
@@ -48,11 +45,22 @@
 			if (kind === 'terminate') {
 				await client.ptyTerminate({ runId: active.runId });
 				terminal.setStatus(active.runId, 'exited', 143);
-				refresh('runs', 'today', ...(active.projectId ? ([`project:${active.projectId}`] as const) : []));
+				refresh(
+					'runs',
+					'today',
+					...(active.projectId ? ([`project:${active.projectId}`] as const) : [])
+				);
 			}
 			if (kind === 'copy') {
 				if (!active.projectId) return;
-				await client.clipboardCopy({ projectId: active.projectId, target: 'sessionId', step: null, chain: active.chain, path: null, stage: null });
+				await client.clipboardCopy({
+					projectId: active.projectId,
+					target: 'sessionId',
+					step: null,
+					chain: active.chain,
+					path: null,
+					stage: null
+				});
 				ui.toast('Session ID copied', 'pass', 'copy');
 			}
 		} catch (e: unknown) {
@@ -62,7 +70,12 @@
 	}
 
 	async function close(runId: string, status: string): Promise<void> {
-		if (status === 'running' || status === 'starting' || status === 'idle' || status === 'blocked') {
+		if (
+			status === 'running' ||
+			status === 'starting' ||
+			status === 'idle' ||
+			status === 'blocked'
+		) {
 			// Closing a running tab ends the session; Rust asks first in a native dialog.
 			const client = await ipc();
 			try {
@@ -92,7 +105,8 @@
 
 	function onTabKey(e: KeyboardEvent, i: number): void {
 		const n = tabs.length;
-		const next = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i - 1 + n) % n : -1;
+		const next =
+			e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i - 1 + n) % n : -1;
 		if (next < 0) return;
 		e.preventDefault();
 		const t = tabs[next];
@@ -114,17 +128,24 @@
 		<div class="drawer-bar">
 			{#if tabs.length === 0}
 				<span class="muted note"
-					>Terminal: no sessions{projectName ? ` in ${projectName}` : ''}. Chat steps run in claude.ai.</span
+					>Terminal: no sessions{projectName ? ` in ${projectName}` : ''}. Chat steps run in
+					claude.ai.</span
 				>
 			{:else}
-				<span class="muted note">Terminal: {tabs.length} {tabs.length === 1 ? 'session' : 'sessions'}, hidden.</span>
+				<span class="muted note"
+					>Terminal: {tabs.length} {tabs.length === 1 ? 'session' : 'sessions'}, hidden.</span
+				>
 				<button class="btn ghost" type="button" onclick={() => ui.toggleDrawer()}>Show</button>
 			{/if}
 			<span class="spacer"></span><kbd title="Toggle terminal drawer">⌃`</kbd>
 		</div>
 	</section>
 {:else}
-	<section class={['drawer', terminal.focusMode && 'focus-mode']} aria-label="Terminal drawer" {@attach heightStyle}>
+	<section
+		class={['drawer', terminal.focusMode && 'focus-mode']}
+		aria-label="Terminal drawer"
+		{@attach heightStyle}
+	>
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (a focusable separator is the ARIA splitter pattern: ↑ ↓ resize) -->
 		<div
 			class="drawer-grip"
@@ -184,10 +205,18 @@
 				>
 				{#if menuOpen && active}
 					<div class="menu" role="menu" aria-label="Session">
-						<button role="menuitem" type="button" onclick={() => act('interrupt')}>Interrupt (Ctrl-C)</button>
-						<button role="menuitem" type="button" onclick={() => act('terminate')}>Terminate…</button>
-						<button role="menuitem" type="button" onclick={() => act('copy')}>Copy session ID</button>
-						<button role="menuitem" type="button" onclick={() => close(active.runId, active.status)}>Close tab</button>
+						<button role="menuitem" type="button" onclick={() => act('interrupt')}
+							>Interrupt (Ctrl-C)</button
+						>
+						<button role="menuitem" type="button" onclick={() => act('terminate')}
+							>Terminate…</button
+						>
+						<button role="menuitem" type="button" onclick={() => act('copy')}
+							>Copy session ID</button
+						>
+						<button role="menuitem" type="button" onclick={() => close(active.runId, active.status)}
+							>Close tab</button
+						>
 					</div>
 				{/if}
 			</div>
@@ -201,16 +230,20 @@
 				{#if active.archived}
 					<details class="archived">
 						<summary
-							><Icon name="chev" class="chev" />Earlier in this session: {active.archived.label}, {active.archived.lines.toLocaleString('en-US')}
+							><Icon name="chev" class="chev" />Earlier in this session: {active.archived.label}, {active.archived.lines.toLocaleString(
+								'en-US'
+							)}
 							lines (archived, read-only)</summary
 						>
 					</details>
 				{/if}
 				{#key active.runId}
 					<TerminalView
-						bind:this={view}
 						runId={active.runId}
-						live={active.status === 'running' || active.status === 'idle' || active.status === 'blocked' || active.status === 'starting'}
+						live={active.status === 'running' ||
+							active.status === 'idle' ||
+							active.status === 'blocked' ||
+							active.status === 'starting'}
 						label="Terminal output, {active.tabName}"
 						{fontSize}
 						{scrollback}
@@ -229,7 +262,10 @@
 		background: var(--term-bg);
 		color: var(--term-ink);
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		grid-template-rows: auto auto auto minmax(0, 1fr);
+		min-width: 0;
+		overflow: hidden;
 		height: min(var(--drawer-h, var(--drawer-height)), 60vh);
 		min-height: 0;
 		transition: height var(--dur-drawer) var(--ease-out);
@@ -299,6 +335,7 @@
 	}
 	.term {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		grid-template-rows: auto minmax(0, 1fr);
 		min-height: 0;
 		padding-top: var(--space-2);

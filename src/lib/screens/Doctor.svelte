@@ -8,7 +8,7 @@
 	import { toIpcFailure } from '#lib/ipc/errors.ts';
 	import { ipc } from '#lib/ipc/index.ts';
 	import type { DoctorCheck, LoginPathPreview } from '#lib/ipc/types.ts';
-	import { refresh } from '#lib/stores/bus.svelte.ts';
+	import { refresh } from '#lib/stores/bus.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
 	import Text from '#lib/render/Text.svelte';
@@ -66,7 +66,9 @@
 			{@const l = look(c)}
 			<li class={[c.level === 'failing' && 'is-fail']}>
 				<Icon name={l.icon} size="glyph" tone={l.tone} />
-				<span class="name">{c.name}<span class="vh">: {c.level === 'ok' ? 'passes' : c.level}</span></span>
+				<span class="name"
+					>{c.name}<span class="vh">: {c.level === 'ok' ? 'passes' : c.level}</span></span
+				>
 				<span class="detail"><Text spans={c.detail} /></span>
 				{#if c.action === 'captureLoginPath'}
 					<button class="btn" type="button" onclick={capture}>Capture my login shell PATH</button>
@@ -85,11 +87,14 @@
 				<h1 class="page-title" id="doc-title">Doctor</h1>
 				<p class="page-sub">
 					What Foreman needs on this Mac to launch steps exactly as the blueprint says.
-					{#if problems}{problems} {problems === 1 ? 'problem blocks' : 'problems block'} some steps.{:else if r}Everything
+					{#if problems}{problems}
+						{problems === 1 ? 'problem blocks' : 'problems block'} some steps.{:else if r}Everything
 						it checks passes.{/if}
 				</p>
 			</div>
-			<button class="btn" type="button" onclick={() => report.reload()}><Icon name="restore" />Check again</button>
+			<button class="btn" type="button" onclick={() => report.reload()}
+				><Icon name="restore" />Check again</button
+			>
 		</div>
 		{#if report.error}
 			<p class="err" role="alert"><Icon name="cross" size="glyph" />{failureText(report.error)}</p>
@@ -108,16 +113,24 @@
 					</div>
 					<table class="table cap">
 						<thead>
-							<tr><th scope="col">Feature</th><th scope="col">Minimum</th><th scope="col">Found</th><th scope="col">Blocks</th></tr>
+							<tr
+								><th scope="col">Feature</th><th scope="col">Minimum</th><th scope="col">Found</th
+								><th scope="col">Blocks</th></tr
+							>
 						</thead>
 						<tbody>
 							{#each r.capabilities as cap (cap.feature)}
 								<tr class={[!cap.found && 'blocks']}>
-									<td>{#if cap.code}<code>{cap.feature}</code>{:else}{cap.feature}{/if}</td>
+									<td
+										>{#if cap.code}<code>{cap.feature}</code>{:else}{cap.feature}{/if}</td
+									>
 									<td>{cap.minimum}</td>
 									<td>
-										{#if cap.found}<span class="status pass"><Icon name="check" size="glyph" />yes</span>
-										{:else}<span class="status fail"><Icon name="cross" size="glyph" />no</span>{/if}
+										{#if cap.found}<span class="status pass"
+												><Icon name="check" size="glyph" />yes</span
+											>
+										{:else}<span class="status fail"><Icon name="cross" size="glyph" />no</span
+											>{/if}
 									</td>
 									<td class={[!cap.blocks && 'muted']}>{cap.blocks ?? '—'}</td>
 								</tr>
@@ -126,8 +139,12 @@
 					</table>
 				</section>
 				<section class="section" aria-labelledby="probe-h">
-					<div class="section-head"><h2 class="section-title" id="probe-h">Contract probes</h2></div>
-					<p class="page-sub small">Run in the trusted probe folder when the version changes. They cost no tokens.</p>
+					<div class="section-head">
+						<h2 class="section-title" id="probe-h">Contract probes</h2>
+					</div>
+					<p class="page-sub small">
+						Run in the trusted probe folder when the version changes. They cost no tokens.
+					</p>
 					<table class="table probes">
 						<thead><tr><th scope="col">Probe</th><th scope="col">Result</th></tr></thead>
 						<tbody>
@@ -135,8 +152,19 @@
 								<tr>
 									<td><Text spans={p.probe} /></td>
 									<td>
-										<span class={['status', p.result === 'pass' ? 'pass' : p.result === 'fail' ? 'fail' : 'attention']}
-											><Icon name={p.result === 'pass' ? 'check' : p.result === 'fail' ? 'cross' : 'clock'} size="glyph" />{p.text}</span
+										<span
+											class={[
+												'status',
+												p.result === 'pass' ? 'pass' : p.result === 'fail' ? 'fail' : 'attention'
+											]}
+											><Icon
+												name={p.result === 'pass'
+													? 'check'
+													: p.result === 'fail'
+														? 'cross'
+														: 'clock'}
+												size="glyph"
+											/>{p.text}</span
 										>
 										{#if p.detail}<div class="muted">{p.detail}</div>{/if}
 									</td>
@@ -150,7 +178,9 @@
 
 			{#if r.checks.some((c) => c.group === 'toolchain')}
 				<section class="section" aria-labelledby="tool-h">
-					<div class="section-head"><h2 class="section-title" id="tool-h">Toolchain and PATH</h2></div>
+					<div class="section-head">
+						<h2 class="section-title" id="tool-h">Toolchain and PATH</h2>
+					</div>
 					{@render checks(r.checks.filter((c) => c.group === 'toolchain'))}
 				</section>
 			{/if}
@@ -171,9 +201,17 @@
 			{#each preview.entries as e, i (i)}
 				<li>
 					<span class="what"
-						>{#if e.ok}<Icon name="check" size="glyph" tone="pass" /> Keep{:else}<Icon name="cross" size="glyph" tone="fail" /> Drop{/if}</span
+						>{#if e.ok}<Icon name="check" size="glyph" tone="pass" /> Keep{:else}<Icon
+								name="cross"
+								size="glyph"
+								tone="fail"
+							/> Drop{/if}</span
 					>
-					<span><code><Text text={e.entry} /></code>{#if e.why}<span class="muted"> {e.why}</span>{/if}</span>
+					<span
+						><code><Text text={e.entry} /></code>{#if e.why}<span class="muted">
+								{e.why}</span
+							>{/if}</span
+					>
 				</li>
 			{/each}
 		</ul>

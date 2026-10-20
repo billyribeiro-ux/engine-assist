@@ -42,7 +42,11 @@
 		tamper: { icon: 'cross', tone: 'fail', action: 'Review packet' },
 		chatAwaitingPaste: { icon: 'paste', tone: 'attention', action: 'Open step' },
 		waitElapsed: { icon: 'clock', tone: 'attention', action: 'Open step' },
-		interruptedSession: { icon: 'broken', tone: 'muted', action: 'Start a fresh chain with context' },
+		interruptedSession: {
+			icon: 'broken',
+			tone: 'muted',
+			action: 'Start a fresh chain with context'
+		},
 		stepReady: { icon: 'ring', tone: 'muted', action: 'Open step' }
 	};
 
@@ -64,10 +68,21 @@
 			case 'outsideChange':
 				return goto(to.changes(i.project));
 			case 'interruptedSession':
-				if (i.step) report(await runStep({ projectId: i.project, step: i.step, surface: 'cli', entry: 'doNext', mode: 'freshWithContext' }));
+				if (i.step)
+					report(
+						await runStep({
+							projectId: i.project,
+							step: i.step,
+							surface: 'cli',
+							entry: 'doNext',
+							mode: 'freshWithContext'
+						})
+					);
 				return;
 			default:
-				return goto(i.step && i.stage !== null ? to.step(i.project, i.stage, i.step) : to.project(i.project));
+				return goto(
+					i.step && i.stage !== null ? to.step(i.project, i.stage, i.step) : to.project(i.project)
+				);
 		}
 	}
 
@@ -75,7 +90,11 @@
 		const s = row.next;
 		if (!s) return { label: 'Review and sign', icon: 'pen', disabled: null };
 		const why = s.whyNotRunnable;
-		const disabled = why ? (why.startsWith('Waits for') ? `${why.split(':')[0] ?? why} to finish` : why) : null;
+		const disabled = why
+			? why.startsWith('Waits for')
+				? `${why.split(':')[0] ?? why} to finish`
+				: why
+			: null;
 		if (s.surface === 'chat') return { label: 'Copy and open', icon: 'copy', disabled };
 		return { label: 'Run in terminal', icon: 'play', disabled };
 	}
@@ -89,16 +108,29 @@
 		}
 		const p = primary(row);
 		if (p.disabled) return ui.say(p.disabled);
-		report(await runStep({ projectId: row.project.id, step: s.key, surface: s.surface, entry: 'stageView' }));
+		report(
+			await runStep({
+				projectId: row.project.id,
+				step: s.key,
+				surface: s.surface,
+				entry: 'stageView'
+			})
+		);
 	}
 
 	function stripLabel(row: NextStepRow): string {
 		const cur = row.project.currentStage ?? 0;
 		const signed = row.strip.map((s, i) => (s === 'signed' ? i : -1)).filter((i) => i > 0);
 		const st = row.strip[cur];
-		const state = st === 'waiting' ? 'packet waiting for your signature' : st ? SHEET[st].word : 'in progress';
-		const sig = signed.length ? `; ${signed.length === 1 ? `stage ${signed[0] ?? ''}` : `stages ${signed[0] ?? ''} to ${signed.at(-1) ?? ''}`} signed` : '';
-		return `Stage ${cur} of 19 ${state === 'in progress' ? 'in progress' : `, ${state}`}${sig}`.replace(' ,', ',');
+		const state =
+			st === 'waiting' ? 'packet waiting for your signature' : st ? SHEET[st].word : 'in progress';
+		const sig = signed.length
+			? `; ${signed.length === 1 ? `stage ${signed[0] ?? ''}` : `stages ${signed[0] ?? ''} to ${signed.at(-1) ?? ''}`} signed`
+			: '';
+		return `Stage ${cur} of 19 ${state === 'in progress' ? 'in progress' : `, ${state}`}${sig}`.replace(
+			' ,',
+			','
+		);
 	}
 
 	let list = $state<HTMLElement>();
@@ -107,7 +139,9 @@
 	}
 	function move(d: number): true {
 		const els = rowsEls();
-		const i = els.findIndex((el) => el === document.activeElement || el.contains(document.activeElement));
+		const i = els.findIndex(
+			(el) => el === document.activeElement || el.contains(document.activeElement)
+		);
 		const next = els[Math.max(0, Math.min(els.length - 1, (i < 0 ? -1 : i) + d))];
 		next?.focus();
 		return true;
@@ -147,7 +181,9 @@
 					the next step here.
 				</p>
 				<div class="actions">
-					<a class="btn primary lg" href={to.setup()} data-today-row>Start your first project<kbd>⌘N</kbd></a>
+					<a class="btn primary lg" href={to.setup()} data-today-row
+						>Start your first project<kbd>⌘N</kbd></a
+					>
 				</div>
 			</div>
 		{:else if today.value}
@@ -171,7 +207,9 @@
 								<span class="proj">{i.projectName}</span>
 								<span class="what">{i.title}<small>{i.detail}</small></span>
 								<button class="btn" type="button" data-today-row onclick={() => act(i)}
-									>{#if i.kind === 'sessionBlocked'}<Icon name="terminal" />{/if}{look.action}</button
+									>{#if i.kind === 'sessionBlocked'}<Icon
+											name="terminal"
+										/>{/if}{look.action}</button
 								>
 							</li>
 						{/each}
@@ -201,7 +239,11 @@
 												: `Stage ${row.project.currentStage ?? ''}, ${row.stageTitle ?? ''}`}</span
 										>
 									</div>
-									{#if row.next.specLine}<SpecLine line={row.next.specLine} id="today-{row.project.id}" compact />{/if}
+									{#if row.next.specLine}<SpecLine
+											line={row.next.specLine}
+											id="today-{row.project.id}"
+											compact
+										/>{/if}
 								{:else if row.whyNone && row.project.readOnly}
 									<div class="stepname">{row.whyNone}</div>
 									<p class="small muted">Nothing here runs until the folder is back.</p>
@@ -224,7 +266,8 @@
 										aria-disabled={p.disabled ? 'true' : undefined}
 										aria-describedby={p.disabled ? `why-${row.project.id}` : undefined}
 										onclick={() => runRow(row)}
-										><Icon name={p.icon} />{p.label}{#if n === 0 && !p.disabled}<kbd>⌘↵</kbd>{/if}</button
+										><Icon name={p.icon} />{p.label}{#if n === 0 && !p.disabled}<kbd>⌘↵</kbd
+											>{/if}</button
 									>
 									{#if p.disabled}
 										<span class="reason" id="why-{row.project.id}">{p.disabled}</span>

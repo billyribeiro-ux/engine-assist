@@ -497,7 +497,10 @@ export class MockIpcClient implements IpcClient {
 	private chainRun(chain: string | null): World['runs'][number] | undefined {
 		if (!chain) return undefined;
 		const mine = this.world.runs.filter((r) => r.summary.chain === chain);
-		return mine.find((r) => r.live) ?? [...mine].sort((a, b) => b.summary.startedAt.localeCompare(a.summary.startedAt))[0];
+		return (
+			mine.find((r) => r.live) ??
+			[...mine].sort((a, b) => b.summary.startedAt.localeCompare(a.summary.startedAt))[0]
+		);
 	}
 	private continues(p: MProject, st: MStep): MStep | undefined {
 		const m = /continues (\S+)/.exec(st.tpl.where);
