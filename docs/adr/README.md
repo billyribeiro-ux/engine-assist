@@ -37,7 +37,7 @@ The design overview is in `docs/design-doc.md`.
 
 | Dependency | Version | Added by | Why |
 |---|---|---|---|
-| `rustix` | 1.1.5 | ADR-010, ADR-011, ADR-006 | Safe `openat`/`O_NOFOLLOW(_ANY)`, `renameatx_np`, `F_GETPATH`, `kill`, `umask` without `unsafe` |
+| `rustix` | 1.1.5 | ADR-010, ADR-011, ADR-006 | Safe `openat`/`O_NOFOLLOW(_ANY)`, `renameatx_np`, `F_GETPATH`, `kill`, `umask` without `unsafe`. The `event` feature (no new crate) is enabled in `foreman-sensor` only, for a 1 s `poll` deadline on the bounded stdin read (2026-10-20) |
 | `icu_casemap` | 2.3.0 | ADR-011 | Full case folding for SR-30 |
 | `icu_normalizer` | 2.3.0 | ADR-011 | NFC for SR-30 (already in the graph through `url`) |
 | `ts-rs` | 12.0.1 | ADR-004 | Generated TS types (behind the `ts` feature; not in release) |

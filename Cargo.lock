@@ -1317,6 +1317,12 @@ dependencies = [
 [[package]]
 name = "foreman-sensor"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+ "rustix",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "foreman-sys"
