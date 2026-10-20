@@ -78,8 +78,8 @@
 	"chips": {
 		"chips": [
 			{
-				"id": "new-chat",
-				"label": "New conversation in the Project",
+				"id": "session",
+				"label": "New conversation in Project Foreman",
 				"strong": true
 			},
 			{

@@ -9,4 +9,4 @@ import type { StepSummary } from "./StepSummary";
 /**
  * `StageView` (§4.3) with `subtitle`, `status`, `statusWhy` (§2.4).
  */
-export type StageView = { stage: Stage, title: string, applicable: Applicability, signed: SignedInfo | null, steps: Array<StepSummary>, packet: PacketSummary | null, subtitle: string, status: SheetStatus, statusWhy: string | null, };
+export type StageView = { stage: Stage, title: string, applicable: Applicability, signed: SignedInfo | null, steps: Array<StepSummary>, packet: PacketSummary | null, subtitle: string, status: SheetStatus, statusWhy: string | null, closeoutChecklist: Array<string>, };

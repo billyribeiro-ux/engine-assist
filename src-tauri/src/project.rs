@@ -845,10 +845,17 @@ impl Opened {
                 signed: signed.contains(&n),
             }
         });
+        // AC-F015-01 (P1): the close-out checklist once the packet is valid, until signed.
+        let closeout_checklist = steps::closeout::checklist(
+            n,
+            packet.as_ref().is_some_and(|p| p.exists && p.problems == 0),
+            signed.contains(&n),
+        );
         StageView {
             stage: Stage(n),
             title: title.to_owned(),
             applicable,
+            closeout_checklist,
             signed: signed.contains(&n).then(|| self.signed_info(n)),
             steps,
             packet,

@@ -6,6 +6,7 @@
 	import { onMount, tick } from 'svelte';
 
 	import { failureText } from '#lib/actions/words.ts';
+	import CloseOutChecklist from '#lib/components/CloseOutChecklist.svelte';
 	import Dialog from '#lib/components/Dialog.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Inspector from '#lib/components/Inspector.svelte';
@@ -307,6 +308,9 @@
 						</li>
 					{/if}
 				{/each}
+				{#if stage.closeoutChecklist.length}
+					<CloseOutChecklist stage={stage.stage} items={stage.closeoutChecklist} />
+				{/if}
 			</ol>
 		</main>
 		<Inspector
