@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-packet-signature-confirm"
+description = "Enables the packet_signature_confirm command without any pre-configured scope."
+commands.allow = ["packet_signature_confirm"]
+
+[[permission]]
+identifier = "deny-packet-signature-confirm"
+description = "Denies the packet_signature_confirm command without any pre-configured scope."
+commands.deny = ["packet_signature_confirm"]

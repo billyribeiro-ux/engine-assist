@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-blueprint-repin"
+description = "Enables the blueprint_repin command without any pre-configured scope."
+commands.allow = ["blueprint_repin"]
+
+[[permission]]
+identifier = "deny-blueprint-repin"
+description = "Denies the blueprint_repin command without any pre-configured scope."
+commands.deny = ["blueprint_repin"]

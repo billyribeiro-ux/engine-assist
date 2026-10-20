@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-terminal-link-open"
+description = "Enables the terminal_link_open command without any pre-configured scope."
+commands.allow = ["terminal_link_open"]
+
+[[permission]]
+identifier = "deny-terminal-link-open"
+description = "Denies the terminal_link_open command without any pre-configured scope."
+commands.deny = ["terminal_link_open"]

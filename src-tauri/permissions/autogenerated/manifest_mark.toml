@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-manifest-mark"
+description = "Enables the manifest_mark command without any pre-configured scope."
+commands.allow = ["manifest_mark"]
+
+[[permission]]
+identifier = "deny-manifest-mark"
+description = "Denies the manifest_mark command without any pre-configured scope."
+commands.deny = ["manifest_mark"]

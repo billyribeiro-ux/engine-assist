@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-add-step"
+description = "Enables the add_step command without any pre-configured scope."
+commands.allow = ["add_step"]
+
+[[permission]]
+identifier = "deny-add-step"
+description = "Denies the add_step command without any pre-configured scope."
+commands.deny = ["add_step"]

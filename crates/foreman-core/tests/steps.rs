@@ -243,11 +243,15 @@ mod steps {
         // The same for a followup's relaunch; a repeatable never becomes done (DR-069).
         let follow = ctx(K::Followup, Some(Surface::Cli), A::Applicable);
         assert_eq!(
-            transition(&at(S::Running), &follow, &E::Exited(0)).unwrap().state,
+            transition(&at(S::Running), &follow, &E::Exited(0))
+                .unwrap()
+                .state,
             S::Done
         );
         assert_eq!(
-            transition(&at(S::Running), &follow, &E::Exited(1)).unwrap().state,
+            transition(&at(S::Running), &follow, &E::Exited(1))
+                .unwrap()
+                .state,
             S::NotStarted
         );
         // A re-run of a done step that fails leaves it re-runnable, not done.

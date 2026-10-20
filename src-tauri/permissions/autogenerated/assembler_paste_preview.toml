@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-assembler-paste-preview"
+description = "Enables the assembler_paste_preview command without any pre-configured scope."
+commands.allow = ["assembler_paste_preview"]
+
+[[permission]]
+identifier = "deny-assembler-paste-preview"
+description = "Denies the assembler_paste_preview command without any pre-configured scope."
+commands.deny = ["assembler_paste_preview"]

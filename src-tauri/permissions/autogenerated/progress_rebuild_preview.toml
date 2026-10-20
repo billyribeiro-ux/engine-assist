@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-progress-rebuild-preview"
+description = "Enables the progress_rebuild_preview command without any pre-configured scope."
+commands.allow = ["progress_rebuild_preview"]
+
+[[permission]]
+identifier = "deny-progress-rebuild-preview"
+description = "Denies the progress_rebuild_preview command without any pre-configured scope."
+commands.deny = ["progress_rebuild_preview"]

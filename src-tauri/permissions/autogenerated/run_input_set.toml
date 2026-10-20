@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-input-set"
+description = "Enables the run_input_set command without any pre-configured scope."
+commands.allow = ["run_input_set"]
+
+[[permission]]
+identifier = "deny-run-input-set"
+description = "Denies the run_input_set command without any pre-configured scope."
+commands.deny = ["run_input_set"]

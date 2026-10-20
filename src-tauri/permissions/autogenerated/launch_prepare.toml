@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-launch-prepare"
+description = "Enables the launch_prepare command without any pre-configured scope."
+commands.allow = ["launch_prepare"]
+
+[[permission]]
+identifier = "deny-launch-prepare"
+description = "Denies the launch_prepare command without any pre-configured scope."
+commands.deny = ["launch_prepare"]

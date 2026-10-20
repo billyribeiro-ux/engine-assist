@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pty-flow"
+description = "Enables the pty_flow command without any pre-configured scope."
+commands.allow = ["pty_flow"]
+
+[[permission]]
+identifier = "deny-pty-flow"
+description = "Denies the pty_flow command without any pre-configured scope."
+commands.deny = ["pty_flow"]

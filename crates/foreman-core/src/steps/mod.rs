@@ -199,22 +199,23 @@ pub fn transition(
         // DR-066: the run ends on any exit code (the code is recorded in the run record).
         // DR-065: only exit 0 of a prompt step makes it done; any other exit returns it to
         // notStarted (run again). A repeatable step is never done (DR-069).
-        (
-            StepKind::Prompt | StepKind::Followup | StepKind::Repeatable,
-            StepEvent::Exited(code),
-        ) if cli(ctx) => match s {
-            StoredState::Running => {
-                let next = if *code == 0 && ctx.kind != StepKind::Repeatable {
-                    StoredState::Done
-                } else {
-                    StoredState::NotStarted
-                };
-                let mut n = with(p, next);
-                n.run_count = p.run_count.saturating_add(1);
-                Ok(n)
+        (StepKind::Prompt | StepKind::Followup | StepKind::Repeatable, StepEvent::Exited(code))
+            if cli(ctx) =>
+        {
+            match s {
+                StoredState::Running => {
+                    let next = if *code == 0 && ctx.kind != StepKind::Repeatable {
+                        StoredState::Done
+                    } else {
+                        StoredState::NotStarted
+                    };
+                    let mut n = with(p, next);
+                    n.run_count = p.run_count.saturating_add(1);
+                    Ok(n)
+                }
+                _ => reject("no run is running"),
             }
-            _ => reject("no run is running"),
-        },
+        }
         (
             StepKind::Prompt | StepKind::Followup | StepKind::Repeatable,
             StepEvent::Errored | StepEvent::Interrupted,
