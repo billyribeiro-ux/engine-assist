@@ -698,7 +698,7 @@ pub async fn metrics_export(
     state: tauri::State<'_, Shared>,
     req: Req<MetricsExportReq>,
 ) -> Result<ExportResult, IpcError> {
-    call(&state, req, commands::packets::metrics_export).await
+    call(&state, req, commands::runs::metrics_export).await
 }
 
 /// `metrics_view`.
@@ -707,7 +707,7 @@ pub async fn metrics_view(
     state: tauri::State<'_, Shared>,
     req: Req<MetricsViewReq>,
 ) -> Result<MetricsView, IpcError> {
-    call(&state, req, commands::packets::metrics_view).await
+    call(&state, req, commands::runs::metrics_view).await
 }
 
 /// `runs_clear`.
@@ -716,7 +716,7 @@ pub async fn runs_clear(
     state: tauri::State<'_, Shared>,
     req: Req<RunsClearReq>,
 ) -> Result<(), IpcError> {
-    call(&state, req, commands::packets::runs_clear).await
+    call(&state, req, commands::runs::runs_clear).await
 }
 
 /// `runs_search`.
@@ -725,7 +725,7 @@ pub async fn runs_search(
     state: tauri::State<'_, Shared>,
     req: Req<RunsSearchReq>,
 ) -> Result<RunsPage, IpcError> {
-    call(&state, req, commands::packets::runs_search).await
+    call(&state, req, commands::runs::runs_search).await
 }
 
 /// `gate_view`.

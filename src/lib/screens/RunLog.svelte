@@ -55,8 +55,10 @@
 	);
 	const m = $derived(metrics.value);
 	const sec = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
+	const min = (ms: number) => `${(ms / 60_000).toFixed(1)} min`;
 	const cli = $derived(m?.perSurface.find((s) => s.surface === 'cli'));
 	const chat = $derived(m?.perSurface.find((s) => s.surface === 'chat'));
+	const edits = $derived(m?.manualEditsByStage.reduce((n, s) => n + s.edits, 0) ?? 0);
 
 	function when(iso: string): string {
 		const d = new Date(iso);
@@ -112,13 +114,17 @@
 			Every launch, with the exact command and what happened. Resume works while Claude Code still
 			has the conversation.
 		</p>
-		<div class="metrics" role="group" aria-label="Time to start a step, last 30 days">
+		<div class="metrics" role="group" aria-label="Time to start a step and active time per step">
 			{#if m && m.runsCounted > 0}
 				<div class="metric">
-					<b>{cli ? sec(cli.medianTimeToStartMs) : '—'}</b><span>Median time to start, CLI</span>
+					<b>{cli ? sec(cli.medianTimeToStartMs) : '—'}</b><span
+						>Median time to start, CLI{cli ? ` (p95 ${sec(cli.p95TimeToStartMs)})` : ''}</span
+					>
 				</div>
 				<div class="metric">
-					<b>{chat ? sec(chat.medianTimeToStartMs) : '—'}</b><span>Median time to start, chat</span>
+					<b>{chat ? sec(chat.medianTimeToStartMs) : '—'}</b><span
+						>Median time to start, chat{chat ? ` (p95 ${sec(chat.p95TimeToStartMs)})` : ''}</span
+					>
 				</div>
 				<div class="metric">
 					<b class={[m.p95AllMs > 10_000 && 'over']}>{sec(m.p95AllMs)}</b><span
@@ -126,10 +132,27 @@
 					>
 				</div>
 				<div class="metric">
-					<b>{m.manualEditsByStage.reduce((n, s) => n + s.edits, 0)}</b><span
-						>Manual prompt edits</span
+					<b>{cli && cli.medianActiveMsPerStep > 0 ? min(cli.medianActiveMsPerStep) : '—'}</b><span
+						>Median active time per step, CLI</span
 					>
 				</div>
+				<div class="metric">
+					<b>{chat && chat.medianActiveMsPerStep > 0 ? min(chat.medianActiveMsPerStep) : '—'}</b
+					><span>Median active time per step, chat</span>
+				</div>
+				<div class="metric">
+					<b>{edits}</b><span>Manual prompt edits</span>
+				</div>
+				<div class="metric">
+					<b>{m.stagesThroughForeman}</b><span>Stages run through Foreman</span>
+				</div>
+				{#if m.baseline}
+					<div class="metric">
+						<b>{sec(m.baseline.foremanMedianMs)} vs {sec(m.baseline.baselineMedianMs)}</b><span
+							>Median to start, Foreman vs by hand</span
+						>
+					</div>
+				{/if}
 			{:else if m}
 				<div class="metric">
 					<b>0</b><span>Runs counted. Metrics start with your first launch.</span>
@@ -137,6 +160,13 @@
 			{/if}
 			<button class="btn export" type="button" onclick={exportMetrics}>Export metrics</button>
 		</div>
+		{#if m && m.manualEditsByStage.length > 0}
+			<p class="muted small" id="rl-edits">
+				Manual prompt edits by stage: {m.manualEditsByStage
+					.map((s) => `Stage ${s.stage} · ${s.edits}`)
+					.join(', ')}
+			</p>
+		{/if}
 		<div class="filters" role="search">
 			<label class="vh" for="rl-q">Search runs</label>
 			<input
@@ -270,7 +300,8 @@
 	}
 	.metrics {
 		display: flex;
-		gap: var(--space-7);
+		flex-wrap: wrap;
+		gap: var(--space-4) var(--space-7);
 		margin-top: var(--space-5);
 		padding: var(--space-4) 0;
 		border-top: var(--hairline) solid var(--rule);

@@ -132,7 +132,6 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 | M3-16 | `progress_rebuild_*` |
 | M3-18, M4-12…M4-14 | `probe_folder_open`, `probe_run`, `doctor_capture_login_path`, `doctor_login_path_apply` |
 | M3-21 | `packet_normalize_apply` (the DR-131 normalizer) |
-| M3-26, M4-02, M4-03 | `metrics_export`, `metrics_view`, `runs_clear`, `runs_search` (run records first) |
 | M4-16…M4-33 | gates, signing, `tamper_restore`, lessons, manifest, assembler, desktop, `add_step`, `add_item`, `run_sheet_export`, `item_kind_confirm`, `terminal_open_here` |
 
 ## M3 chat tickets (branch `stage/05-chat`)
@@ -144,10 +143,29 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 | M3-24 | in-progress | Paste-back preview and apply: `foreman_core::pasteback` plans every target from declared paths only (packet, attachments, extra outs, outputs; wrong stage, two packets, P1 appends refused), apply re-checks every stamp before the first write. Tests: `pasteback::lists_targets_before_write`, `atomic::refuses_newer_file` (paste-back conflict), invalid packet → fix request, clipboard errors, policy refusal, AC-XC-16 `pasteback::no_chat_content_stored`. **Left:** field-level normalization (DR-131: unsigned forms, `none`, smart quotes, NBSP, header variants) is M3-20's `packet::normalize_packet`; paste-back calls the structural `pasteback::prepare` (BOM, CRLF, fence) through a normalizer seam until M3-20 lands, then the call in `chat::paste_back_preview` swaps to it. AC-F012-13's "explicit Open action" for pasted links has no command in ipc.md (links show as text). |
 | M3-25 | done | Close-out checklist step (P1): `foreman_core::steps::closeout`, `StageView.closeoutChecklist` (ipc.md §2.4), `CloseOutChecklist.svelte` once the packet is valid and the stage unsigned. Test: `steps::closeout_sequences`, component tests. |
 
+## Run metrics, retention and the run log (branch `stage/05-metrics`: M3-26, M4-02, M4-03, M3-28)
+
+| Ticket | Status | Built | Left |
+| ------ | ------ | ----- | ---- |
+| M3-26 | in-progress | `metrics_export` (native save dialog; `.md` only; `WritePurpose::UserExport`), `metrics_view`; the engine is `foreman_core::runlog` (`parse_index`, `merge_latest`, `analyze`, `Baseline`, `export_metrics`); tests `metrics::runlog::*`, `metrics_view::*`, `export::*` (core and app); `bench_metrics_100k` 169 ms for 100k lines against the 300 ms NFR-02 budget (shared 2-core Linux container, not a Mac) | Chat clock call sites: `runs::record_chat_copy` (Copy and open) and `runs::note_step_done` (mark done, paste-back) are built and tested, but `chat.rs` and the paste-back/mark-done handlers belong to other branches and must call them at merge. Real-Mac performance run. |
+| M4-02 | in-progress | `runs_clear`, full `project_remove` (`projects/<id>/`, approvals, fingerprints; the repo is untouched), 90-day tail pruning on the startup scan, `remove_file`/`remove_tree`/`tree_size` through symlink-safe `unlinkat` in `store::app_dirs`, a native confirmation for each, `settings.runHistory` size; tests `privacy::*`, `retention::*`, `app_data_delete::*` | Template/event pruning (events belong to M4-09). Project-removal UI (no screen calls it). APFS behaviors (Mac). |
+| M4-03 | in-progress | `runs_search` (newest 3000 records scanned when a query is given; paged), the strip on `RunLog` (time to start, p95, active time, edits, baseline comparison); tests `search::*`, `RunLog.svelte.test.ts`, a11y flow | Cross-check of the mockup in both themes on a Mac. |
+| M3-28 | in-progress | `tests/flows/p1-loop.spec.ts`: a keyboard-only mock flow for create, chat steps, paste back, config acknowledge, CLI run, re-arm of a continuing step, terminal focus out and back (3 tests, chromium). Fixes: `selectStep` also walks up with K; the mock gains `setRunIdle` (the P2 sensor's idle status) | The real-app keyboard script (`e2e/specs`, macOS only; the ticket's `tests/e2e/keyboard-p1.e2e.ts` path does not exist: the specs live in `e2e/specs`). WebKit flow project not installed in the sandbox. |
+
+Definitions and assumptions (stated in the export too):
+- The baseline is `docs/metrics-baseline.md` of the first registered project that has a filled log; the chat baseline needs at least 10 steps (kill check, per surface). Desktop runs are not in the kill check.
+- Time to start leaves out `rearm`/`repair` entries. Active time per step is the sum of `timeToStartMs + durationMs - waitMs` per (surface, project, step), counted only if some run finished and none was interrupted. Median is the midpoint of an even pair; p95 is nearest-rank.
+- Edits are run-input interventions (a run input set again to a different value; the first set is not one) plus Copy prompt on a CLI step. Marks live in memory and reset on restart; so does the chat step-done duration.
+- `BaselineComparison` is the median time to start over both surfaces against the by-hand median ([CR-008b](change-requests/CR-008b-metrics-view-per-surface-baseline.md)). The latest index line per `runId` wins, and a chat step has a second line ([CR-008a](change-requests/CR-008a-run-index-latest-line-wins.md)).
+- The export path policy is stricter than SR-30 asks: `.md` only, never inside `.git`, `.claude` or `.foreman` folders anywhere, never `CLAUDE.md`, never the app's data folder.
+- A month index file is read up to 8 MB (`ReadClass::AppState`).
+- `ipc.md` writes `MetricsView` without `p95_all_ms` in the §1052 Rust block but has `p95AllMs` in the TS block; the code has the field.
+- The old `metrics_*`/`runs_*` stubs in `src-tauri/src/ipc/commands/packets.rs` are now unused; delete them at merge (that file belongs to the packets branch).
+
 ### Open follow-ups
 
 - `settings.json` v2 with `screenReaderMode` (core schema + migration; files.md §4.1 proposal).
-- `project_remove` removes the registry entry only; deleting `projects/<id>/`, approvals and fingerprints needs a store delete (M4-02).
+- `project_remove` is complete (M4-02, `stage/05-metrics`). No screen calls `projectRemove` yet; the removal UI is left (M4-02 asks for the native confirmation, which Rust raises).
 - `foreman-core::store::dirs::ensure_dir` (new, for setup's empty folders) needs a core review.
 - (CR-003) `foreman-core::pin_check::p1_annotation_errors` (new) lets `setup_preview` refuse before anything is written; it mirrors `lock`'s private `problem`/`step_at` (pinned by `pin_check::preview_check_matches_pin`). The core owner may fold it into `lock.rs`. Pin refusals map to `IpcError{notAllowed, detail: annotationErrors}`; Setup and the wizard list each error (`AnnotationProblems.svelte`). No re-pin screen exists yet; it should reuse that component.
 - `PtySession::wait_exit` now returns only after the sink was told of the exit (`pty::write_requires_live_run` raced the sink: 3 of 60 runs under load failed; 0 of 60 after).

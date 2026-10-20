@@ -173,6 +173,14 @@ export class MockIpcClient implements IpcClient {
 	setDialogAnswer(a: DialogAnswer): void {
 		this.dialog = a;
 	}
+	/** Test hook for the P2 sensor: the live session of `runId` is now idle (so Run can re-arm it). */
+	setRunIdle(runId: string): void {
+		const r = this.liveRun(runId);
+		r.summary.status = 'idle';
+		this.emit('run:status', { runId, status: 'idle', rev: ++this.revCounter });
+		const p = this.world.projects.find((x) => x.id === r.summary.project);
+		if (p) this.touch(p); // steps that wait on this session re-read their blockers
+	}
 	setClipboard(text: string): void {
 		this.world.clipboard = text;
 	}

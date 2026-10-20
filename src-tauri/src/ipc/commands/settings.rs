@@ -130,20 +130,9 @@ pub fn view(app: &App, s: &SettingsFile) -> Result<SettingsView, IpcError> {
             })
             .collect(),
         screen_reader_mode,
-        // The run count; the size on disk comes with the Data pane (M4-02).
-        run_history: RunHistorySize {
-            runs: app
-                .app_root()
-                .ok()
-                .and_then(|r| foreman_core::store::app_dirs::list_app_data_dir(&r, "runs").ok())
-                .map_or(0, |ids| {
-                    let n = ids
-                        .iter()
-                        .filter(|n| foreman_core::ids::is_uuid_v4(n))
-                        .count();
-                    u32::try_from(n).unwrap_or(u32::MAX)
-                }),
-            megabytes: 0,
+        run_history: {
+            let (runs, megabytes) = crate::runs::history_size(app);
+            RunHistorySize { runs, megabytes }
         },
     })
 }

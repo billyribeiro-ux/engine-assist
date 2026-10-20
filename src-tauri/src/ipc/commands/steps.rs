@@ -540,12 +540,22 @@ pub fn run_input_set(app: &App, req: RunInputSetReq) -> Result<StepView, IpcErro
     if decl.remember {
         p.progress.remembered.insert(name.to_owned(), value.clone());
     }
+    // A value set again after it was already set is an intervention (F-026, AC-KC-03).
+    let changed = p
+        .progress
+        .run_inputs
+        .get(&s.key)
+        .and_then(|m| m.get(name))
+        .is_some_and(|old| *old != value);
     p.progress
         .run_inputs
         .entry(s.key.clone())
         .or_default()
         .insert(name.to_owned(), value);
     p.save_progress(app)?;
+    if changed {
+        app.runs().note_input_retyped(p.id(), s.key.as_str());
+    }
     view_of(app, &p, req.step.as_str())
 }
 
@@ -1050,6 +1060,9 @@ pub fn clipboard_copy(app: &App, req: ClipboardCopyReq) -> Result<CopyResult, Ip
             let focus = (s.kind == CoreKind::Followup)
                 .then(|| chain_live_run(app, &p, &s))
                 .flatten();
+            if s.surface == Some(foreman_core::ids::Surface::Cli) {
+                app.runs().note_copy_prompt(p.id(), s.key.as_str());
+            }
             if s.kind == CoreKind::Followup && p.read_only.is_none() {
                 apply_event(app, &mut p, key.as_str(), &StepEvent::Copy, "not-runnable")?;
                 p.progress

@@ -600,6 +600,10 @@ pub fn start(
         wall_start: app.now(),
         cwd: Some(cwd_name(cwd_kind)),
     });
+    // What Billy did to this step's prompt since its last run (AC-F026-01, AC-KC-03).
+    let marks = app.runs().take_marks(p.id(), held.step.as_str());
+    file.run_input_interventions = marks.interventions;
+    file.copy_prompt_on_cli = marks.copy_prompt;
     file.t.prepared = Some(0);
     file.t.confirmed = Some(u64::try_from(held.started.elapsed().as_millis()).unwrap_or(u64::MAX));
     let stamp = runs::write_run(&p.app_root, &file, &ReadStamp::Absent)?;

@@ -5,6 +5,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const TRADELOG = '7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11';
+const RUN23 = 'a0000000-0000-4000-8000-000000000023';
 const PACKET = [
 	'=== HANDOFF PACKET · Stage 1 → Stage 2 ===',
 	'PROJECT: Ledger',
@@ -27,9 +28,10 @@ const clipboard = (page: Page) =>
 const toast = (page: Page, text: string | RegExp) =>
 	expect(page.locator('.toast').filter({ hasText: text }).first()).toBeVisible();
 
-/** Moves the selection with J until the focused step row matches. */
+/** Moves the selection with J (then K, when the row is above) until the focused step row matches. */
 async function selectStep(page: Page, re: RegExp): Promise<void> {
 	for (let i = 0; i < 12 && !re.test(await focused(page)); i++) await page.keyboard.press('j');
+	for (let i = 0; i < 24 && !re.test(await focused(page)); i++) await page.keyboard.press('k');
 	expect(await focused(page)).toMatch(re);
 }
 /** Tabs (or Shift+Tabs) until the focused control matches. */
@@ -112,6 +114,42 @@ test('P1 loop, keyboard only: acknowledge config, run a CLI step, terminal focus
 	await page.keyboard.press('Meta+Enter');
 	await page.keyboard.press('Meta+Enter');
 	await expect(page.getByRole('tab', { name: /x-2-1|x.2.1/ })).toBeVisible();
+
+	await page.keyboard.press('Meta+Shift+t');
+	await expect(page.locator('.xterm-helper-textarea').first()).toBeFocused();
+	await page.keyboard.press('Meta+Shift+e');
+	await expect(page.locator('.xterm-helper-textarea').first()).not.toBeFocused();
+	expect(await page.evaluate(() => document.activeElement?.closest('main') !== null)).toBe(true);
+});
+
+test('P1 loop, keyboard only: re-arm a continuing step, terminal focus returns', async ({
+	page
+}) => {
+	// In Stage 2 the session of 2.3 is still alive, so 2.4 (which continues it) re-arms it: Run
+	// ends the idle session after the native confirmation and resumes the chain (AC-F028-02).
+	await page.goto(`/projects/${TRADELOG}/stages/2`);
+	await expect(
+		page.getByRole('heading', { level: 1, name: "Architect's Design Studio" })
+	).toBeVisible();
+
+	await page.keyboard.press('Tab');
+	await selectStep(page, /^2\.4/);
+	await tabTo(page, /^Acknowledge$/, 'Shift+Tab');
+	await page.keyboard.press('Enter');
+	await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0);
+
+	// The sensor reports the session idle (the mock's stand-in for it), so Run may re-arm it.
+	await page.evaluate((run) => {
+		(
+			window as unknown as { __foremanMock: { setRunIdle(id: string): void } }
+		).__foremanMock.setRunIdle(run);
+	}, RUN23);
+	await selectStep(page, /^2\.4/);
+	await page.keyboard.press('Meta+Enter');
+	await page.keyboard.press('Meta+Enter');
+	// The idle session ended and the chain resumed in a new tab: no second live session.
+	await expect(page.getByRole('tab', { name: /2-4|2\.4/ })).toBeVisible();
+	await expect(page.getByRole('tab', { name: /2-3.* running/ })).toHaveCount(0);
 
 	await page.keyboard.press('Meta+Shift+t');
 	await expect(page.locator('.xterm-helper-textarea').first()).toBeFocused();
