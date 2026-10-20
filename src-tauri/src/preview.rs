@@ -14,4 +14,6 @@ pub enum Preview {
     Paste(Box<crate::ipc::commands::chat::HeldPaste>),
     /// `sign_preview` → `sign_apply`.
     Sign(Box<crate::signing::HeldSign>),
+    /// `doctor_capture_login_path` → `doctor_login_path_apply`.
+    LoginPath(Box<crate::ipc::commands::doctor::HeldLoginPath>),
 }

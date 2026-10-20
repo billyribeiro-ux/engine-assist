@@ -48,9 +48,10 @@ fn pty_error(e: &PtyError) -> IpcError {
     }
 }
 
-fn status_of(r: &LiveRun) -> RunStatus {
+fn status_of(app: &App, r: &LiveRun) -> RunStatus {
     match r.session.status() {
-        PtyStatus::Running => RunStatus::Running,
+        // P2: the sensor's idle/blocked for a live session (display only).
+        PtyStatus::Running => crate::sensor_ingest::live_status(app, &r.run_id),
         PtyStatus::Exited(i) if i.code.is_some() => RunStatus::Exited,
         PtyStatus::Exited(_) => RunStatus::Errored,
     }
@@ -72,7 +73,7 @@ pub fn pty_attach(
     }
     r.outputs.attach(output);
     Ok(AttachInfo {
-        status: status_of(&r),
+        status: status_of(app, &r),
         replayed_lines: lines,
         tab_name: r.tab_name.clone(),
     })
@@ -162,6 +163,8 @@ pub fn pty_terminate(app: &App, req: PtyTerminateReq) -> Result<(), IpcError> {
 struct Ui<'a> {
     app: &'a App,
     progress: &'a Channel<LaunchProgress>,
+    /// Billy chose Wait in the busy dialog (P2, AC-F010-14).
+    waited: std::cell::Cell<bool>,
 }
 
 impl RearmUi for Ui<'_> {
@@ -174,11 +177,16 @@ impl RearmUi for Ui<'_> {
     }
 
     fn confirm_busy(&self, tasks: u32) -> bool {
-        self.app.os().confirm(&Confirm::new(
-            "Background tasks are running",
-            format!("{tasks} background tasks are still running. Ending the session stops them."),
+        let ok = self.app.os().confirm(&Confirm::new(
+            format!(
+                "{tasks} background {} still running",
+                if tasks == 1 { "task" } else { "tasks" }
+            ),
+            "Ending the session now stops them. Wait lets them finish; press Run again when Claude is idle.",
             "End anyway",
-        ))
+        ));
+        self.waited.set(!ok);
+        ok
     }
 
     fn end_yourself(&self) {}
@@ -267,7 +275,16 @@ fn drive(
         *started.borrow_mut() = Some(s);
         Ok(session)
     };
-    let ui = Ui { app, progress };
+    let ui = Ui {
+        app,
+        progress,
+        waited: std::cell::Cell::new(false),
+    };
+    // ADR-008 P2: the sensor's idle (AC-F010-13) or busy (AC-F010-14) answer, read now that Billy
+    // pressed Run; without a sensor or its events, his native confirmation (AC-F011-09).
+    let idle = old.as_ref().map_or(IdleSource::Billy, |r| {
+        crate::sensor_ingest::idle_source(app, &r.run_id)
+    });
     let mut hooks = Hooks {
         prepare_again: &mut prepare_again,
         archive: &mut archive,
@@ -277,7 +294,7 @@ fn drive(
         rearm::rearm_start(
             UserAction::from_ipc_invoke(),
             old.as_ref().map(|r| &r.session),
-            IdleSource::Billy,
+            idle,
             &held.plan,
             &ui,
             &mut hooks,
@@ -306,6 +323,10 @@ fn drive(
                 chain: ChainId::from_trusted(chain),
             })
         }
+        Ok(SysRearm::Cancelled) if ui.waited.get() => Err(IpcError::not_allowed(
+            "background-tasks-running",
+            "Background tasks are still running. Press Run again when Claude is idle.",
+        )),
         Ok(SysRearm::Cancelled) => Err(IpcError::cancelled()),
         Ok(SysRearm::Stale(_)) => {
             let fresh = fresh

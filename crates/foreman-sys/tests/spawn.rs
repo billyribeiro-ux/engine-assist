@@ -281,3 +281,68 @@ mod spawn {
         );
     }
 }
+
+/// SR-02 (M4-14): the single consented shell. Its argv is fixed (`-l -c 'printf %s "$PATH"'`),
+/// it runs in app data with exactly the given environment, and the shell path gets SR-01's checks
+/// (absolute, an executable regular file, not inside a project).
+mod login_shell {
+    use super::*;
+
+    #[test]
+    fn fixed_argv_in_app_data() {
+        assert_eq!(sp::LOGIN_SHELL_ARGS, ["-l", "-c", "printf %s \"$PATH\""]);
+        let d = tempfile::tempdir().unwrap();
+        let app = d.path().join("app");
+        let project = d.path().join("project");
+        std::fs::create_dir_all(&app).unwrap();
+        std::fs::create_dir_all(&project).unwrap();
+        let ctx = SpawnCtx {
+            home: d.path().into(),
+            app_data: app.clone(),
+            projects: vec![project.clone()],
+            settings: vec![],
+        };
+        // A shell that reports its argv and cwd instead of PATH.
+        let shell = d.path().join("bin/fakesh");
+        std::fs::create_dir_all(shell.parent().unwrap()).unwrap();
+        std::fs::write(
+            &shell,
+            "#!/bin/sh\nprintf '%s|' \"$@\"; pwd; printf '%s' \"$PATH\"\n",
+        )
+        .unwrap();
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let req = |s: PathBuf| SpawnRequest::LoginShellPath {
+            shell: s,
+            consent: sp::LoginShellConsent::granted_in_native_dialog(),
+        };
+        let mut o = opts(vec![("PATH".into(), "/usr/bin:/bin".into())]);
+        o.cwd = Cwd::Dir(project.clone());
+        let out = sp::run(&req(shell.clone()), &o, &ctx).unwrap();
+        let text = String::from_utf8(out.stdout).unwrap();
+        let (args, rest) = text.split_once('\n').unwrap();
+        assert_eq!(
+            args,
+            format!(
+                "-l|-c|printf %s \"$PATH\"|{}",
+                sp::canonical(&app).display()
+            )
+        );
+        assert_eq!(rest, "/usr/bin:/bin");
+        // SR-01 checks on the shell path.
+        assert!(matches!(
+            sp::run(&req(PathBuf::from("bin/sh")), &o, &ctx),
+            Err(SpawnError::RelativePath(_))
+        ));
+        let inside = project.join("sh");
+        std::fs::copy(&shell, &inside).unwrap();
+        assert!(matches!(
+            sp::run(&req(inside), &o, &ctx),
+            Err(SpawnError::InsideProject(_))
+        ));
+        assert!(matches!(
+            sp::run(&req(d.path().join("missing")), &o, &ctx),
+            Err(SpawnError::NotExecutable(_))
+        ));
+    }
+}

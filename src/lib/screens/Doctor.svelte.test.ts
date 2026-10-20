@@ -31,6 +31,22 @@ describe('Doctor', () => {
 			.toBeVisible();
 	});
 
+	it('primary: Run probes now runs the contract probes', async () => {
+		const m = fresh('happy');
+		const probe = vi.spyOn(m, 'probeRun');
+		const s = await render(Doctor);
+		await s.getByRole('button', { name: 'Run probes now' }).click();
+		await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(1));
+	});
+
+	it('primary: Open probe folder opens Claude Code there in a terminal tab', async () => {
+		const m = fresh('happy');
+		const open = vi.spyOn(m, 'probeFolderOpen');
+		const s = await render(Doctor);
+		await s.getByRole('button', { name: 'Open probe folder' }).click();
+		await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+	});
+
 	it('error: a failed run is announced', async () => {
 		const m = fresh('happy');
 		failing(m, 'doctorRun');

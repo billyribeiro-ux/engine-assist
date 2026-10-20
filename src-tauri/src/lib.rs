@@ -12,9 +12,12 @@ pub mod logging;
 pub mod notify;
 pub mod os;
 pub mod preview;
+pub mod probe;
 pub mod project;
 pub mod render;
 pub mod runs;
+pub mod sensor;
+pub mod sensor_ingest;
 pub mod signing;
 pub mod state;
 pub mod text;
@@ -149,6 +152,15 @@ pub fn run() -> tauri::Result<()> {
             let state = state::App::new(os, paths);
             watch::start(state.weak());
             inbox::start(&state);
+            // ADR-009: install the bundled sensor (if this build has one) off the main thread.
+            let weak = state.weak();
+            let _ = std::thread::Builder::new()
+                .name("fm-sensor-install".into())
+                .spawn(move || {
+                    if let Some(app) = weak.upgrade() {
+                        let _ = sensor::install(&app);
+                    }
+                });
             app.manage::<ipc::Shared>(state);
             window::build_main(app)?;
             Ok(())

@@ -224,3 +224,62 @@ fn size_of(dir: &std::os::fd::OwnedFd, rel: &str, depth: usize) -> Result<u64, S
     }
     Ok(total)
 }
+
+/// Installs an executable into app data (ADR-009: `bin/foreman-sensor-<sha256-12>`, files.md §2
+/// row 24, mode `0700`): whatever is at `rel` (a file or a symlink, never followed) is removed,
+/// `bytes` are written through the atomic writer (`O_EXCL`, never replacing), and the new file is
+/// set to `0700` through an fd opened without following links. Only for app data.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused, names a folder, or a step fails.
+pub fn install_executable(root: &Root, rel: &str, bytes: &[u8]) -> Result<(), StoreError> {
+    if root.kind() != RootKind::AppData {
+        return Err(StoreError::NotFound(format!("{rel}: not app data")));
+    }
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    remove_file(root, rel)?;
+    root.write(&p, bytes, &super::ReadStamp::Absent)?;
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Err(StoreError::NotFound(rel.to_owned()));
+    };
+    let fd = rustix::fs::openat(
+        &dir,
+        name.as_str(),
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK,
+        Mode::empty(),
+    )
+    .map_err(|e| StoreError::io(rel, e))?;
+    rustix::fs::fchmod(&fd, Mode::from_raw_mode(0o700)).map_err(|e| StoreError::io(rel, e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    #[test]
+    fn install_executable_is_0700_and_replaces_links() {
+        let d = tempfile::tempdir().unwrap();
+        let app = d.path().join("app");
+        let root = Root::open_app_data(&app).unwrap();
+        install_executable(&root, "bin/tool-0123456789ab", b"one").unwrap();
+        let f = app.join("bin/tool-0123456789ab");
+        assert_eq!(std::fs::read(&f).unwrap(), b"one");
+        assert_eq!(
+            std::fs::metadata(&f).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        // A planted symlink is replaced, its target untouched.
+        let victim = d.path().join("victim");
+        std::fs::write(&victim, b"keep").unwrap();
+        std::fs::remove_file(&f).unwrap();
+        std::os::unix::fs::symlink(&victim, &f).unwrap();
+        install_executable(&root, "bin/tool-0123456789ab", b"two").unwrap();
+        assert_eq!(std::fs::read(&victim).unwrap(), b"keep");
+        assert!(!std::fs::symlink_metadata(&f).unwrap().is_symlink());
+        assert_eq!(std::fs::read(&f).unwrap(), b"two");
+        // A folder in the way is refused.
+        std::fs::create_dir_all(app.join("bin/dir-0123456789ab")).unwrap();
+        assert!(install_executable(&root, "bin/dir-0123456789ab", b"x").is_err());
+    }
+}

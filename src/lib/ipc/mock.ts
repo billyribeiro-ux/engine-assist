@@ -168,20 +168,35 @@ export class MockIpcClient implements IpcClient {
 		this.picks = 0;
 		this.overrides.clear();
 		this.outputs.clear();
+		this.sensor.clear();
 		this.emit('projects:changed', { rev: ++this.revCounter });
 		this.emit('settings:changed', { rev: this.world.settings.rev });
 	}
 	setDialogAnswer(a: DialogAnswer): void {
 		this.dialog = a;
 	}
-	/** Test hook for the P2 sensor: the live session of `runId` is now idle (so Run can re-arm it). */
-	setRunIdle(runId: string): void {
+	/**
+	 * Test hook for the P2 sensor (M4-09, M4-10), as Rust's `sensor_ingest` derives it from the
+	 * hook events: the live session of `runId` shows `idle`, `blocked` or `running`, with `tasks`
+	 * background tasks outstanding. It only updates what is shown (SR-18); Run reads it to decide
+	 * whether the re-arm needs Billy's idle dialog (no sensor answer) or the busy dialog (tasks).
+	 */
+	setRunSensor(
+		runId: string,
+		state: { status: 'idle' | 'blocked' | 'running'; tasks?: number }
+	): void {
 		const r = this.liveRun(runId);
-		r.summary.status = 'idle';
-		this.emit('run:status', { runId, status: 'idle', rev: ++this.revCounter });
+		this.sensor.set(runId, { status: state.status, tasks: state.tasks ?? 0 });
+		r.summary.status = state.status;
+		this.emit('run:status', { runId, status: state.status, rev: ++this.revCounter });
 		const p = this.world.projects.find((x) => x.id === r.summary.project);
 		if (p) this.touch(p); // steps that wait on this session re-read their blockers
 	}
+	/** The sensor reports the live session of `runId` idle with nothing outstanding. */
+	setRunIdle(runId: string): void {
+		this.setRunSensor(runId, { status: 'idle' });
+	}
+	private sensor = new Map<string, { status: 'idle' | 'blocked' | 'running'; tasks: number }>();
 	setClipboard(text: string): void {
 		this.world.clipboard = text;
 	}
@@ -2177,8 +2192,14 @@ export class MockIpcClient implements IpcClient {
 		return this.run('rearm_start', req, () => {
 			const plan = this.takePlan(req.planId);
 			if (!plan.rearm) throw notAllowed('no-rearm-needed');
-			this.ask();
 			const old = this.chainRun(plan.chain);
+			// ADR-008 P2: the sensor's idle skips the dialog (AC-F010-13); outstanding tasks ask
+			// "N background tasks still running" (Wait refuses, AC-F010-14); otherwise Billy's
+			// native idle confirmation (AC-F011-09).
+			const sensed = old?.live ? this.sensor.get(old.summary.runId) : undefined;
+			if (sensed && sensed.tasks > 0) {
+				if (this.dialog === 'cancel') throw notAllowed('background-tasks-running');
+			} else if (!(sensed?.status === 'idle')) this.ask();
 			if (old?.live) {
 				progress?.({ phase: 'ending', step: 'exit' });
 				this.deliver(old.summary.runId, '/exit\r\n\x1b[2mGoodbye.\x1b[0m\r\n');

@@ -837,6 +837,14 @@ mod spawn {
                 assert!(!code.contains(shell), "{}: {shell}", f.display());
             }
             let is_spawn = f.ends_with("foreman-sys/src/spawn.rs");
+            // SR-02: the single consented shell's argv lives in `spawn` only.
+            if code.contains("printf %s") || code.contains("LOGIN_SHELL_ARGS") {
+                assert!(
+                    is_spawn || f.ends_with("src-tauri/src/ipc/commands/doctor.rs"),
+                    "{}: login shell",
+                    f.display()
+                );
+            }
             for ctor in ["Command::new(", "CommandBuilder::new(", "new_default_prog("] {
                 if code.contains(ctor) {
                     assert!(is_spawn, "{}: {ctor}", f.display());

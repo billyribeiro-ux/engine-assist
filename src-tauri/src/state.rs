@@ -139,6 +139,8 @@ pub struct App {
     runs: crate::runs::Runs,
     watchers: crate::watch::Watchers,
     launch: Mutex<crate::launch::LaunchState>,
+    sensor: crate::sensor::Sensor,
+    sessions: crate::sensor_ingest::Sessions,
     inner: Mutex<Inner>,
     /// Serializes mutating commands (one writer at a time; CAS still guards every file).
     write_lock: Mutex<()>,
@@ -209,6 +211,8 @@ impl App {
             runs: crate::runs::Runs::default(),
             watchers: crate::watch::Watchers::default(),
             launch: Mutex::new(crate::launch::LaunchState::default()),
+            sensor: crate::sensor::Sensor::default(),
+            sessions: crate::sensor_ingest::Sessions::default(),
             inner: Mutex::new(Inner {
                 settings_rev: 1,
                 projects_rev: 1,
@@ -239,6 +243,18 @@ impl App {
     /// Plans, pending acknowledgements and re-arms (IPC-R7).
     pub fn launch(&self) -> MutexGuard<'_, crate::launch::LaunchState> {
         guard(&self.launch)
+    }
+
+    /// The P2 sensor's install and per-run tokens (ADR-009).
+    #[must_use]
+    pub fn sensor(&self) -> &crate::sensor::Sensor {
+        &self.sensor
+    }
+
+    /// The sensor's derived session states (display only, SR-18).
+    #[must_use]
+    pub fn sessions(&self) -> &crate::sensor_ingest::Sessions {
+        &self.sessions
     }
 
     /// The OS seam.

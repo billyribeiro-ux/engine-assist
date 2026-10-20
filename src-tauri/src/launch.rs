@@ -134,7 +134,8 @@ fn lines(bytes: &[u8]) -> Vec<String> {
 /// `PATH` sources (SR-05): `/etc/paths` through the fixed outside-read list, the fixed
 /// candidates and the consented login PATH. `/etc/paths.d/*` needs a listing the outside store
 /// doesn't offer yet, so it isn't read (docs/progress.md).
-fn path_sources(app: &App, login: Vec<String>) -> PathSources {
+#[must_use]
+pub fn path_sources(app: &App, login: Vec<String>) -> PathSources {
     let home = app.paths().home.clone();
     PathSources {
         etc_paths: outside::read(&OutsideRead::EtcPaths, &home, None)
@@ -392,6 +393,20 @@ fn prepare_inner(
         })
         .collect();
     let run_id = Uuid::new_v4();
+    // P2 (M4-08, M4-12): the sensor hooks after the per-run hash check (SR-15), and the contract
+    // probes when Claude Code's version changed (AC-F008-21).
+    let (sensor, sensor_warning) = crate::sensor::hooks_for_run(app, run_id);
+    warnings.extend(sensor_warning);
+    let (contract, contract_warnings) = crate::probe::for_launch(
+        app,
+        &settings,
+        effective.value,
+        matches!(
+            session,
+            SessionPlan::Continue { .. } | SessionPlan::Fork { .. }
+        ),
+    );
+    warnings.extend(contract_warnings);
     let facts = LaunchFacts {
         spawn: &ctx,
         own_env: &own_env,
@@ -419,7 +434,7 @@ fn prepare_inner(
         input_blockers,
         run_input_blockers,
         warnings,
-        contract: None,
+        contract,
         screen_reader: app.inner().screen_reader_mode,
         confirm: ConfirmCtx {
             overlay_step: false,
@@ -429,7 +444,7 @@ fn prepare_inner(
         },
         cache: cache.as_ref().map(|(c, _)| c.clone()),
         allowlist: &allow,
-        sensor: None,
+        sensor,
         case_variants: CaseVariants::NotListed,
         run_id,
         project_id: p.id().to_owned(),
@@ -451,6 +466,9 @@ fn prepare_inner(
     if let Some(chain) = prepared.broken_chain {
         p.progress.chains = chain::mark_broken(&p.progress.chains, chain);
         p.save_progress(app)?;
+    }
+    if matches!(prepared.outcome, sl::PrepareOutcome::Blocked { .. }) {
+        app.sensor().forget(&run_id.hyphenated().to_string());
     }
     match prepared.outcome {
         sl::PrepareOutcome::Blocked { blockers, warnings } => Ok(Prepared {
@@ -606,6 +624,8 @@ pub fn start(
     file.copy_prompt_on_cli = marks.copy_prompt;
     file.t.prepared = Some(0);
     file.t.confirmed = Some(u64::try_from(held.started.elapsed().as_millis()).unwrap_or(u64::MAX));
+    // P2 (ADR-009): the run's empty event folder exists before spawn; its token goes in run.json.
+    file.sensor_token = crate::sensor::begin_run(app, &p.app_root, &run_id);
     let stamp = runs::write_run(&p.app_root, &file, &ReadStamp::Absent)?;
     let outputs = Arc::new(Outputs::default());
     if let Some(ch) = output {
@@ -651,6 +671,7 @@ pub fn start(
         config_changed: AtomicBool::new(false),
         started: held.started,
     }));
+    crate::sensor_ingest::watch_run(app, &run_id);
     // The chain, the step and the first-launch flag (DR-065, DR-110). A detached run (Fix this)
     // leaves the step and its chains as they were.
     if !held.detached {

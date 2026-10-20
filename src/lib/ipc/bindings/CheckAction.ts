@@ -3,4 +3,4 @@
 /**
  * §2.4 an action a Doctor row offers.
  */
-export type CheckAction = "captureLoginPath";
+export type CheckAction = "captureLoginPath" | "openProbeFolder";

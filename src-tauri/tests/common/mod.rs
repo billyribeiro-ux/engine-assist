@@ -8,6 +8,7 @@
 )]
 
 pub mod project;
+pub mod sensor;
 pub mod table;
 
 use std::path::{Path, PathBuf};
