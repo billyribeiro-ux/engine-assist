@@ -56,17 +56,31 @@ describe('e2e CSP helpers (SR-20)', () => {
 	it('rejects the dev policy being served', () => {
 		const dev = configuredCsp(conf, 'devCsp');
 		const problems = compareServedCsp(
-			[...dev].map(([k, v]) => [k, ...v, ...(k === 'script-src' ? [HASH] : [])].join(' ')).join('; '),
+			[...dev]
+				.map(([k, v]) => [k, ...v, ...(k === 'script-src' ? [HASH] : [])].join(' '))
+				.join('; '),
 			production
 		);
 		expect(problems.join('\n')).toContain('connect-src');
 	});
 
 	it.each([
-		['unsafe-inline in script-src', (d: Map<string, string[]>) => d.get('script-src')?.push("'unsafe-inline'")],
-		['unsafe-eval in script-src', (d: Map<string, string[]>) => d.get('script-src')?.push("'unsafe-eval'")],
-		['a remote host in script-src', (d: Map<string, string[]>) => d.get('script-src')?.push('https://cdn.example')],
-		['an extra directive', (d: Map<string, string[]>) => d.set('report-uri', ['https://r.example'])],
+		[
+			'unsafe-inline in script-src',
+			(d: Map<string, string[]>) => d.get('script-src')?.push("'unsafe-inline'")
+		],
+		[
+			'unsafe-eval in script-src',
+			(d: Map<string, string[]>) => d.get('script-src')?.push("'unsafe-eval'")
+		],
+		[
+			'a remote host in script-src',
+			(d: Map<string, string[]>) => d.get('script-src')?.push('https://cdn.example')
+		],
+		[
+			'an extra directive',
+			(d: Map<string, string[]>) => d.set('report-uri', ['https://r.example'])
+		],
 		['a dropped directive', (d: Map<string, string[]>) => d.delete('frame-ancestors')],
 		['a hash in connect-src', (d: Map<string, string[]>) => d.get('connect-src')?.push(HASH)],
 		['a relaxed img-src', (d: Map<string, string[]>) => d.get('img-src')?.push('https:')]

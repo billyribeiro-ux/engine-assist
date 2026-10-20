@@ -24,10 +24,7 @@ export function parseCsp(policy: string): CspDirectives {
 }
 
 /** Reads `app.security.csp` (or `devCsp`) from a parsed tauri.conf.json (object or string form). */
-export function configuredCsp(
-	conf: unknown,
-	field: 'csp' | 'devCsp' = 'csp'
-): CspDirectives {
+export function configuredCsp(conf: unknown, field: 'csp' | 'devCsp' = 'csp'): CspDirectives {
 	const security = (conf as { app?: { security?: Record<string, unknown> } }).app?.security;
 	const value = security?.[field];
 	if (typeof value === 'string') return parseCsp(value);

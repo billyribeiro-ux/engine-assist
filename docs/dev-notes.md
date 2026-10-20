@@ -112,6 +112,8 @@ Three specs run against the built debug app in the real WKWebView:
 - The page's `connect-src` has no `'self'`, so it can't fetch its own headers. The served policy is read from the violation event's `originalPolicy` instead.
 - `compareServedCsp` (`e2e/helpers/csp.ts`) is pure and unit-tested on every OS (`tests/e2e-helpers.test.ts`). If Tauri adds a token the spec doesn't expect, spec 2 fails with the exact directive; record it in ADR-014 rather than loosening the check.
 
+**Dry run on Linux (2026-10-20, Xvfb + WebKitGTK, not WKWebView).** The plugin supports Linux, so the same suite was run against a Linux `tauri build --debug --no-bundle --features e2e` binary: CSP spec 3/3 pass (the served policy matched `tauri.conf.json` plus the generated hash and nonce, and the injected script was blocked), navigation spec 6/6 pass, launch spec 2/3 pass. The one failure is expected there: `main-window.json` is `platforms: ["macOS"]`, so on Linux `app_bootstrap` is refused and Today shows its error banner, which is the assertion working. This validates the specs, the config loading and the service wiring, not WKWebView behavior; the first Mac run is still the real test.
+
 **Known limits.**
 
 - WebDriver script calls carry no user activation, so WebKit may refuse `window.open` and link clicks by itself. Spec 3 then still passes (outcome-based) but proves less; the rule itself is proven by `webview::navigation_denied_to_remote` and the handlers being installed in `window::build_main`. A passing control test shows navigation isn't just broken.

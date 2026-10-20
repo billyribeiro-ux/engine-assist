@@ -36,7 +36,16 @@ function run(argv) {
 
 if (process.env.FOREMAN_E2E_SKIP_BUILD !== '1') {
 	process.stdout.write('test:e2e: building the debug app with --features e2e\n');
-	const built = run(['pnpm', 'exec', 'tauri', 'build', '--debug', '--no-bundle', '--features', 'e2e']);
+	const built = run([
+		'pnpm',
+		'exec',
+		'tauri',
+		'build',
+		'--debug',
+		'--no-bundle',
+		'--features',
+		'e2e'
+	]);
 	if (built !== 0) process.exit(built);
 }
 
