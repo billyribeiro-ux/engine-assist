@@ -7,6 +7,7 @@
 #![warn(clippy::pedantic)]
 
 pub mod diagnostic;
+pub mod git;
 pub mod ids;
 pub mod json;
 pub mod pathpolicy;
