@@ -472,7 +472,7 @@ sequenceDiagram
       3. temporary `GIT_INDEX_FILE`: `read-tree <tip>` (unborn: `read-tree --empty`), `update-index --cacheinfo`, `write-tree`;
       4. `commit-tree --no-gpg-sign` (always in v1; unborn: no `-p`);
       5. `update-ref <ref> <new> <old>` (unborn: old = the zero OID);
-      6. current branch only: `update-index --cacheinfo` on the real index for those paths only, retried 5 × 200 ms on `index.lock`; on failure `indexRefreshPending` is recorded and the banner "Index not refreshed; don't commit until this clears" shows until a retry on open or focus succeeds.
+      6. current branch only: `update-index --cacheinfo` on the real index for those paths only, retried 5 × 200 ms on `index.lock`, with `-c core.attributesFile=/dev/null` and `GIT_ATTR_SOURCE=<empty tree>` on that call (CR-002), and not attempted at all while `$GIT_DIR/info/attributes` is non-empty (CR-002); on failure or skip `indexRefreshPending` is recorded and the banner "Index not refreshed; don't commit until this clears" shows until a retry on open or focus succeeds.
 
       Another branch (SR-43) uses the same plumbing against that branch's tip and leaves HEAD, the index and the working tree untouched.
    5. Read-back: `cat-file blob <commit>:<path>` for every path, comparing hashes. The stage stays `signed (commit pending)` until this passes; then the stamp animation runs. The commit OID goes to `progress.json` `signing[NN].commit`, never into the stage record (the record is inside that commit).

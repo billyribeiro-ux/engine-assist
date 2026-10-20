@@ -589,10 +589,10 @@ Stage: 6
 Depends on: M1-16, M1-08
 ADRs: ADR-012, ADR-022
 Threats mitigated: T-064, T-065, T-067
-Likely files: crates/foreman-core/src/lock.rs, crates/foreman-sys/src/git/show.rs, crates/foreman-core/tests/lock.rs, crates/foreman-sys/tests/lock_restore.rs
+Likely files: crates/foreman-core/src/lock.rs, crates/foreman-sys/src/git/show.rs, crates/foreman-core/tests/lock.rs, crates/foreman-sys/tests/lock_restore.rs, crates/foreman-core/src/template/validate.rs (CR-003)
 Acceptance criteria:
 - AC-F002-01
-- AC-F002-02
+- AC-F002-02 (CR-003: also refuses annotation errors in Stages 1–2 and F.2)
 - AC-F002-03
 - AC-F002-04
 - AC-F002-05
@@ -601,6 +601,7 @@ Acceptance criteria:
 - AC-F001-16
 Required tests:
 - lock::pin_contents, lock::repin_window, lock::restore_from_git, lock::hash_mismatch_read_only, lock::dirty_blueprint_refused
+- lock::pin_refuses_p1_annotation_errors, lock::pin_allows_errors_outside_p1, lock::pin_clean_p1 (CR-003)
 - template::swapped_bullets_reconfirm
 Out of scope: re-confirm kind UI (M4-17).
 

@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::grammar::{ChainRef, Session, StepKind, Tag};
 use super::structure::Extras;
-use super::{Step, StepStatus, Template};
+use super::{P1_STAGES, Place, ScopedError, Step, StepStatus, Template};
 use crate::diagnostic::Diagnostic;
 use crate::ids::{Effort, StepKey, Surface, is_item_id};
 use crate::pathpolicy::COUNCIL_AGENTS;
@@ -668,33 +668,49 @@ pub(super) fn run(t: &mut Template, extras: &Extras, file: &str) {
     t.diagnostics.extend(v.diags);
 }
 
+/// The rules whose errors make every step not runnable (DR-037).
+fn is_global_rule(d: &Diagnostic) -> bool {
+    matches!(
+        d.rule.as_str(),
+        "grammar.missing-version" | "structure.depth-limit"
+    )
+}
+
+/// Where an error sits (DR-037 scoping): its stage (from `stage`, else from the line), the Stage
+/// Gate templates, Appendix F, or none of those.
+fn place_of(d: &Diagnostic, extras: &Extras) -> Place {
+    let in_range = |r: &(u32, u32)| d.line >= r.0 && d.line < r.1;
+    let stage = d.stage.or_else(|| {
+        extras
+            .stage_ranges
+            .iter()
+            .find(|(_, a, b)| d.line >= *a && d.line < *b)
+            .map(|(n, _, _)| *n)
+    });
+    if let Some(n) = stage {
+        Place::Stage(n)
+    } else if extras.appendix_f_ranges.iter().any(in_range) {
+        Place::AppendixF
+    } else if extras.template_ranges.iter().any(in_range) {
+        Place::StageGate
+    } else {
+        Place::Elsewhere
+    }
+}
+
 /// Marks steps not runnable when their stage (or their template) has an error (DR-037, AC-F001-15).
 pub(super) fn finish(t: &mut Template, extras: &Extras) {
-    let errors: Vec<&Diagnostic> = t.diagnostics.iter().filter(|d| d.is_error()).collect();
-    let global = errors.iter().any(|d| {
-        matches!(
-            d.rule.as_str(),
-            "grammar.missing-version" | "structure.depth-limit"
-        )
-    }) || t.grammar_version.is_none();
-    let in_range = |line: u32, r: &(u32, u32)| line >= r.0 && line < r.1;
     let mut bad_stages: BTreeSet<u8> = BTreeSet::new();
     let mut bad_templates = false;
-    let mut everything = global;
-    for d in &errors {
-        let stage = d.stage.or_else(|| {
-            extras
-                .stage_ranges
-                .iter()
-                .find(|(_, a, b)| d.line >= *a && d.line < *b)
-                .map(|(n, _, _)| *n)
-        });
-        if let Some(n) = stage {
-            bad_stages.insert(n);
-        } else if extras.template_ranges.iter().any(|r| in_range(d.line, r)) {
-            bad_templates = true;
-        } else {
-            everything = true;
+    let mut everything = t.grammar_version.is_none();
+    for d in t.diagnostics.iter().filter(|d| d.is_error()) {
+        everything |= is_global_rule(d);
+        match place_of(d, extras) {
+            Place::Stage(n) => {
+                bad_stages.insert(n);
+            }
+            Place::StageGate | Place::AppendixF => bad_templates = true,
+            Place::Elsewhere => everything = true,
         }
     }
     for s in &mut t.steps {
@@ -706,4 +722,32 @@ pub(super) fn finish(t: &mut Template, extras: &Extras) {
             s.status = StepStatus::Invalid;
         }
     }
+}
+
+/// The errors that make a P1 step not runnable (CR-003, DR-155), in line order: those in a P1
+/// stage, those that make every step not runnable, and those in the gate or F.2 templates while
+/// a P1 stage has an instance of one (`1:F.2`, `2:F.2`). Each carries where it sits.
+pub(super) fn p1_errors(t: &Template, extras: &Extras) -> Vec<ScopedError> {
+    let p1_has_instance = t
+        .steps
+        .iter()
+        .any(|s| s.template_id.is_some() && P1_STAGES.contains(&s.stage));
+    let mut out: Vec<ScopedError> = t
+        .errors()
+        .filter_map(|d| {
+            let place = place_of(d, extras);
+            let reaches_p1 = is_global_rule(d)
+                || match place {
+                    Place::Stage(n) => P1_STAGES.contains(&n),
+                    Place::StageGate | Place::AppendixF => p1_has_instance,
+                    Place::Elsewhere => true,
+                };
+            reaches_p1.then(|| ScopedError {
+                place,
+                diagnostic: d.clone(),
+            })
+        })
+        .collect();
+    out.sort_by_key(|e| (e.diagnostic.line, e.diagnostic.column));
+    out
 }

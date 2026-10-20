@@ -1,8 +1,9 @@
 # CR-002 · Neutralize git attributes on the real-index refresh, and skip it when `info/attributes` is non-empty
 
-Status: PROPOSED. Applied provisionally in M1 (`foreman-sys::git`), awaiting Billy's decision.
+Status: APPROVED. Applied in M1 (`foreman-sys::git`) as written under "What changes".
 Requested by: the M1 build agent, found while building `git::status_and_diff_never_run_filters` (ADR-012 amendment 2026-10-20). Written 2026-10-20.
-Decided by: Billy Ribeiro (pending). Never sign on his behalf.
+Decided by: Billy Ribeiro.
+Approved by Billy Ribeiro on 2026-10-20 (in chat, 12:38 ET)
 
 ## What changes
 
@@ -49,10 +50,16 @@ The refresh exists so that `git status` in Billy's checkout doesn't show the com
 
 APPROVE the current behavior as the default, and MODIFY with alternative 5 or 3 for the 2.39 gap (Doctor warns on git < 2.40; refresh only when git ≥ 2.40). If approved, `docs/scope.md` AC-XC-04 and the requirements text for SR-44/SR-45 get the two list entries.
 
-## Deltas for Stage 4 (filled in when approved)
+## Decision (2026-10-20)
 
-- docs/scope.md: AC-XC-04's exact `-c` and environment lists: add `core.attributesFile=/dev/null` and `GIT_ATTR_SOURCE=<empty tree>` for `update-index --cacheinfo` on the real index only.
-- docs/requirements.md: SR-44, SR-45 (same entries).
-- docs/adr/: ADR-012 (already amended; set Status wording to match the decision).
-- docs/threat-model.md: T-040 row (cite the decision).
-- docs/contracts/files.md: none.
+Approved as written under "What changes": both behaviors stay. The recommendation's optional MODIFY (alternative 5 or 3, for the git 2.39 gap) was not chosen, so the 2.39 residual stays as stated under "Behavior and residual risk" (UNVERIFIED on Billy's Mac). A Doctor warning for git < 2.40, or an opt-in refresh, needs its own CR.
+
+## Deltas for Stage 4 (applied 2026-10-20, each edit marked "(CR-002)")
+
+- docs/scope.md: AC-XC-04's exact `-c` and environment lists: add `core.attributesFile=/dev/null` and `GIT_ATTR_SOURCE=<empty tree>` for `update-index --cacheinfo` on the real index only. Done.
+- docs/requirements.md: SR-44, SR-45 (same entries). Done (SR-45 holds the lists; SR-44 points to it).
+- docs/adr/: ADR-012 (already amended; Status wording now matches the decision). Done.
+- docs/threat-model.md: T-040 row (cites the decision). Done.
+- docs/domain-rules.md: DR-143's "Real-index refresh" bullet (the attribute neutralizing and the `info/attributes` skip), and DR-140's note that this one call carries two extra settings. Done (not listed when the CR was written; the rules describe the same step).
+- docs/design-doc.md: step 6 of the signing sequence. Done (same reason).
+- docs/contracts/files.md: the CR said none; `indexRefreshPending` also records the `info/attributes` skip, so its description gained one sentence. Done.
