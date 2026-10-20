@@ -7,12 +7,13 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::diagnostic::Diagnostic;
 use crate::ids::ItemId;
 use crate::pathpolicy::{self, DecisionPath, ReadClass, WritePurpose};
 use crate::schema::approvals::ItemKindConfirm;
 use crate::schema::lock::{LockFile, LockedItem};
 use crate::store::{Root, StoreError};
-use crate::template::{Template, parse_template, source_sha256};
+use crate::template::{FILE, Place, ScopedError, Template, parse_template_p1, source_sha256};
 
 /// The app-data copy of the pinned text (files.md row 20).
 #[must_use]
@@ -36,9 +37,127 @@ pub enum LockError {
         /// `rev-parse HEAD:<path>`.
         head: Option<String>,
     },
+    /// CR-003 (DR-155, AC-F002-02): a step in the P1 scope (Stages 1–2 and F.2) is in error, so
+    /// pinning would fix a blueprint Billy can't repair after Stage 1 is signed. Errors in other
+    /// stages don't refuse.
+    #[error("{}", annotation_message(problems))]
+    AnnotationErrors {
+        /// Every error that makes a P1 step not runnable, in line order.
+        problems: Vec<AnnotationProblem>,
+    },
     /// Store failure.
     #[error(transparent)]
     Store(#[from] StoreError),
+}
+
+/// One annotation error that stops a pin (CR-003): where it is, and the diagnostic as the parser
+/// reported it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationProblem {
+    /// The stage it sits in, when it sits in one (from the diagnostic, else from its line).
+    pub stage: Option<u8>,
+    /// The annotation ID of the step it belongs to (`2.3`, `council-setup`, `F.2`, `gate.A`), when
+    /// a step contains the line.
+    pub step: Option<String>,
+    /// The error (rule, file, line, column, message).
+    pub diagnostic: Diagnostic,
+}
+
+impl AnnotationProblem {
+    /// "Stage 2 step 2.3", "Stage 2", "Step F.2" or "The blueprint".
+    #[must_use]
+    pub fn place(&self) -> String {
+        match (self.stage, self.step.as_deref()) {
+            (Some(n), Some(step)) => format!("Stage {n} step {step}"),
+            (Some(n), None) => format!("Stage {n}"),
+            (None, Some(step)) => format!("Step {step}"),
+            (None, None) => "The blueprint".to_owned(),
+        }
+    }
+
+    /// The parser's message without its own "2.3: " step prefix, ending in a full stop.
+    fn text(&self) -> String {
+        let m = self.diagnostic.message.trim();
+        let m = self
+            .step
+            .as_deref()
+            .and_then(|s| m.strip_prefix(s))
+            .and_then(|r| r.strip_prefix(": "))
+            .unwrap_or(m);
+        if m.ends_with('.') {
+            m.to_owned()
+        } else {
+            format!("{m}.")
+        }
+    }
+}
+
+/// How many problems the message lists before "and N more".
+const MESSAGE_LIST_LIMIT: usize = 8;
+
+/// The refusal text: one error reads as a sentence, several as a list (the UI also gets the
+/// diagnostics themselves).
+fn annotation_message(problems: &[AnnotationProblem]) -> String {
+    const FIX: &str = "Fix the blueprint, then pin again.";
+    if let [p] = problems {
+        return format!(
+            "{} has an annotation error on line {}: {} {FIX}",
+            p.place(),
+            p.diagnostic.line,
+            p.text()
+        );
+    }
+    let mut lines = vec![format!(
+        "{} annotation errors in Stages 1–2 and F.2 stop the pin:",
+        problems.len()
+    )];
+    lines.extend(
+        problems
+            .iter()
+            .take(MESSAGE_LIST_LIMIT)
+            .map(|p| format!("- {}, line {}: {}", p.place(), p.diagnostic.line, p.text())),
+    );
+    if problems.len() > MESSAGE_LIST_LIMIT {
+        lines.push(format!(
+            "- and {} more.",
+            problems.len() - MESSAGE_LIST_LIMIT
+        ));
+    }
+    lines.push(FIX.to_owned());
+    lines.join("\n")
+}
+
+/// The step that holds `line`: the last step starting at or before it, among the steps of the
+/// error's stage, the gate templates or the F.2 template.
+fn step_at(t: &Template, place: Place, line: u32) -> Option<String> {
+    let candidates: Vec<&crate::template::Step> = match place {
+        Place::Stage(n) => t
+            .steps
+            .iter()
+            .filter(|s| s.stage == n && s.template_id.is_none())
+            .collect(),
+        Place::StageGate => t.gate_templates.iter().collect(),
+        Place::AppendixF => t.f2_template.iter().collect(),
+        Place::Elsewhere => Vec::new(),
+    };
+    candidates
+        .into_iter()
+        .filter(|s| s.line <= line)
+        .max_by_key(|s| s.line)
+        .map(|s| s.id.clone())
+}
+
+fn problem(t: &Template, e: ScopedError) -> AnnotationProblem {
+    let stage = match e.place {
+        Place::Stage(n) => Some(n),
+        _ => e.diagnostic.stage,
+    };
+    AnnotationProblem {
+        stage,
+        step: step_at(t, e.place, e.diagnostic.line),
+        diagnostic: e.diagnostic,
+    }
 }
 
 /// Why a project opens read-only (DR-156).
@@ -140,7 +259,9 @@ pub struct BlueprintState {
     pub head_oid: Option<String>,
 }
 
-/// Pins (DR-155): refuses a dirty file; stores the text in app data at
+/// Pins (DR-155): refuses a dirty file and, since CR-003, a blueprint with annotation errors in
+/// the P1 scope (Stages 1–2 and F.2; errors in other stages still pin and leave those steps not
+/// runnable); stores the text in app data at
 /// `templates/<sourceSha256>.md` and writes `.foreman/blueprint.lock.json` in the project. Returns
 /// the lock.
 ///
@@ -170,7 +291,12 @@ pub fn pin(
         });
     }
     let text = String::from_utf8_lossy(&state.bytes);
-    let t = parse_template(&text);
+    let (t, p1_errors) = parse_template_p1(&text, FILE);
+    if !p1_errors.is_empty() {
+        return Err(LockError::AnnotationErrors {
+            problems: p1_errors.into_iter().map(|e| problem(&t, e)).collect(),
+        });
+    }
     store_text(app, &t.source_sha256, &state.bytes)?;
     let lock = lock_for(&t, &state.commit, path, pinned_at);
     let json = crate::json::to_canonical(&lock).map_err(|e| StoreError::Io {

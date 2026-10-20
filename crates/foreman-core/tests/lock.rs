@@ -16,7 +16,9 @@ use std::collections::BTreeMap;
 
 use common::{assert_valid, blueprint, parse, replace_once};
 use foreman_core::ids::ItemId;
-use foreman_core::lock::{self as lk, BlueprintState, Fetched, LockError, ReadOnly, Restored};
+use foreman_core::lock::{
+    self as lk, AnnotationProblem, BlueprintState, Fetched, LockError, ReadOnly, Restored,
+};
 use foreman_core::schema::approvals::ItemKindConfirm;
 use foreman_core::schema::lock::LockFile;
 use foreman_core::store::{Root, RootKind, sha256_hex};
@@ -233,6 +235,231 @@ mod lock {
             Err(LockError::Dirty { head: None, .. })
         ));
         assert!(files_under(d.project.path()).is_empty() && files_under(d.app.path()).is_empty());
+    }
+
+    /// The pin's refusal for annotation errors (CR-003, DR-155, AC-F002-02): the problems it
+    /// carries, in line order.
+    fn refused(d: &Dirs, src: &str) -> Vec<AnnotationProblem> {
+        match d.pin(src, false) {
+            Err(LockError::AnnotationErrors { problems }) => problems,
+            other => panic!("expected AnnotationErrors, got {other:?}"),
+        }
+    }
+
+    /// 1-based line of `needle`'s first occurrence in `src`.
+    fn line_of(src: &str, needle: &str) -> u32 {
+        let at = src.find(needle).unwrap();
+        u32::try_from(src[..at].matches('\n').count() + 1).unwrap()
+    }
+
+    /// CR-003 (DR-155, AC-F002-02): a pin is refused while a step in the P1 scope (Stages 1–2 and
+    /// their F.2) is in error; the diagnostics come back, and nothing is written.
+    #[test]
+    fn pin_refuses_p1_annotation_errors() {
+        let src = blueprint();
+
+        // One error in Stage 2: the message names the stage, the step and the line.
+        let d = Dirs::new();
+        let bad = replace_once(&src, "<!-- fm:step id=2.5 ", "<!-- fm:step id=2.5 bogus=1 ");
+        let line = line_of(&bad, "<!-- fm:step id=2.5 ");
+        let problems = refused(&d, &bad);
+        assert_eq!(problems.len(), 1, "{problems:#?}");
+        let p = &problems[0];
+        assert_eq!((p.stage, p.step.as_deref()), (Some(2), Some("2.5")));
+        assert_eq!(p.diagnostic.rule, "grammar.unknown-key");
+        assert_eq!(p.diagnostic.line, line);
+        assert!(p.diagnostic.is_error());
+        let e = d.pin(&bad, false).unwrap_err();
+        assert_eq!(
+            e.to_string(),
+            format!(
+                "Stage 2 step 2.5 has an annotation error on line {line}: unknown key `bogus` (grammar v1). Fix the blueprint, then pin again."
+            )
+        );
+        // Nothing was written, in the project or in app data.
+        assert!(files_under(d.project.path()).is_empty() && files_under(d.app.path()).is_empty());
+
+        // Several errors: all of them come back, in line order, and the message lists each.
+        let d = Dirs::new();
+        let bad = replace_once(
+            &replace_once(
+                &src,
+                "id=2.3 kind=followup tag=core surface=cli session=continue chain=2.2",
+                "id=2.3 kind=followup tag=core surface=cli session=continue chain=2.9",
+            ),
+            "id=1.2 tag=core session=continue chain=1.1",
+            "id=1.2 tag=core session=continue chain=1.9",
+        );
+        let problems = refused(&d, &bad);
+        let seen: Vec<(Option<u8>, &str, &str)> = problems
+            .iter()
+            .map(|p| {
+                (
+                    p.stage,
+                    p.step.as_deref().unwrap(),
+                    p.diagnostic.rule.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                (Some(1), "1.2", "grammar.bad-chain"),
+                (Some(1), "1.2", "grammar.missing-surface"),
+                (Some(2), "2.3", "grammar.bad-chain"),
+                (Some(2), "2.3", "grammar.missing-cwd"),
+            ]
+        );
+        assert!(
+            problems
+                .windows(2)
+                .all(|w| w[0].diagnostic.line <= w[1].diagnostic.line)
+        );
+        let text = d.pin(&bad, false).unwrap_err().to_string();
+        assert!(
+            text.starts_with("4 annotation errors in Stages 1–2 and F.2 stop the pin:\n"),
+            "{text}"
+        );
+        assert!(text.contains("\n- Stage 1 step 1.2, line "), "{text}");
+        assert!(text.contains("\n- Stage 2 step 2.3, line "), "{text}");
+        assert!(
+            text.ends_with("\nFix the blueprint, then pin again."),
+            "{text}"
+        );
+
+        // F.2 (the lessons step) is in the scope too.
+        let d = Dirs::new();
+        let bad = replace_once(
+            &src,
+            "chain=@stage appends=docs/lessons.md",
+            "chain=@stage appends=/etc/passwd",
+        );
+        let problems = refused(&d, &bad);
+        assert_eq!(problems.len(), 1);
+        assert_eq!(
+            (problems[0].stage, problems[0].step.as_deref()),
+            (None, Some("F.2"))
+        );
+        assert!(
+            d.pin(&bad, false)
+                .unwrap_err()
+                .to_string()
+                .starts_with("Step F.2 has an annotation error on line ")
+        );
+
+        // An error under the Stage Gate templates also makes 1:F.2 and 2:F.2 not runnable
+        // (DR-037), so it stops the pin.
+        let d = Dirs::new();
+        let bad = replace_once(
+            &src,
+            "id=gate.A tag=core surface=cli",
+            "id=gate.A tag=bogus surface=cli",
+        );
+        let problems = refused(&d, &bad);
+        assert_eq!(problems[0].step.as_deref(), Some("gate.A"));
+        assert_eq!(problems[0].diagnostic.rule, "grammar.unknown-value");
+
+        // An error that makes every step unusable (no grammar line) stops it too.
+        let d = Dirs::new();
+        let bad = replace_once(&src, "<!-- fm:grammar v=1 -->\n", "");
+        let problems = refused(&d, &bad);
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.diagnostic.rule == "grammar.missing-version")
+        );
+
+        // A re-pin (allowed before Stage 1 is signed) is refused the same way and leaves the
+        // existing lock and stored text alone.
+        let d = Dirs::new();
+        d.pin(&src, false).unwrap();
+        let lock_file = d.project.path().join(".foreman/blueprint.lock.json");
+        let (before, stored) = (
+            std::fs::read(&lock_file).unwrap(),
+            files_under(d.app.path()),
+        );
+        refused(
+            &d,
+            &replace_once(&src, "<!-- fm:step id=2.5 ", "<!-- fm:step id=2.5 bogus=1 "),
+        );
+        assert_eq!(std::fs::read(&lock_file).unwrap(), before);
+        assert_eq!(files_under(d.app.path()), stored);
+
+        // The other refusals keep their place in the order: closed re-pin, then dirty, then errors.
+        let bad = replace_once(&src, "<!-- fm:step id=2.5 ", "<!-- fm:step id=2.5 bogus=1 ");
+        let d = Dirs::new();
+        d.pin(&src, false).unwrap();
+        assert_eq!(d.pin(&bad, true).unwrap_err(), LockError::RepinClosed);
+        let d = Dirs::new();
+        let mut st = clean_state(&bad);
+        st.working_oid = "2222222222222222222222222222222222222222".into();
+        let e = lk::pin(&d.project(), &d.app(), PATH, &st, false, "t").unwrap_err();
+        assert!(matches!(e, LockError::Dirty { .. }), "{e:?}");
+    }
+
+    /// CR-003: errors that leave every P1 step runnable still pin, and those steps stay not
+    /// runnable (DR-037, AC-F001-15).
+    #[test]
+    fn pin_allows_errors_outside_p1() {
+        let src = blueprint();
+        let bad = replace_once(
+            &replace_once(
+                &replace_once(&src, "<!-- fm:step id=0.1 ", "<!-- fm:step id=0.1 bogus=1 "),
+                "<!-- fm:step id=3.1 ",
+                "<!-- fm:step id=3.1 bogus=1 ",
+            ),
+            "<!-- fm:step id=4.3 tag=core surface=chat session=new",
+            "<!-- fm:step id=4.3 tag=core surface=chat session=continue chain=4.9",
+        );
+        let t = parse(&bad);
+        let error_stages: std::collections::BTreeSet<u8> =
+            t.errors().filter_map(|e| e.stage).collect();
+        assert_eq!(error_stages, [0, 3, 4].into());
+        let d = Dirs::new();
+        let lock = d.pin(&bad, false).unwrap();
+        assert_eq!(lock.source_sha256, source_sha256(&bad));
+        assert!(
+            d.project
+                .path()
+                .join(".foreman/blueprint.lock.json")
+                .exists()
+        );
+        // The steps in error are listed and not runnable; the P1 steps are fine.
+        for n in [0u8, 3, 4] {
+            assert!(
+                t.stage_steps(n)
+                    .filter(|s| s.annotation.is_some())
+                    .all(|s| !s.runnable()),
+                "stage {n}"
+            );
+        }
+        for n in [1u8, 2] {
+            assert!(
+                t.stage_steps(n)
+                    .filter(|s| s.annotation.is_some())
+                    .all(|s| s.runnable()),
+                "stage {n}"
+            );
+        }
+    }
+
+    /// CR-003: a clean P1 pins; warnings (lints) in it never refuse.
+    #[test]
+    fn pin_clean_p1() {
+        let src = blueprint();
+        let t = parse(&src);
+        assert_eq!(t.errors().count(), 0);
+        assert!(
+            t.diagnostics.iter().any(|d| !d.is_error()),
+            "the fixture carries lint warnings"
+        );
+        let d = Dirs::new();
+        let lock = d.pin(&src, false).unwrap();
+        assert_eq!(lock.source_sha256, source_sha256(&src));
+        assert_eq!(
+            files_under(d.project.path()),
+            [".foreman/blueprint.lock.json"]
+        );
     }
 }
 

@@ -400,6 +400,32 @@ pub fn item_hash(normalized: &str) -> String {
     crate::store::sha256_hex(normalized.as_bytes())
 }
 
+/// The stages the first release runs (P1): Stages 1–2, with their `F.2` instances (CR-003,
+/// DR-155).
+pub const P1_STAGES: std::ops::RangeInclusive<u8> = 1..=2;
+
+/// Where an error sits, for scoping (DR-037).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    /// In stage N: from the diagnostic's own stage, else from its line.
+    Stage(u8),
+    /// In the Stage Gate section (gate templates).
+    StageGate,
+    /// In Appendix F (the F.2 template).
+    AppendixF,
+    /// In none of those (the preamble, the other appendices).
+    Elsewhere,
+}
+
+/// An error and where it sits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopedError {
+    /// Where.
+    pub place: Place,
+    /// The error.
+    pub diagnostic: Diagnostic,
+}
+
 /// Parses a blueprint (never panics; problems become diagnostics).
 #[must_use]
 pub fn parse_template(source: &str) -> Template {
@@ -409,9 +435,17 @@ pub fn parse_template(source: &str) -> Template {
 /// [`parse_template`] with the file name used in diagnostics.
 #[must_use]
 pub fn parse_template_named(source: &str, file: &str) -> Template {
+    parse_template_p1(source, file).0
+}
+
+/// [`parse_template_named`] plus the errors that make a P1 step ([`P1_STAGES`] and their F.2)
+/// not runnable, in line order (CR-003): what a pin refuses on.
+#[must_use]
+pub fn parse_template_p1(source: &str, file: &str) -> (Template, Vec<ScopedError>) {
     let (mut t, extras) = structure::parse(source, file);
     validate::run(&mut t, &extras, file);
     lint::run(&mut t, file);
     validate::finish(&mut t, &extras);
-    t
+    let p1 = validate::p1_errors(&t, &extras);
+    (t, p1)
 }

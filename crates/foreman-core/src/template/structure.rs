@@ -124,6 +124,8 @@ pub(super) struct Extras {
     pub stage_ranges: Vec<(u8, u32, u32)>,
     /// Line ranges of the Stage Gate section and of Appendix F (templates).
     pub template_ranges: Vec<(u32, u32)>,
+    /// The part of `template_ranges` that is Appendix F (where the F.2 template sits; CR-003).
+    pub appendix_f_ranges: Vec<(u32, u32)>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1047,7 +1049,11 @@ pub(super) fn parse(source: &str, file: &str) -> (Template, Extras) {
         let end = w.marks.get(i + 1).map_or(total, |m| m.1);
         match sec {
             Section::Stage(n) => extras.stage_ranges.push((*n, *start, end)),
-            Section::Gate | Section::AppendixF => extras.template_ranges.push((*start, end)),
+            Section::Gate => extras.template_ranges.push((*start, end)),
+            Section::AppendixF => {
+                extras.template_ranges.push((*start, end));
+                extras.appendix_f_ranges.push((*start, end));
+            }
             Section::None => {}
         }
     }
