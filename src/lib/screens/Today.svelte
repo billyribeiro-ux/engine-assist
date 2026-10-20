@@ -5,12 +5,15 @@
 	import { goto } from '$app/navigation';
 	import { onMount, tick } from 'svelte';
 
-	import { report, runStep } from '#lib/actions/run.ts';
+	import { report, runPrepared, runStep } from '#lib/actions/run.ts';
+	import { failureText } from '#lib/actions/words.ts';
+	import { toIpcFailure } from '#lib/ipc/errors.ts';
+	import { ipc } from '#lib/ipc/index.ts';
 	import Icon from '#lib/components/Icon.svelte';
 	import MiniStrip from '#lib/components/MiniStrip.svelte';
 	import SpecLine from '#lib/components/SpecLine.svelte';
 	import type { IconName } from '#lib/components/icons.ts';
-	import type { InboxItem, NextStepRow } from '#lib/ipc/types.ts';
+	import type { InboxItem, NextStepRow, RunSummary } from '#lib/ipc/types.ts';
 	import { registerShortcuts } from '#lib/keyboard/registry.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import type { Tone } from '#lib/nav/status.ts';
@@ -26,6 +29,29 @@
 		(c) => c.todayGet({}),
 		() => ['today']
 	);
+
+	// Sessions that were running when Foreman last quit or crashed (SR-57, AC-F020-10): listed with
+	// Resume, never relaunched by themselves.
+	const boot = resource(
+		() => null,
+		(c) => c.appBootstrap({}),
+		() => ['runs', 'projects']
+	);
+	const interrupted: RunSummary[] = $derived(boot.value?.interrupted ?? []);
+	async function resume(r: RunSummary): Promise<void> {
+		const c = await ipc();
+		try {
+			const prep = await c.chainResumePrepare({ chain: r.chain });
+			report(
+				await runPrepared(
+					{ projectId: r.project, step: r.step ?? '', surface: 'cli', entry: 'stageView' },
+					prep
+				)
+			);
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
+		}
+	}
 
 	const rows: NextStepRow[] = $derived(today.value?.rows ?? []);
 	const inbox: InboxItem[] = $derived(today.value?.inbox ?? []);
@@ -215,6 +241,38 @@
 											name="terminal"
 										/>{/if}{look.action}</button
 								>
+							</li>
+						{/each}
+					</ol>
+				</section>
+			{/if}
+
+			{#if interrupted.length}
+				<section class="section" aria-labelledby="int-h">
+					<div class="section-head">
+						<h2 class="section-title" id="int-h">Interrupted sessions</h2>
+						<span class="muted"
+							>Foreman quit while these were running. Nothing restarts by itself.</span
+						>
+					</div>
+					<ol class="inbox" aria-label="Interrupted sessions">
+						{#each interrupted as r (r.runId)}
+							<li>
+								<Icon name="broken" size="glyph" tone="muted" />
+								<span class="proj">{r.projectName}</span>
+								<span class="what"
+									>{r.step ?? ''}
+									{r.stepTitle}<small
+										><code>{r.tabName}</code>{#if !r.resumable && r.whyNotResumable}, {r.whyNotResumable}{/if}</small
+									></span
+								>
+								{#if r.resumable}
+									<button class="btn" type="button" data-today-row onclick={() => resume(r)}
+										><Icon name="play" />Resume</button
+									>
+								{:else}
+									<span class="muted small">Can't resume</span>
+								{/if}
 							</li>
 						{/each}
 					</ol>

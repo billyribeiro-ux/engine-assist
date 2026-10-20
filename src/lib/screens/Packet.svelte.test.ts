@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-import { failing, fresh, IDS, project } from '#lib/test/screen.ts';
+import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
 
 import Packet from './Packet.svelte';
 
@@ -32,5 +32,23 @@ describe('Packet', () => {
 		const p = await project(m, IDS.foreman);
 		const s = await render(Packet, { project: p, stageNo: 4 });
 		await expect.element(s.getByRole('alert')).toBeVisible();
+	});
+
+	it('normalize: the changes are listed first and written only on the button (AC-F013-08)', async () => {
+		const m = fresh('invalidPacket');
+		const p = await project(m, IDS.tradelog);
+		const apply = vi.spyOn(m, 'packetNormalizeApply');
+		const s = await render(Packet, { project: p, stageNo: 2 });
+		await expect
+			.element(s.getByRole('heading', { name: 'Formatting Foreman can fix' }))
+			.toBeVisible();
+		await expect.element(s.getByText('unsigned').first()).toBeVisible();
+		expect(apply).not.toHaveBeenCalled();
+		await s.getByRole('button', { name: 'Normalize the file' }).click();
+		await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+		await vi.waitFor(() => expect(said()).toContain('Packet normalized'));
+		await expect
+			.element(s.getByRole('heading', { name: 'Formatting Foreman can fix' }))
+			.not.toBeInTheDocument();
 	});
 });

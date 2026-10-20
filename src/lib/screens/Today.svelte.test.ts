@@ -54,4 +54,29 @@ describe('Today', () => {
 			.element(s.getByText('Nothing here runs until the folder is back.').first())
 			.toBeVisible();
 	});
+
+	it('interrupted: a session from a crash is listed with Resume, through the preflight (AC-F020-10)', async () => {
+		const m = fresh('brokenChain');
+		const boot = await m.appBootstrap({});
+		const run = boot.interrupted[0];
+		expect(run).toBeDefined();
+		if (!run) return;
+		vi.spyOn(m, 'appBootstrap').mockResolvedValue({
+			...boot,
+			interrupted: [{ ...run, resumable: true, whyNotResumable: null }]
+		});
+		const prep = vi.spyOn(m, 'chainResumePrepare');
+		const s = await render(Today);
+		await expect.element(s.getByRole('heading', { name: 'Interrupted sessions' })).toBeVisible();
+		await s.getByRole('button', { name: 'Resume' }).click();
+		await vi.waitFor(() => expect(prep).toHaveBeenCalledWith({ chain: run.chain }));
+	});
+
+	it('interrupted: a session that cannot resume says why and offers nothing to run', async () => {
+		fresh('brokenChain');
+		const s = await render(Today);
+		const list = s.getByRole('list', { name: 'Interrupted sessions' });
+		await expect.element(list.getByText(/Transcript removed after 30 days/).first()).toBeVisible();
+		await expect.element(s.getByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
+	});
 });

@@ -95,7 +95,7 @@ The runner halves below are built and tested; each ticket's IPC command, native 
 | M3-13 | in-progress | terminate (SIGTERM → SIGKILL), hangup | app: `pty_terminate` native dialog done; quit guard left |
 | M3-14 | in-progress | chain planning, S-3/S-8 branches, transcript path; `chain::*` | — |
 | M3-15 | in-progress | re-arm machine + driver; `rearm::*` | app: `rearm_start`/`rearm_continue` with the native idle dialog done (`rearm::relaunches_after_idle_confirm`) |
-| M3-19 | in-progress | watcher (interest set, lstat roots, re-read by stamp); `watcher::*` | app: `watcher::config_changed_marks_open_runs` done (`src-tauri/src/watch.rs`, a 5 s re-fingerprint tick while runs are live; the watcher has no config interest); `ProjectWatcher` → `packet:changed`/`decision:pending` event mapping left |
+| M3-19 | in-progress | watcher (interest set, lstat roots, re-read by stamp); `watcher::*` | app: `ProjectWatcher` → `packet:changed`/`decision:pending` mapping and config hint watchers done in `stage/05-packets` (see the M3 packets table below); `watcher::refocus_rescan_catches_missed_event` (ADR-013) not written |
 | M4-09/M4-12 (sys part) | in-progress | sensor ingest, contract probes (probe B redesigned, ADR-017) | `probe_run` (still `Unsupported`, M4-12: needs the P2 sensor hooks and `sensor::hash_checked_per_run`, M4-08), Doctor rows, retention |
 ## M2 tickets (stage/05-app: IPC, the Tauri app)
 
@@ -124,12 +124,20 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 | ------ | -------- |
 | S-7′ | `project_env_approve` |
 | M2-06 | `clipboard_copy { target: "command" }` |
-| M3-12, M3-16 | `terminal_link_open`, `progress_rebuild_*` |
+| M3-12 | `terminal_link_open` |
 | M3-18, M4-12…M4-14 | `probe_folder_open`, `probe_run`, `doctor_capture_login_path`, `doctor_login_path_apply` |
-| M3-21 | `packet_normalize_apply` (the DR-131 normalizer) |
 | M3-23, M3-24 | `chat_copy_and_open`, `chat_link_set`, `paste_back_*` |
 | M3-26, M4-02, M4-03 | `metrics_export`, `metrics_view`, `runs_clear`, `runs_search` (run records first) |
 | M4-16…M4-33 | gates, signing, `tamper_restore`, lessons, manifest, assembler, desktop, `add_step`, `add_item`, `run_sheet_export`, `item_kind_confirm`, `terminal_open_here` |
+
+## M3 packets, watcher and restart (branch `stage/05-packets`)
+
+| Ticket | Status | Done | Notes |
+| ------ | ------ | ---- | ----- |
+| M3-20 | done | `packet::normalize_packet` (DR-131 notes per kind with lines), `packet::split_paste` (DR-132: preamble kept apart, two packets / wrong stage refused), `packet::fix_request_text` (DR-137; `Problem.field` added); `crates/foreman-core/tests/packet_paste.rs` (`packet::normalization_golden` over Foreman's own packets, `split_paste`, `fix_request_text`, variants, idempotence proptest) | `paste_back_*` (M3-24, chat agent) should call `normalize_packet` then `split_paste`; `clipboard_copy { fixRequest }` now uses the core text. |
+| M3-21 | done | `packet_view` normalization notes and the AC-F004-12 problem; `packet_normalize_apply` (CAS, `packet:changed`); `packet_signature_confirm` tested (Cancel, stale, void on change); watcher started by `project_open`, mapped in `src-tauri/src/watch.rs`; Doctor warning on a stopped watcher; focus re-stat; Packet screen "Formatting Foreman can fix"; `src-tauri/tests/packet_landing.rs` (`packet::outside_signature_needs_confirmation`, `watcher::packet_visible_within_1s` …) | Rename-over saves only in the latency test (20 writes, not ADR-013's 100). FSEvents latency is a **Mac task**: run `cargo test -p foreman-app --test packet_landing watcher` on macOS. |
+| M3-22 | done | `project::refresh_decisions` from watcher hints (`decision:pending` live); per-run `HintWatcher` over the fingerprint sources replaces the 5 s tick (now a 60 s fallback, 5 s only without a watcher); `src-tauri/tests/outside_change_live.rs` (`decisions::outside_edit_has_no_effect_until_accepted` live, `watcher::config_changed_by_watcher_event`, `watcher::config_targets_relevance`) | `watcher::config_changed_marks_open_runs` stays in `tests/launch.rs`. |
+| M3-16 | done | `progress_rebuild_preview`/`_apply` (unreadable file kept as `progress.json.corrupt-<ts>`, CAS, single use); a missing `progress.json` is rebuilt from packets on open; `read_progress` error names the file; Rebuild from repo on the project error screen; Interrupted sessions with Resume on Today (`chain_resume_prepare` → `launch_start`); `src-tauri/tests/restart.rs` (`lifecycle::crash_leaves_interrupted` restart case, `rebuild::*`) | A hand signature confirmed before app data was deleted must be confirmed again (it lived in approvals; DR-135). Stage records (M4) will add signing entries to the rebuild. |
 
 ### Open follow-ups
 

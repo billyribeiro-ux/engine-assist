@@ -2373,9 +2373,7 @@ export class MockIpcClient implements IpcClient {
 			fields: pk.fields,
 			problems,
 			normalization:
-				pk.stage === 2
-					? [{ field: 'APPROVED BY', message: '<sign here> is treated as unsigned' }]
-					: [],
+				pk.normalization ?? (pk.stage === 2 ? [{ field: 'APPROVED BY', message: 'unsigned' }] : []),
 			signed: pk.signedBy
 				? { name: 'Billy Ribeiro', date: '2026-10-12', byForeman: false, confirmed: true }
 				: null,
@@ -2400,6 +2398,11 @@ export class MockIpcClient implements IpcClient {
 			if (view.sha256 !== req.seenSha256)
 				throw fail('stale', { kind: 'stale', what: 'readStamp', fresh: view });
 			this.writable(p);
+			const pk = p.packets[req.stage];
+			if (pk && view.normalization.length > 0) {
+				pk.normalization = [];
+				pk.sha = `${pk.sha.slice(0, 56)}${String(p.rev + 1).padStart(8, '0')}`;
+			}
 			this.emit('packet:changed', { projectId: p.id, stage: req.stage, rev: ++p.rev });
 			return this.packet(p, req.stage);
 		});
