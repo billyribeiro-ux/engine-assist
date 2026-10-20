@@ -218,7 +218,10 @@ fn s(v: &[&str]) -> Vec<String> {
     v.iter().map(|x| (*x).to_owned()).collect()
 }
 
-#[allow(clippy::too_many_lines, reason = "one match arm per DR-140 operation, kept together for review")]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one match arm per DR-140 operation, kept together for review"
+)]
 /// Builds the validated arguments of an operation.
 ///
 /// # Errors
