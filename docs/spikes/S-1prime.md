@@ -66,4 +66,4 @@ Documents changed (file and section): ____________
 
 Notes:
 
-- Probe B in the 2026-10-20 Linux rehearsal exited 0 with no output for an unknown UUID, so it cannot separate "parsed" from "ignored". If the Mac does the same, ADR-017 needs a probe-B criterion that works (for example only flag-parse errors on stderr), recorded here: ____________
+- Probe B in the 2026-10-20 Linux rehearsal exited 0 with no output for an unknown UUID, so it cannot separate "parsed" from "ignored". If the Mac does the same, ADR-017 needs a probe-B criterion that works (for example only flag-parse errors on stderr), recorded here: done 2026-10-20 in ADR-017's amendment (B1 fork form accepted + B2 `--resume --session-id` without `--fork-session` refused; flag errors read from stderr even on exit 0). Confirm on the Mac that B2 is refused with the same message.

@@ -773,7 +773,7 @@ Written by `foreman-sensor` with `O_CREAT|O_EXCL|O_NOFOLLOW`, `0600` (SR-15). AD
 
 - `redacted` is the canonical parsed JSON of a settings-like source after `fingerprint::redact` (values under `env`/`headers`, `apiKey*` keys, keys containing `token`/`secret`/`password`, and secret-pattern strings become `‹redacted sha256:<8 hex>›`), or `null` for non-JSON sources (Markdown, programs), which are diffed by hash only (SR-55).
 - From `~/.claude.json`, only `mcpServers` (user scope and `projects[<repo path>]`) is ever stored (SR-31a).
-- `envKey` = SHA-256 over the sorted env **names** and the SHA-256 of their values (never the values themselves).
+- `envKey` = SHA-256 over the sorted env **names** and the SHA-256 of their values (never the values themselves), leaving out `FOREMAN_RUN_ID`, which is new every run (amended 2026-10-20, ADR-021).
 - Retention: until the project is removed (PR-04).
 
 ### 4.10 `templates/<sourceSha256>.p<parserVersion>.json` · v1 · class (b)
@@ -782,7 +782,7 @@ The parsed `Template` (design doc §3.2.1) serialized with serde, keyed by sourc
 
 ### 4.11 `probe/settings.json` · Claude Code settings format · P2
 
-Same schema as §4.4 with exactly one hook (`SessionStart`, the sensor writing a marker into `probe/marker-<uuid>`), no `effortLevel`. Recreated with the folder before each probe run (SR-17).
+Same schema as §4.4 with exactly one hook (`SessionStart`, the hash-checked sensor run with a fresh probe run ID and token), no `effortLevel`; its deny rules name the probe folder and app data. The marker is the `SessionStart` event file the sensor writes to `events/<probeRunId>/` with that token (amended 2026-10-20, ADR-017: it reuses the sensor's checked writer instead of a separate marker file). Recreated with the folder before each probe run (SR-17).
 
 ## 5. Handoff packet text format
 
