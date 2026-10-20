@@ -98,6 +98,7 @@ fn answers_auth_status_with_scripted_method_and_exit() {
 #[test]
 fn init_only_exit_code_is_scripted() {
     let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("x.json"), "{}").unwrap();
     let out = fake(
         tmp.path(),
         &["--init-only", "--settings", "x.json"],
@@ -117,4 +118,51 @@ fn plays_scripted_output_and_exit_code() {
     );
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(String::from_utf8(out.stdout).unwrap(), "done\n");
+}
+
+/// M3: `--init-only` parses flags like Claude Code 2.1.304 (ADR-017 amendment's table).
+#[test]
+fn init_only_parses_like_claude_code() {
+    let tmp = tempfile::tempdir().unwrap();
+    let r = "7a1f3c2e-0b4d-4e6f-9a8b-1c2d3e4f5a6b";
+    let n = "8b2e4d3f-1c5e-4f70-8b9c-2d3e4f5a6b7c";
+    let cases: [(&[&str], i32, &str); 6] = [
+        (&["--init-only", "--bogus"], 1, "unknown option '--bogus'"),
+        (
+            &["--init-only", "--resume", r, "--session-id", n],
+            1,
+            "--fork-session is also specified",
+        ),
+        (
+            &[
+                "--init-only",
+                "--resume",
+                r,
+                "--fork-session",
+                "--session-id",
+                n,
+            ],
+            0,
+            "",
+        ),
+        (&["--init-only", "--resume", r], 0, ""),
+        (
+            &["--init-only", "--effort", "bogus"],
+            0,
+            "Unknown --effort value 'bogus'",
+        ),
+        (
+            &["--init-only", "--settings", "/nonexistent.json"],
+            1,
+            "Settings file not found",
+        ),
+    ];
+    for (args, code, err) in cases {
+        let out = fake(tmp.path(), args, None);
+        assert_eq!(out.status.code(), Some(code), "{args:?}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(err),
+            "{args:?}"
+        );
+    }
 }
