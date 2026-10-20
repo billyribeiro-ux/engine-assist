@@ -2,6 +2,11 @@
 	"kind": "blocked",
 	"blockers": [
 		{
+			"kind": "notRunnable",
+			"reason": "running",
+			"text": "Waits for 2.3: Claude is still working in this session. Run re-arms it with Accept edits when it's idle."
+		},
+		{
 			"kind": "configChanged",
 			"cwd": "spec",
 			"fingerprint": "abababababababababababababababababababababababababababababababab",

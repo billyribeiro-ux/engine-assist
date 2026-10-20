@@ -61,6 +61,7 @@
 
 	onMount(() => {
 		void f.load();
+		if (start === 0) document.getElementById('w-name')?.focus();
 		return registerShortcuts({
 			run: async () => {
 				await next();

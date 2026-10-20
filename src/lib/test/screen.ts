@@ -12,20 +12,25 @@ import { ui } from '#lib/stores/ui.svelte.ts';
 
 export { IDS } from '#lib/ipc/mock/world.ts';
 
+const overridden = new Set<string>();
+
 export function fresh(scenario: Scenario = 'happy'): MockIpcClient {
 	vi.restoreAllMocks();
+	const shared = resetMock(scenario);
+	for (const name of overridden) Reflect.deleteProperty(shared, name);
+	overridden.clear();
 	resetBus();
 	terminal.reset();
 	ui.toasts = [];
 	ui.hint = '';
-	return resetMock(scenario);
+	return shared;
 }
 
 /** Makes one mock command reject with an `io` failure. */
 export function failing(m: MockIpcClient, command: keyof MockIpcClient): void {
-	vi.spyOn(m, command as never).mockRejectedValue(
-		new IpcFailure({ code: 'io', message: 'disk is full', detail: null }) as never
-	);
+	const fail = new IpcFailure({ code: 'io', message: 'disk is full', detail: null });
+	(m as unknown as Record<string, unknown>)[command] = () => Promise.reject(fail);
+	overridden.add(command);
 }
 
 export async function project(m: MockIpcClient, id: string): Promise<ProjectView> {

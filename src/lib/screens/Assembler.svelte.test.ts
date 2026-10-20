@@ -27,6 +27,6 @@ describe('Assembler', () => {
 		failing(m, 'assemblerView');
 		const p = await project(m, IDS.tradelog);
 		const s = await render(Assembler, { project: p });
-		await expect.element(s.getByText(/failed|went wrong/i).first()).toBeVisible();
+		await expect.element(s.getByRole('alert')).toBeVisible();
 	});
 });

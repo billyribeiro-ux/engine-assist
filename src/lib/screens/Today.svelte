@@ -164,7 +164,11 @@
 	$effect(() => {
 		if (focused || !today.value) return;
 		focused = true;
-		void tick().then(() => document.querySelector<HTMLElement>('.next [data-today-row]')?.focus());
+		void tick().then(() =>
+			document
+				.querySelector<HTMLElement>('.next [data-today-row], .empty-start [data-today-row]')
+				?.focus()
+		);
 	});
 </script>
 

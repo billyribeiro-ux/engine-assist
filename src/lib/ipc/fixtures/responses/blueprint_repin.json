@@ -390,7 +390,7 @@
 			],
 			"packet": {
 				"path": "docs/handoff/stage-01.md",
-				"exists": true,
+				"exists": false,
 				"problems": 0,
 				"signed": false
 			},
@@ -920,7 +920,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {
@@ -956,7 +956,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {
@@ -992,7 +992,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {
@@ -1028,7 +1028,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {
@@ -1064,7 +1064,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {
@@ -1100,7 +1100,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {
@@ -1136,7 +1136,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {
@@ -1172,7 +1172,7 @@
 					"surface": "chat",
 					"specLine": {
 						"surface": "chat",
-						"where": "Chat, new conversation in Project",
+						"where": "Chat, new conversation in Project TradeLog",
 						"model": {
 							"value": "Opus 5.5",
 							"origin": {

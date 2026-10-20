@@ -12,7 +12,11 @@ describe('Packet', () => {
 		const p = await project(m, IDS.tradelog);
 		const s = await render(Packet, { project: p, stageNo: 2 });
 		await expect.element(s.getByRole('heading', { name: /Stage 2 packet/ })).toBeVisible();
-		expect(s.container.textContent).toMatch(/problem/i);
+		await expect.element(s.getByText('2 problems')).toBeVisible();
+		await expect.element(s.getByText(/DATA WE HANDLE is required/)).toBeVisible();
+		const repair = vi.spyOn(m, 'packetRepairPrepare');
+		await s.getByRole('button', { name: 'Repair' }).first().click();
+		await vi.waitFor(() => expect(repair).toHaveBeenCalled());
 	});
 
 	it('empty: no packet yet says which step writes it', async () => {

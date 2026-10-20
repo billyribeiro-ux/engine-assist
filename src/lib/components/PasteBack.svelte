@@ -9,6 +9,7 @@
 	import Text from '#lib/render/Text.svelte';
 	import { refresh } from '#lib/stores/bus.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
+	import { tick } from 'svelte';
 
 	import Icon from './Icon.svelte';
 
@@ -30,6 +31,7 @@
 	let preview = $state<PastePreview | null>(null);
 	let error = $state<string | null>(null);
 	let busy = $state(false);
+	let writeBtn = $state<HTMLButtonElement>();
 	const headId = $derived(`pb-${step.replace(/[^a-z0-9]/gi, '-')}`);
 
 	$effect(() => {
@@ -42,6 +44,9 @@
 		error = null;
 		try {
 			preview = await c.pasteBackPreview({ projectId, step, kind: 'auto', source: 'clipboard' });
+			// The exact writes are the next decision: move focus to Write so the keyboard can act.
+			await tick();
+			writeBtn?.focus();
 			return true;
 		} catch (e: unknown) {
 			preview = null;
@@ -124,7 +129,7 @@
 			{/each}
 		</ul>
 		<div class="actions">
-			<button class="btn primary" type="button" disabled={busy} onclick={write}
+			<button class="btn primary" type="button" disabled={busy} onclick={write} bind:this={writeBtn}
 				>Write {total} {total === 1 ? 'file' : 'files'}</button
 			>
 			<button class="btn ghost" type="button" onclick={() => (preview = null)}>Cancel</button>

@@ -12,8 +12,9 @@ describe('Wizard', () => {
 		const s = await render(Wizard);
 		await s.getByRole('textbox', { name: /^Name/ }).fill('Ledger');
 		await s.getByRole('button', { name: 'Choose…' }).click();
+		await s.getByRole('button', { name: 'Choose…' }).click();
 		await s.getByRole('button', { name: /Continue/ }).click();
-		await expect.element(s.getByRole('heading', { name: 'Variables', level: 1 }).or(s.getByRole('heading', { name: 'Variables', level: 2 }))).toBeVisible();
+		await expect.element(s.getByRole('textbox', { name: /Rough idea/ })).toBeVisible();
 	});
 
 	it('locked: Continue without a name says what to fix', async () => {

@@ -120,7 +120,9 @@
 	<main class="main" id="main" aria-labelledby="asm-title">
 		<div class="page narrow">
 			<h1 class="page-title" id="asm-title">Build package</h1>
-			{#if asm.error}
+			{#if asm.error && asm.error.code !== 'notFound' && asm.error.code !== 'notAllowed'}
+				<p class="err" role="alert"><Icon name="cross" size="glyph" />{failureText(asm.error)}</p>
+			{:else if asm.error}
 				<div class="empty">
 					<strong>No build package yet</strong>
 					<span

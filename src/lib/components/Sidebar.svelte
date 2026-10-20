@@ -24,7 +24,7 @@
 	const boot = resource(
 		() => null,
 		(c) => c.appBootstrap({}),
-		() => ['doctor', 'projects']
+		() => ['doctor', 'doctorStatus', 'projects']
 	);
 	let doctorLevel = $state<'ok' | 'warning' | 'failing' | 'unknown'>('unknown');
 	$effect(() => {

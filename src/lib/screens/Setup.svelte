@@ -40,6 +40,7 @@
 
 	onMount(() => {
 		void f.load();
+		document.getElementById('f-name')?.focus();
 		return registerShortcuts({ run: () => submit() });
 	});
 

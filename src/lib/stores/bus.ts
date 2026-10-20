@@ -9,6 +9,7 @@ export type RefreshKey =
 	| 'today'
 	| 'settings'
 	| 'doctor'
+	| 'doctorStatus'
 	| 'runs'
 	| `project:${string}`
 	| `packet:${string}:${number}`
@@ -60,7 +61,9 @@ export function keysFor<E extends EventName>(event: E, p: EventPayloads[E]): Ref
 			return [`project:${e.projectId}`];
 		}
 		case 'doctor:status':
-			return ['doctor'];
+			// Only status readers refetch: Doctor itself fetches through doctor_run, which emits
+			// this event, so refreshing 'doctor' here would run the checks in a loop.
+			return ['doctorStatus'];
 		case 'settings:changed':
 			return ['settings'];
 	}

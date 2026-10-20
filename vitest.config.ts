@@ -29,6 +29,7 @@ export default mergeConfig(
 					test: {
 						name: 'browser',
 						include: ['src/**/*.svelte.test.ts'],
+						setupFiles: ['src/lib/test/browser-setup.ts'],
 						browser: {
 							enabled: true,
 							headless: true,

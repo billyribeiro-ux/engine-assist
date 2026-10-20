@@ -2,6 +2,76 @@
 	"rows": [
 		{
 			"project": {
+				"id": "f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f",
+				"name": "Foreman",
+				"displayPath": "~/Code/engine-assist",
+				"rev": 41,
+				"readOnly": null,
+				"currentStage": 4,
+				"pinned": 2
+			},
+			"next": {
+				"key": "4.5",
+				"number": "4.5",
+				"title": "Design system and key screens",
+				"state": "notStarted",
+				"tag": "conditional",
+				"surface": "chat",
+				"specLine": {
+					"surface": "chat",
+					"where": "Chat, new conversation in Project Foreman",
+					"model": {
+						"value": "Opus 5.5",
+						"origin": {
+							"kind": "template"
+						},
+						"from": null
+					},
+					"effort": {
+						"value": "adaptive",
+						"origin": {
+							"kind": "template"
+						},
+						"from": null
+					},
+					"mode": null,
+					"agents": [],
+					"droppedAgents": [],
+					"note": "Research off"
+				},
+				"whyNotRunnable": null,
+				"stateText": "Not started",
+				"conditionNote": null,
+				"kind": "prompt",
+				"run": null,
+				"next": true
+			},
+			"whyNone": null,
+			"strip": [
+				"notApplicable",
+				"signed",
+				"signed",
+				"signed",
+				"inProgress",
+				"locked",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"notApplicable",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation"
+			],
+			"stageTitle": "Construction Drawings"
+		},
+		{
+			"project": {
 				"id": "7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11",
 				"name": "TradeLog",
 				"displayPath": "~/Code/tradelog",
@@ -75,76 +145,6 @@
 				"needsAnnotation"
 			],
 			"stageTitle": "Architect's Design Studio"
-		},
-		{
-			"project": {
-				"id": "f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f",
-				"name": "Foreman",
-				"displayPath": "~/Code/engine-assist",
-				"rev": 41,
-				"readOnly": null,
-				"currentStage": 4,
-				"pinned": 2
-			},
-			"next": {
-				"key": "4.5",
-				"number": "4.5",
-				"title": "Design system and key screens",
-				"state": "notStarted",
-				"tag": "conditional",
-				"surface": "chat",
-				"specLine": {
-					"surface": "chat",
-					"where": "Chat, new conversation in Project",
-					"model": {
-						"value": "Opus 5.5",
-						"origin": {
-							"kind": "template"
-						},
-						"from": null
-					},
-					"effort": {
-						"value": "adaptive",
-						"origin": {
-							"kind": "template"
-						},
-						"from": null
-					},
-					"mode": null,
-					"agents": [],
-					"droppedAgents": [],
-					"note": "Research off"
-				},
-				"whyNotRunnable": null,
-				"stateText": "Not started",
-				"conditionNote": null,
-				"kind": "prompt",
-				"run": null,
-				"next": true
-			},
-			"whyNone": null,
-			"strip": [
-				"notApplicable",
-				"signed",
-				"signed",
-				"signed",
-				"inProgress",
-				"locked",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation",
-				"notApplicable",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation",
-				"needsAnnotation"
-			],
-			"stageTitle": "Construction Drawings"
 		},
 		{
 			"project": {

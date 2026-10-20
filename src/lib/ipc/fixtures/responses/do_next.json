@@ -1,35 +1,7 @@
 {
-	"kind": "cli",
-	"project": "7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11",
-	"step": "2.4",
-	"prepare": {
-		"kind": "blocked",
-		"blockers": [
-			{
-				"kind": "configChanged",
-				"cwd": "spec",
-				"fingerprint": "abababababababababababababababababababababababababababababababab",
-				"diffs": [
-					{
-						"source": "spec/.claude/agents/principal-engineer.md",
-						"entries": [
-							{
-								"keyPath": "tools",
-								"change": "valueChanged",
-								"before": "\"Read, Grep, Glob\"",
-								"after": "\"Read, Grep, Glob, Bash\""
-							},
-							{
-								"keyPath": "model",
-								"change": "valueChanged",
-								"before": "\"fable\"",
-								"after": "\"opus\""
-							}
-						]
-					}
-				]
-			}
-		],
-		"warnings": []
-	}
+	"kind": "chat",
+	"project": "f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f",
+	"step": "4.5",
+	"ready": true,
+	"blockers": []
 }

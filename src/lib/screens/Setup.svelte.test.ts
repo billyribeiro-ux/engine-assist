@@ -15,9 +15,12 @@ describe('Setup', () => {
 		const s = await render(Setup);
 		await s.getByRole('textbox', { name: /^Name/ }).fill('Ledger');
 		await s.getByRole('button', { name: 'Choose…' }).click();
+		// The first folder is inside another Foreman project: Rust refuses it and says where to go.
+		await expect.element(s.getByText(/inside another Foreman project/).first()).toBeVisible();
+		await s.getByRole('button', { name: 'Choose…' }).click();
 		await s.getByRole('textbox', { name: /Rough idea/ }).fill('A ledger for my receipts.');
 		await s.getByRole('textbox', { name: /Who it's for/ }).fill('Me and my accountant.');
-		await vi.waitFor(() => expect(s.container.textContent).not.toMatch(/Fix \d+ fields? first[^.]*\./));
+		await vi.waitFor(() => expect(s.container.textContent.match(/Fix \d+ fields? first[^.]*\./)?.[0]).toBeUndefined());
 		await s.getByRole('button', { name: 'Create project' }).click();
 		await vi.waitFor(() => expect(apply).toHaveBeenCalled());
 	});
