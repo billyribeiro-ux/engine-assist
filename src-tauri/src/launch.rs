@@ -675,6 +675,7 @@ pub fn start(
         started: held.started,
     }));
     crate::sensor_ingest::watch_run(app, &run_id);
+    runs::watch_output(app, &run_id);
     // The chain, the step and the first-launch flag (DR-065, DR-110). A detached run (Fix this)
     // leaves the step and its chains as they were.
     if !held.detached {

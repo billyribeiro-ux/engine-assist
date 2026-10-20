@@ -106,6 +106,21 @@ class Terminal {
 		this.focusTick += 1;
 	}
 
+	/**
+	 * `run:status` (AC-F009-02, AC-F009-03): the tab takes the new status at once; when the run
+	 * ended, its exit code comes from the run record (`runs_search`, newest first), so the tab says
+	 * `exited 1`, not a guess.
+	 */
+	async statusChanged(client: IpcClient, runId: string, status: RunStatus): Promise<void> {
+		this.setStatus(runId, status);
+		if (status !== 'exited' && status !== 'errored') return;
+		const page = await client
+			.runsSearch({ query: '', projectId: null, cursor: null, limit: 50 })
+			.catch(() => null);
+		const run = page?.runs.find((r) => r.runId === runId);
+		if (run) this.setStatus(runId, run.status, run.exitCode);
+	}
+
 	setStatus(runId: string, status: RunStatus, exitCode: number | null = null): void {
 		this.tabs = this.tabs.map((t) =>
 			t.runId === runId ? { ...t, status, exitCode: exitCode ?? t.exitCode } : t

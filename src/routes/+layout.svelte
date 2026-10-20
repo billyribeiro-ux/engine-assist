@@ -54,7 +54,7 @@
 			const boot = await client.appBootstrap({});
 			if (boot.firstRun && page.url.pathname === '/') await goto(to.firstRun());
 			await client.listen('run:status', (p) => {
-				terminal.setStatus(p.runId, p.status, p.status === 'exited' ? 0 : null);
+				void terminal.statusChanged(client, p.runId, p.status);
 			});
 			const runs = await client.runsSearch({ query: '', projectId: null, cursor: null, limit: 50 });
 			// A re-attached run starts with an empty archive: the earlier run's buffer lived in

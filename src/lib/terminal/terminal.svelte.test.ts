@@ -17,6 +17,7 @@ import { IDS, fresh } from '#lib/test/screen.ts';
 import packageJson from '../../../package.json';
 import { archiveOf, findNext } from './archive.ts';
 import { routeKey, xtermHandles } from './keys.ts';
+import { findUrls, urlLinks } from './links.ts';
 import { styleNonce, withStyleNonce } from './style-nonce.ts';
 import {
 	SCROLLBACK_DEFAULT,
@@ -384,5 +385,52 @@ describe('terminal', () => {
 		} finally {
 			carrier.remove();
 		}
+	});
+	it('terminal::web_links_route_to_rust', async () => {
+		// AC-F009-17: plain URLs in output become links whose click hands the text to Rust.
+		expect(findUrls('see https://example.com/docs?q=1. and http://localhost:5173/x,')).toEqual([
+			{ start: 4, text: 'https://example.com/docs?q=1' },
+			{ start: 38, text: 'http://localhost:5173/x' }
+		]);
+		expect(findUrls('(https://a.example/b) "https://c.example"')).toEqual([
+			{ start: 1, text: 'https://a.example/b' },
+			{ start: 23, text: 'https://c.example' }
+		]);
+		expect(findUrls('javascript:alert(1) file:///etc/passwd ftp://x https://')).toEqual([]);
+		const { t, host } = mounted();
+		await write(t, 'open https://claude.ai/chat/abc now\r\n');
+		const opened: string[] = [];
+		const provider = urlLinks(t, (u) => opened.push(u));
+		const links = await new Promise<Parameters<Parameters<typeof provider.provideLinks>[1]>[0]>(
+			(done) => {
+				provider.provideLinks(1, done);
+			}
+		);
+		expect(links?.map((l) => [l.text, l.range.start.x, l.range.end.x])).toEqual([
+			['https://claude.ai/chat/abc', 6, 31]
+		]);
+		links?.[0]?.activate(new MouseEvent('click'), links[0].text);
+		expect(opened).toEqual(['https://claude.ai/chat/abc']);
+		const none = await new Promise<unknown>((done) => {
+			provider.provideLinks(2, done);
+		});
+		expect(none).toBeUndefined();
+		t.dispose();
+		host.remove();
+	});
+	it('terminal::tab_shows_exit_code', async () => {
+		// AC-F009-02: when a run ends, its tab says exited and the code from the run record.
+		const m = fresh('happy');
+		m.streamDelayMs = 0;
+		terminal.add({ runId: IDS.run23, chain: 'c23', tabName: 'fm-tradelog-s02-2-3' }, null);
+		await m.ptyTerminate({ runId: IDS.run23 });
+		await terminal.statusChanged(m, IDS.run23, 'exited');
+		const tab = terminal.tabs.find((t) => t.runId === IDS.run23);
+		expect(tab?.status).toBe('exited');
+		expect(tab?.exitCode).toBe(143);
+		const s = await render(TerminalDrawer);
+		await expect
+			.element(s.getByRole('tab', { name: /fm-tradelog-s02-2-3.*exited 143/ }))
+			.toBeVisible();
 	});
 });

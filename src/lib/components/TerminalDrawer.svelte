@@ -42,7 +42,7 @@
 	}
 
 	function word(t: (typeof tabs)[number]): string {
-		if (t.status === 'exited') return `exited ${t.exitCode ?? 0}`;
+		if (t.status === 'exited') return t.exitCode === null ? 'exited' : `exited ${t.exitCode}`;
 		return RUN[t.status].word;
 	}
 
