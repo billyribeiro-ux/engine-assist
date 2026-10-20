@@ -37,5 +37,13 @@ jsonschema = { version = "=0.59.0", default-features = false }
 name = "core"
 harness = false
 
+[[bench]]
+name = "template"
+harness = false
+
+[[bench]]
+name = "resolver"
+harness = false
+
 [lints]
 workspace = true
