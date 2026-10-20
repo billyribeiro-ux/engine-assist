@@ -80,3 +80,8 @@ CI jobs `deny`, `deny-e2e`, `audit` (`cargo audit`), `pnpm-audit`; the Playwrigh
 ## Exit path
 
 The policy is configuration. Relaxing it for a specific crate is a `[bans]` exception with a `wrappers` scope and a reason, reviewed like code.
+
+## Log
+
+**2026-10-20 · M0.** `deny.toml` is in the repo. The license list was fixed from the real `aarch64-apple-darwin` graph: `MIT`, `Apache-2.0`, `BSD-3-Clause`, `Unicode-3.0`, `Zlib`, `MPL-2.0`, `CC0-1.0`. `Apache-2.0 WITH LLVM-exception`, `BSD-2-Clause` and `ISC` were dropped because no crate uses them (cargo-deny warns on unused allowances); `deny-e2e.toml` keeps `Apache-2.0 WITH LLVM-exception`, which only the `e2e` graph needs. Known duplicate versions inside the tauri 2.12.4 graph are listed in `[bans] skip` so `cargo deny` reports zero warnings while any new duplicate still warns. `deny-e2e.toml` allows `axum` only under `tauri-plugin-wdio-webdriver`, and `hyper`/`hyper-util` only under `axum`. `cargo audit` scans the whole lockfile regardless of target, so `.cargo/audit.toml` ignores two warnings (RUSTSEC-2024-0370, RUSTSEC-2024-0429) whose crates are only in the Linux GTK graph (checked absent from `cargo tree --target aarch64-apple-darwin`). `scripts/sandbox/deny-network.sb` and `scripts/no-network-run.sh` exist; `network::blocked_network_run` runs on macOS only and is still UNVERIFIED until Billy runs it.
+

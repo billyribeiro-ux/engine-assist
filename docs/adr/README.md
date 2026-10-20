@@ -46,3 +46,9 @@ The design overview is in `docs/design-doc.md`.
 | `tracing-subscriber` | 0.3.23 | ADR-018 | Local diagnostics with a redaction layer |
 | `tauri-plugin-notification` | 2.7.0 | ADR-014 | `wait` steps and P2 notifications (Rust side only) |
 | `@sveltejs/kit` / `@sveltejs/adapter-static` | 3.1.0 / 4.0.0 | ADR-002 | Frontend framework (Billy's decision) |
+| `@types/node` | 22.20.5 | M0 (ADR-019) | Node types for tooling scripts, configs and Node-side tests only; webview code doesn't reference them |
+| `tempfile` | 3.27.0 (dev) | M0 (ADR-015) | Temp dirs for `fake-claude` integration tests (already in r7's list for the store) |
+| `proptest` · `insta` · `criterion` | 1.12.0 · 1.49.0 · 0.8.2 (dev) | M0 (ADR-015) | Layer-1 tooling wired in `foreman-core` (`criterion` with `default-features = false`) |
+| `tauri-plugin-wdio-webdriver` | 1.5.0 (optional) | M0 (ADR-015) | WDIO smoke; only under the `e2e` feature, never in release (`release::no_webdriver`) |
+| `@playwright/test` · `@axe-core/playwright` | 1.64.0 · 4.13.0 (dev) | M0 (ADR-015) | Layer-4 flows and axe (stepped back for the 7-day release age; ADR-024 log) |
+| CI-only tools | cargo-deny 0.20.2 · cargo-audit 0.22.2 · cargo-cyclonedx 0.5.9 · gitleaks 8.30.1 · semgrep 1.180.0 | M0 (ADR-015, ADR-016) | Gates in `pnpm verify` and CI; installed with exact versions (`--locked`, checksum-verified for gitleaks), never linked into Foreman |
