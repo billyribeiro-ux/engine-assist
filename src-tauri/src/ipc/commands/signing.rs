@@ -120,3 +120,97 @@ pub fn tamper_restore(app: &App, req: TamperRestoreReq) -> Result<PacketView, Ip
     v.tamper = signing::tamper_diff(&p, n);
     Ok(v)
 }
+
+/// `packet_repair_prepare` (AC-F013-11; M4-23): prepares a re-arm of the stage's chain with
+/// "Fix only these problems in docs/handoff/stage-NN.md: … Do not change anything else." The
+/// problems come from Rust's own validation of the current packet, never from the webview; the
+/// prompt is sanitized and passes `check_prompt` in the preparation. Nothing starts here: Billy
+/// continues with `rearm_start` (its native idle dialog) or `launch_start` when the chain's
+/// session has ended.
+///
+/// # Errors
+/// `NotFound` (no packet, or the chain never ran), `ReadOnly`, `NotAllowed("no-problems" |
+/// "not-cli-packet" | "chain-handed-off")`.
+pub fn packet_repair_prepare(
+    app: &App,
+    req: crate::ipc::dto::requests::PacketRepairPrepareReq,
+    progress: tauri::ipc::Channel<crate::ipc::dto::launch::LaunchProgress>,
+) -> Result<crate::ipc::dto::launch::PrepareOutcome, IpcError> {
+    use foreman_core::ids::Surface;
+    use foreman_core::schema::progress::ChainStatus;
+    let n = req.stage.0;
+    let mut p = project::open(app, req.project_id.as_str())?;
+    p.writable()?;
+    let Some(file) = p.packets.get(&n).cloned() else {
+        return Err(IpcError::not_found("That packet doesn't exist yet."));
+    };
+    let problems = p.packet_problems(n, &file.text);
+    if problems.is_empty() {
+        return Err(IpcError::not_allowed(
+            "no-problems",
+            "The packet has no problems to fix.",
+        ));
+    }
+    let (t, path, _) = p.parts()?;
+    let Some(producer) = foreman_core::rules::packet_producer(t, path, n).cloned() else {
+        return Err(IpcError::not_found(
+            "This stage has no packet-producing step.",
+        ));
+    };
+    if producer.surface != Some(Surface::Cli) {
+        return Err(IpcError::not_allowed(
+            "not-cli-packet",
+            "A chat packet is fixed in the chat: use Copy fix request.",
+        ));
+    }
+    let start_key = producer
+        .chain
+        .clone()
+        .unwrap_or_else(|| producer.key.clone());
+    let Some(chain) = p
+        .progress
+        .chains
+        .iter()
+        .rev()
+        .find(|c| c.start == start_key && c.status != ChainStatus::Superseded)
+        .cloned()
+    else {
+        return Err(IpcError::not_found(
+            "The stage's chain hasn't run, so there's no session to re-arm.",
+        ));
+    };
+    if chain.status == ChainStatus::HandedOff {
+        return Err(IpcError::not_allowed(
+            "chain-handed-off",
+            "The chain was handed off to Desktop. Fix the packet there or in your editor.",
+        ));
+    }
+    let chain_id = uuid::Uuid::parse_str(&chain.id)
+        .map_err(|_| IpcError::io("The chain's ID is unreadable."))?;
+    let list: Vec<String> = problems
+        .iter()
+        .map(|x| format!("line {}: {}", x.line, x.message))
+        .collect();
+    let prompt = foreman_core::sanitize::for_paste(&format!(
+        "Fix only these problems in {}: {} Do not change anything else.",
+        foreman_core::packet::file_name(n),
+        list.join("; ") + if list.is_empty() { "" } else { "." }
+    ))
+    .0;
+    let start = chain
+        .last_start
+        .or(producer.start)
+        .ok_or_else(|| IpcError::not_found("The chain has no run config."))?;
+    let custom = crate::launch::Custom {
+        prompt,
+        start,
+        resume: Some(chain_id),
+        detached: false,
+    };
+    let send = |m: crate::ipc::dto::launch::LaunchProgress| {
+        let _ = progress.send(m);
+    };
+    let prepared =
+        crate::launch::prepare_custom(app, &mut p, producer.key.as_str(), &custom, &send)?;
+    Ok(crate::launch::hold(app, prepared))
+}
