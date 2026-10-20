@@ -6,9 +6,9 @@
 // its own response headers. A violation event carries `originalPolicy`, the policy as served, so the
 // header is read from the event for the injected script.
 import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 
-import { $, browser } from '@wdio/globals';
-
+import { type RunningApp, startApp } from '../app.ts';
 import { productionCsp } from '../helpers/app.ts';
 import { compareServedCsp } from '../helpers/csp.ts';
 import { INJECT_INLINE_SCRIPT, TODAY_HEADING } from '../helpers/scripts.ts';
@@ -27,16 +27,23 @@ interface InjectionResult {
 }
 
 describe('content security policy (SR-20)', () => {
+	let app: RunningApp;
 	let result: InjectionResult;
 
-	before(async () => {
-		// The page must have booted first: the hashed SvelteKit bootstrap script only runs if the
-		// served policy pins the right hash (a missing hash leaves a blank page in release builds).
-		const heading = $('h1');
-		await heading.waitForDisplayed({ timeout: 30_000 });
-		assert.equal((await heading.getText()).trim(), TODAY_HEADING);
+	before(
+		async () => {
+			app = await startApp();
+			// The page must have booted first: the hashed SvelteKit bootstrap script only runs if the
+			// served policy pins the right hash (a missing hash leaves a blank page in release builds).
+			const heading = await app.driver.waitForDisplayed('h1');
+			assert.equal((await heading.text()).trim(), TODAY_HEADING);
 
-		result = await browser.execute<InjectionResult, []>(INJECT_INLINE_SCRIPT);
+			result = await app.driver.execute<InjectionResult>(INJECT_INLINE_SCRIPT);
+		},
+		{ timeout: 120_000 }
+	);
+	after(async () => {
+		await app.stop();
 	});
 
 	it('does not run an injected inline <script>', () => {

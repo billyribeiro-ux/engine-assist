@@ -10,7 +10,8 @@ const root = new URL('..', import.meta.url).pathname;
 /** The debug binary of `foreman-app` made with `--features e2e` (see e2e/run.mjs). */
 export function appBinary(env: NodeJS.ProcessEnv = process.env): string {
 	return (
-		env['FOREMAN_E2E_APP'] ?? join(env['CARGO_TARGET_DIR'] ?? join(root, 'target'), 'debug', 'foreman-app')
+		env.FOREMAN_E2E_APP ??
+		join(env.CARGO_TARGET_DIR ?? join(root, 'target'), 'debug', 'foreman-app')
 	);
 }
 
@@ -69,7 +70,7 @@ export async function startApp(startTimeoutMs = 90_000): Promise<RunningApp> {
 			});
 		});
 	};
-	const baseUrl = `http://127.0.0.1:${port}`;
+	const baseUrl = `http://127.0.0.1:${String(port)}`;
 	try {
 		await waitForServer(baseUrl, startTimeoutMs, () => !exited);
 		const driver = await WebDriver.create(baseUrl);

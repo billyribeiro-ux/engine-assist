@@ -1,6 +1,5 @@
-// Page scripts for the smoke specs, as plain-JavaScript strings. WebdriverIO would otherwise
-// serialize TypeScript functions after tsx has compiled them (with helper calls such as `__name`
-// that do not exist in the page), so the page code stays a string and is never compiled.
+// Page scripts for the smoke specs, as plain-JavaScript strings sent over WebDriver. They stay
+// strings (never TypeScript functions) so nothing compiles or serializes them on the way.
 
 /** The Today heading. The one place to change if M2 reshapes the Today route. */
 export const TODAY_HEADING = 'Today';

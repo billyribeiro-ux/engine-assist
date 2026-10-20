@@ -9,9 +9,9 @@
 // link clicks on its own. The unit-level predicates (webview::navigation_denied_to_remote) prove the
 // rule; this spec proves the handlers are wired into the built window and nothing regressed.
 import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
 
-import { $, browser } from '@wdio/globals';
-
+import { type RunningApp, startApp } from '../app.ts';
 import { isAppOrigin, readState } from '../helpers/app.ts';
 import {
 	NAVIGATION_ATTEMPTS,
@@ -25,28 +25,36 @@ const REMOTE = 'https://example.invalid/';
 const SETTLE_MS = 1500;
 
 describe('remote navigation is denied (SR-29)', () => {
+	let app: RunningApp;
 	let startUrl: string;
 
-	before(async () => {
-		const heading = $('h1');
-		await heading.waitForDisplayed({ timeout: 30_000 });
-		assert.ok(isAppOrigin((await readState()).origin));
-		startUrl = await browser.execute<string, []>(SET_MARKER);
-		assert.equal((await browser.getWindowHandles()).length, 1);
+	before(
+		async () => {
+			app = await startApp();
+			await app.driver.waitForDisplayed('h1');
+			assert.ok(isAppOrigin((await readState(app.driver)).origin));
+			startUrl = await app.driver.execute<string>(SET_MARKER);
+			assert.equal((await app.driver.getWindowHandles()).length, 1);
+		},
+		{ timeout: 120_000 }
+	);
+	after(async () => {
+		await app.stop();
 	});
 
 	for (const [name, script] of Object.entries(NAVIGATION_ATTEMPTS)) {
 		it(`${name} to a remote URL changes nothing`, async () => {
-			const returned = await browser.execute<string, [string]>(script, REMOTE);
-			await browser.pause(SETTLE_MS);
+			const { driver } = app;
+			const returned = await driver.execute<string>(script, [REMOTE]);
+			await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
 
 			assert.notEqual(returned, 'window', `${name} returned a window object`);
 			assert.equal(
-				(await browser.getWindowHandles()).length,
+				(await driver.getWindowHandles()).length,
 				1,
 				`${name} opened another window (returned ${returned})`
 			);
-			const state = await readState();
+			const state = await readState(driver);
 			assert.equal(state.href, startUrl, `${name} navigated the main webview`);
 			assert.equal(state.marker, 'alive', `${name} replaced the document`);
 			assert.equal(state.heading, TODAY_HEADING);
@@ -54,14 +62,15 @@ describe('remote navigation is denied (SR-29)', () => {
 	}
 
 	it('control: navigating within the app origin still works', async () => {
-		await browser.execute<string, []>(RELOAD_SAME_ORIGIN);
-		await browser.waitUntil(
+		const { driver } = app;
+		await driver.execute<string>(RELOAD_SAME_ORIGIN);
+		await driver.waitUntil(
 			async () => {
-				const state = await readState();
+				const state = await readState(driver);
 				return state.marker === null && state.heading === TODAY_HEADING;
 			},
-			{ timeout: 20_000, timeoutMsg: 'same-origin navigation did not reload the app' }
+			{ timeoutMs: 20_000, message: 'same-origin navigation did not reload the app' }
 		);
-		assert.ok(isAppOrigin((await readState()).origin));
+		assert.ok(isAppOrigin((await readState(driver)).origin));
 	});
 });

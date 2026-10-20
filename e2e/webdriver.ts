@@ -51,14 +51,18 @@ async function call(
 	try {
 		parsed = text === '' ? {} : JSON.parse(text);
 	} catch {
-		throw new WebDriverError('invalid response', `${method} ${path}: not JSON: ${text.slice(0, 200)}`, response.status);
+		throw new WebDriverError(
+			'invalid response',
+			`${method} ${path}: not JSON: ${text.slice(0, 200)}`,
+			response.status
+		);
 	}
-	const value = isRecord(parsed) ? parsed['value'] : undefined;
+	const value = isRecord(parsed) ? parsed.value : undefined;
 	if (!response.ok) {
 		const err = isRecord(value) ? value : {};
 		throw new WebDriverError(
-			typeof err['error'] === 'string' ? err['error'] : 'unknown error',
-			typeof err['message'] === 'string' ? err['message'] : `${method} ${path} failed`,
+			typeof err.error === 'string' ? err.error : 'unknown error',
+			typeof err.message === 'string' ? err.message : `${method} ${path} failed`,
 			response.status
 		);
 	}
@@ -77,14 +81,14 @@ export async function waitForServer(
 		if (!isAlive()) throw new Error('the app exited before the WebDriver server was ready');
 		try {
 			const value = await call(baseUrl, 'GET', '/status', undefined, 2000);
-			if (isRecord(value) && value['ready'] === true) return;
+			if (isRecord(value) && value.ready === true) return;
 			last = 'server up, webview not ready';
 		} catch (e) {
 			last = e instanceof Error ? e.message : String(e);
 		}
 		await new Promise((resolve) => setTimeout(resolve, 250));
 	}
-	throw new Error(`WebDriver server at ${baseUrl} not ready after ${timeoutMs} ms (${last})`);
+	throw new Error(`WebDriver server at ${baseUrl} not ready after ${String(timeoutMs)} ms (${last})`);
 }
 
 export class Element {
@@ -120,7 +124,7 @@ export class WebDriver {
 	static async create(baseUrl: string, options: ClientOptions = {}): Promise<WebDriver> {
 		const timeoutMs = options.requestTimeoutMs ?? 60_000;
 		const value = await call(baseUrl, 'POST', '/session', { capabilities: {} }, timeoutMs);
-		const id = isRecord(value) ? value['sessionId'] : undefined;
+		const id = isRecord(value) ? value.sessionId : undefined;
 		if (typeof id !== 'string' || id === '') {
 			throw new WebDriverError('session not created', 'no sessionId in the response', 500);
 		}
@@ -200,7 +204,7 @@ export class WebDriver {
 				const element = await this.findElement(css);
 				return (await element.isDisplayed()) ? element : false;
 			},
-			{ timeoutMs, message: `${css} not displayed within ${timeoutMs} ms` }
+			{ timeoutMs, message: `${css} not displayed within ${String(timeoutMs)} ms` }
 		);
 	}
 }
