@@ -666,7 +666,16 @@ export class MockIpcClient implements IpcClient {
 			firstRun: this.world.firstRun,
 			settingsRev: this.world.settings.rev,
 			projects: this.world.projects.map((p) => this.summary(p)),
-			doctor: this.world.doctor.level
+			interrupted: this.world.runs
+				.filter((r) => r.summary.status === 'interrupted')
+				.map((r) => r.summary),
+			doctor: this.world.doctor.level,
+			capabilities: {
+				claudeVersion: this.world.firstRun ? null : '2.1.293',
+				desktop: !this.world.firstRun,
+				sensor: false,
+				probesVerified: !this.world.firstRun
+			}
 		}));
 	}
 	settingsGet(req: Requests['settings_get']): Promise<T.SettingsView> {

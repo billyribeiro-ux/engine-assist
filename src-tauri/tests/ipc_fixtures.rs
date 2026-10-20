@@ -5,27 +5,50 @@
     reason = "integration-test code (tests/): unwrap/expect are denied only outside tests (SR-62)"
 )]
 
+mod common;
+
 mod ipc {
-    use foreman_app::ipc::commands::app::{AppBootstrap, AppBootstrapReq};
-    use serde_json::Value;
+    use super::common::{fixtures, table};
+    use foreman_app::ipc::COMMANDS;
 
-    const REQ_APP_BOOTSTRAP: &str =
-        include_str!("../../src/lib/ipc/fixtures/requests/app_bootstrap.json");
-    const RES_APP_BOOTSTRAP: &str =
-        include_str!("../../src/lib/ipc/fixtures/responses/app_bootstrap.json");
-
-    /// `ipc::fixture_requests_deserialize`: every request fixture deserializes into its struct.
+    /// `ipc::fixture_requests_deserialize`: every request fixture (variants included)
+    /// deserializes into its command's request struct, and every command has one.
     #[test]
     fn fixture_requests_deserialize() {
-        let _: AppBootstrapReq = serde_json::from_str(REQ_APP_BOOTSTRAP).unwrap();
+        let files = fixtures("requests");
+        let mut failures = Vec::new();
+        for (cmd, name, json) in &files {
+            if let Err(e) = table::request(cmd, json) {
+                failures.push(format!("{name}: {e}"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+        for c in COMMANDS {
+            assert!(
+                files.iter().any(|(cmd, _, _)| cmd == c),
+                "no request fixture for {c}"
+            );
+        }
     }
 
-    /// `ipc::fixture_responses_roundtrip`: every response fixture deserializes and re-serializes
-    /// to the same JSON value (formatting aside: fixtures are Prettier-formatted).
+    /// `ipc::fixture_responses_roundtrip`: every response fixture deserializes into its command's
+    /// response type and re-serializes to the same JSON value (formatting aside: fixtures are
+    /// Prettier-formatted), and every command has one.
     #[test]
     fn fixture_responses_roundtrip() {
-        let typed: AppBootstrap = serde_json::from_str(RES_APP_BOOTSTRAP).unwrap();
-        let original: Value = serde_json::from_str(RES_APP_BOOTSTRAP).unwrap();
-        assert_eq!(serde_json::to_value(&typed).unwrap(), original);
+        let files = fixtures("responses");
+        let mut failures = Vec::new();
+        for (cmd, name, json) in &files {
+            if let Err(e) = table::response(cmd, json) {
+                failures.push(format!("{name}: {e}"));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+        for c in COMMANDS {
+            assert!(
+                files.iter().any(|(cmd, _, _)| cmd == c),
+                "no response fixture for {c}"
+            );
+        }
     }
 }

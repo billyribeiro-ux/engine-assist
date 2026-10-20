@@ -1,5 +1,7 @@
 //! The main window, built in Rust so navigation and new windows can be denied (SR-29, ADR-014).
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::webview::NewWindowResponse;
 use tauri::{Manager, Runtime, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -31,6 +33,20 @@ pub fn is_dev_server(u: &Url) -> bool {
 #[must_use]
 pub fn navigation_allowed(u: &Url) -> bool {
     is_app_origin(u) || (cfg!(debug_assertions) && is_dev_server(u))
+}
+
+static REDUCED_EFFECTS: AtomicBool = AtomicBool::new(false);
+
+/// Records what the webview's `prefers-reduced-transparency`/`prefers-contrast` report
+/// (`settings_update.osDisplay`, AC-XC-23). Window vibrancy arrives with M2-03 and reads this.
+pub fn set_reduced_effects(on: bool) {
+    REDUCED_EFFECTS.store(on, Ordering::Relaxed);
+}
+
+/// Whether window effects are off (reduce transparency or increase contrast).
+#[must_use]
+pub fn reduced_effects() -> bool {
+    REDUCED_EFFECTS.load(Ordering::Relaxed)
 }
 
 /// Builds the `main` window (the only window in v1; `capabilities/main-window.json`).

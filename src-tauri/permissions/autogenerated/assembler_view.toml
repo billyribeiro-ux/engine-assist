@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-assembler-view"
+description = "Enables the assembler_view command without any pre-configured scope."
+commands.allow = ["assembler_view"]
+
+[[permission]]
+identifier = "deny-assembler-view"
+description = "Denies the assembler_view command without any pre-configured scope."
+commands.deny = ["assembler_view"]

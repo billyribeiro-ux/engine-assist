@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-packet-repair-prepare"
+description = "Enables the packet_repair_prepare command without any pre-configured scope."
+commands.allow = ["packet_repair_prepare"]
+
+[[permission]]
+identifier = "deny-packet-repair-prepare"
+description = "Denies the packet_repair_prepare command without any pre-configured scope."
+commands.deny = ["packet_repair_prepare"]

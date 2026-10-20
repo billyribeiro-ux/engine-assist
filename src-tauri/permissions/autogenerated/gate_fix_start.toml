@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-gate-fix-start"
+description = "Enables the gate_fix_start command without any pre-configured scope."
+commands.allow = ["gate_fix_start"]
+
+[[permission]]
+identifier = "deny-gate-fix-start"
+description = "Denies the gate_fix_start command without any pre-configured scope."
+commands.deny = ["gate_fix_start"]

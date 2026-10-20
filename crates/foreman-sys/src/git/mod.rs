@@ -257,3 +257,57 @@ pub fn ensure_exclude(
         Path::new(&common),
     )?)
 }
+
+/// The git binary Foreman runs: the Settings path or the fixed candidates (SR-01). For Doctor
+/// and Settings, which show the path; every git operation still goes through [`run`].
+///
+/// # Errors
+/// When no candidate passes the SR-01 checks.
+pub fn resolve(ctx: &SpawnCtx) -> Result<PathBuf, SpawnError> {
+    spawn::resolve(spawn::Program::Git, ctx)
+}
+
+/// SR-01 checks on a git path Billy picked in Settings (absolute, named `git`, outside every
+/// project, executable, not in a world-writable folder).
+///
+/// # Errors
+/// The first check that fails.
+pub fn check_path(p: &Path, ctx: &SpawnCtx) -> Result<PathBuf, SpawnError> {
+    spawn::check_program_path(spawn::Program::Git, p, ctx)
+}
+
+/// A Settings entry that makes `p` the git binary in a [`SpawnCtx`].
+#[must_use]
+pub fn settings_entry(p: PathBuf) -> (spawn::Program, PathBuf) {
+    (spawn::Program::Git, p)
+}
+
+/// `git --version` (Doctor and Settings; no repository involved, so no `-C` or `-c` overrides).
+///
+/// # Errors
+/// [`GitError::Spawn`] or [`GitError::Failed`].
+pub fn version(home: &Path, ctx: &SpawnCtx) -> Result<String, GitError> {
+    let git = resolve(ctx)?;
+    let out = spawn::run(
+        &SpawnRequest::Git {
+            args: vec!["--version".to_owned()],
+            stdin: None,
+            index_file: None,
+        },
+        &RunOpts {
+            env: env(home, &git),
+            timeout: Duration::from_secs(10),
+            output_cap: 64 * 1024,
+            cwd: Cwd::AppData,
+        },
+        ctx,
+    )?;
+    if out.code == Some(0) {
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+    } else {
+        Err(GitError::Failed {
+            op: "--version".to_owned(),
+            stderr: String::from_utf8_lossy(&out.stderr).trim().to_owned(),
+        })
+    }
+}

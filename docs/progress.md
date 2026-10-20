@@ -48,3 +48,43 @@ fails only for a milestone marked `done` below. Statuses: `todo`, `in-progress`,
 | M1-31 | done | Abuse-case suite |
 | M1-32 | done | M1 benchmarks |
 | M1-33 | review-pending | M1 exit review |
+
+## M2 tickets (stage/05-app: IPC, the Tauri app)
+
+Statuses for the app side of each ticket. A command not built yet answers `Unsupported`
+(`notYetAvailable:<ticket>`, ipc.md IPC-R12) after its request validates.
+
+| Ticket | Status | Title |
+| ------ | ------ | ----- |
+| M2-01 | review-pending | IPC command framework: 91 commands registered, granted and validated; §2.4 types; ts-rs bindings; drift tests |
+| M2-12 | in-progress | Settings backend and tool paths (`settings_get`, `settings_update`, `settings_pick_tool`; screen-reader mode in memory until settings v2) |
+| M2-13 | in-progress | File opening and reveal (`file_open`, `file_reveal` through `foreman-sys::spawn`) |
+| M2-15 | in-progress | Doctor P1 (`doctor_run`: claude path and version, git; auth row waits for M3-01/M3-04) |
+| M2-16 | in-progress | First run (`blueprint_pick_repo`) |
+| M2-17 | in-progress | Project setup backend (`setup_*`; `docs/templates/` content from the pinned kit not written yet) |
+| M2-19 | in-progress | Project open, registry and read-only states (`project_open`, `projects_list`) |
+| M2-20 | in-progress | Today (`today_get`, `do_next`; CLI steps wait for `launch_prepare`) |
+| M2-21 | in-progress | Stage workspace backend (`step_view`, `step_skip`, `action_preview`, `action_apply`) |
+| M2-22 | in-progress | Run inputs and prompt block (`run_input_set`, `optional_part_set`) |
+| M2-24 | in-progress | Conditions, variables, outside-change review (`condition_set`, `variable_set`, `pending_*`) |
+| M2-25 | todo | Launch preview (`launch_prepare` returns prompt-side blockers; the plan needs the argv builder and run settings) |
+| M2-26 | in-progress | `step_mark_done` |
+
+### Commands not built yet (IPC-R12), by ticket
+
+| Ticket | Commands |
+| ------ | -------- |
+| M2-25, M3-01…M3-05 | `launch_prepare` (plan), `config_ack`, `auth_key_allowlist_add`, `project_env_approve` |
+| M2-06 | `clipboard_copy { target: "command" }` |
+| M3-10…M3-16 | `launch_start`, `chain_resume_prepare`, `pty_*`, `rearm_*`, `terminal_link_open`, `progress_rebuild_*` |
+| M3-18, M4-12…M4-14 | `probe_folder_open`, `probe_run`, `doctor_capture_login_path`, `doctor_login_path_apply` |
+| M3-21 | `packet_normalize_apply` (the DR-131 normalizer) |
+| M3-23, M3-24 | `chat_copy_and_open`, `chat_link_set`, `paste_back_*` |
+| M3-26, M4-02, M4-03 | `metrics_export`, `metrics_view`, `runs_clear`, `runs_search` (run records first) |
+| M4-16…M4-33 | gates, signing, `tamper_restore`, lessons, manifest, assembler, desktop, `add_step`, `add_item`, `run_sheet_export`, `item_kind_confirm`, `terminal_open_here` |
+
+### Open follow-ups
+
+- `settings.json` v2 with `screenReaderMode` (core schema + migration; files.md §4.1 proposal).
+- `project_remove` removes the registry entry only; deleting `projects/<id>/`, approvals and fingerprints needs a store delete (M4-02).
+- `foreman-core::store::dirs::ensure_dir` (new, for setup's empty folders) needs a core review.

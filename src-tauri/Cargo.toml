@@ -26,6 +26,15 @@ foreman-sys = { path = "../crates/foreman-sys" }
 tauri = { version = "=2.12.4", features = [] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
+# Native dialogs and the clipboard, Rust side only (SR-24a, SR-56; design doc §3.2 plugin pins,
+# checked against crates.io on 2026-10-20: the newest stable 2.x of each). No capability grants
+# any plugin permission to the webview (SR-22).
+tauri-plugin-dialog = "=2.8.3"
+tauri-plugin-clipboard-manager = "=2.5.0"
+# Same exact pins as foreman-core (design doc §3.2).
+jiff = "=0.2.38"
+uuid = { version = "=1.28.0", features = ["v4"] }
+rustix = { version = "=1.1.5", features = ["fs"] }
 # ADR-004: TS bindings are generated only with `--features ts`; release builds never compile ts-rs.
 ts-rs = { version = "=12.0.1", optional = true }
 # ADR-015: the WebDriver plugin exists only under `e2e`, never in release (release::no_webdriver).
@@ -33,6 +42,8 @@ tauri-plugin-wdio-webdriver = { version = "=1.5.0", optional = true }
 
 [dev-dependencies]
 tauri = { version = "=2.12.4", features = ["test"] }
+proptest = "=1.12.0"
+tempfile = "=3.27.0"
 
 [features]
 default = []

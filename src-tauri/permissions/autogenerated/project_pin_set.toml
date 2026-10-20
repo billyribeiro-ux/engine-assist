@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-project-pin-set"
+description = "Enables the project_pin_set command without any pre-configured scope."
+commands.allow = ["project_pin_set"]
+
+[[permission]]
+identifier = "deny-project-pin-set"
+description = "Denies the project_pin_set command without any pre-configured scope."
+commands.deny = ["project_pin_set"]

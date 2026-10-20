@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-probe-folder-open"
+description = "Enables the probe_folder_open command without any pre-configured scope."
+commands.allow = ["probe_folder_open"]
+
+[[permission]]
+identifier = "deny-probe-folder-open"
+description = "Denies the probe_folder_open command without any pre-configured scope."
+commands.deny = ["probe_folder_open"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-assembler-paste-apply"
+description = "Enables the assembler_paste_apply command without any pre-configured scope."
+commands.allow = ["assembler_paste_apply"]
+
+[[permission]]
+identifier = "deny-assembler-paste-apply"
+description = "Denies the assembler_paste_apply command without any pre-configured scope."
+commands.deny = ["assembler_paste_apply"]

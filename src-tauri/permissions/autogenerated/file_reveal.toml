@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-file-reveal"
+description = "Enables the file_reveal command without any pre-configured scope."
+commands.allow = ["file_reveal"]
+
+[[permission]]
+identifier = "deny-file-reveal"
+description = "Denies the file_reveal command without any pre-configured scope."
+commands.deny = ["file_reveal"]

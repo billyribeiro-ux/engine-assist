@@ -19,6 +19,7 @@ use sha2::{Digest as _, Sha256};
 use crate::pathpolicy::{PolicyViolation, ReadClass, RepoPath};
 
 mod atomic;
+pub mod dirs;
 pub mod git_exclude;
 pub mod outside;
 pub mod walk;

@@ -8,6 +8,8 @@
 
 use serde_json::{Value, json};
 
+mod common;
+
 const TAURI_CONF: &str = include_str!("../tauri.conf.json");
 const MAIN_WINDOW: &str = include_str!("../capabilities/main-window.json");
 const CARGO_TOML: &str = include_str!("../Cargo.toml");
@@ -230,12 +232,8 @@ mod capabilities {
 
         // Handler set: every listed command is registered (a missing handler answers
         // "command not found"), and an unlisted name is not.
-        let app = foreman_app::builder(tauri::test::mock_builder())
-            .build(tauri::test::mock_context(tauri::test::noop_assets()))
-            .unwrap();
-        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
-            .build()
-            .unwrap();
+        let t = super::common::TestApp::new();
+        let (_app, webview) = super::common::tauri_app(t.app.clone());
         let invoke = |cmd: &str| {
             tauri::test::get_ipc_response(
                 &webview,
@@ -269,12 +267,8 @@ mod ipc {
     /// IPC-R1 through the real Tauri invoke path: an unknown field is a typed `Invalid`.
     #[test]
     fn rejects_unknown_fields_over_invoke() {
-        let app = foreman_app::builder(tauri::test::mock_builder())
-            .build(tauri::test::mock_context(tauri::test::noop_assets()))
-            .unwrap();
-        let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
-            .build()
-            .unwrap();
+        let t = super::common::TestApp::new();
+        let (_app, webview) = super::common::tauri_app(t.app.clone());
         let req = |body| tauri::webview::InvokeRequest {
             cmd: "app_bootstrap".into(),
             callback: tauri::ipc::CallbackFn(0),

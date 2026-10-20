@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pending-changes-list"
+description = "Enables the pending_changes_list command without any pre-configured scope."
+commands.allow = ["pending_changes_list"]
+
+[[permission]]
+identifier = "deny-pending-changes-list"
+description = "Denies the pending_changes_list command without any pre-configured scope."
+commands.deny = ["pending_changes_list"]

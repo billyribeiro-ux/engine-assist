@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-chat-link-set"
+description = "Enables the chat_link_set command without any pre-configured scope."
+commands.allow = ["chat_link_set"]
+
+[[permission]]
+identifier = "deny-chat-link-set"
+description = "Denies the chat_link_set command without any pre-configured scope."
+commands.deny = ["chat_link_set"]

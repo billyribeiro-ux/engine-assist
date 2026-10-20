@@ -1,6 +1,6 @@
 /// <reference types="node" />
 // ipc/contract.test.ts (ADR-004, docs/contracts/ipc.md §7.1).
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -29,9 +29,21 @@ describe('ipc contract', () => {
 		expect(Object.keys(COMMAND_MAP).sort()).toEqual(contract);
 	});
 
-	it('every command Rust registers (bindings/commands.json) is in COMMAND_MAP', () => {
-		// Rust adds commands ticket by ticket (M2-01 ff.); the TS contract carries all 91 already.
-		for (const c of commands) expect(Object.keys(COMMAND_MAP)).toContain(c);
+	it('the commands Rust registers (bindings/commands.json, ipc::COMMANDS) equal COMMAND_MAP', () => {
+		// Drift in either direction fails: a command only in TS, or only in Rust.
+		expect([...commands].sort()).toEqual(Object.keys(COMMAND_MAP).sort());
+		expect(commands).toHaveLength(91);
+	});
+
+	it('every request type is the Rust request struct (bindings/<Name>Req.ts)', () => {
+		const src = readFileSync(join(import.meta.dirname, 'contract.ts'), 'utf8');
+		const reqs =
+			src.split('export interface Requests')[1]?.split('export interface Responses')[0] ?? '';
+		for (const cmd of Object.keys(COMMAND_MAP)) {
+			const m = new RegExp(`\\t${cmd}: (\\w+);`).exec(reqs);
+			expect(m?.[1], cmd).toMatch(/Req$/);
+			expect(existsSync(join(bindingsDir, `${m?.[1] ?? ''}.ts`)), cmd).toBe(true);
+		}
 	});
 
 	it('MockIpcClient has a method for every command', () => {

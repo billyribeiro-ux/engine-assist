@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-lessons-status"
+description = "Enables the lessons_status command without any pre-configured scope."
+commands.allow = ["lessons_status"]
+
+[[permission]]
+identifier = "deny-lessons-status"
+description = "Denies the lessons_status command without any pre-configured scope."
+commands.deny = ["lessons_status"]

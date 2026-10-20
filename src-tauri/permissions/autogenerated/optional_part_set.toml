@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-optional-part-set"
+description = "Enables the optional_part_set command without any pre-configured scope."
+commands.allow = ["optional_part_set"]
+
+[[permission]]
+identifier = "deny-optional-part-set"
+description = "Denies the optional_part_set command without any pre-configured scope."
+commands.deny = ["optional_part_set"]

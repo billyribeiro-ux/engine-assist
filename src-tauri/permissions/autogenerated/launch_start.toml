@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-launch-start"
+description = "Enables the launch_start command without any pre-configured scope."
+commands.allow = ["launch_start"]
+
+[[permission]]
+identifier = "deny-launch-start"
+description = "Denies the launch_start command without any pre-configured scope."
+commands.deny = ["launch_start"]

@@ -408,6 +408,7 @@ App data is `~/Library/Application Support/<bundle id>/` (`app_data_dir()`).
 
 - `authKeyAllowlist[].sha256` is `sha256("<key>=<canonical JSON value>")` for a key in **user** settings only (SR-07); the value itself is never stored.
 - `lastSeenClaudeVersion` drives the "Claude Code updated X → Y" confirmation (SR-19); `contract.version` drives the probes (SR-17).
+- **Proposal (v2, Stage 5):** add `"screenReaderMode": { "type": "boolean" }` (default `false`), the Settings toggle `settings_update` patches (ipc.md §2.4, AC-XC-22). Until the core's `SettingsFile` gains it with a v1→v2 migration (ADR-023), foreman-app keeps the toggle in memory only. Tracked in `docs/progress.md`.
 - Missing file → defaults and auto-detection (AC-F029-03). Migration: ADR-023 chain; app data only, no approval path.
 
 ### 4.2 `projects.json` · v1 · class (f)

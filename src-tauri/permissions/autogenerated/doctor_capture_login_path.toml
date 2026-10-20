@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-doctor-capture-login-path"
+description = "Enables the doctor_capture_login_path command without any pre-configured scope."
+commands.allow = ["doctor_capture_login_path"]
+
+[[permission]]
+identifier = "deny-doctor-capture-login-path"
+description = "Denies the doctor_capture_login_path command without any pre-configured scope."
+commands.deny = ["doctor_capture_login_path"]

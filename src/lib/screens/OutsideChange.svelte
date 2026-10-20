@@ -38,7 +38,7 @@
 	const FILE: Record<PendingChange['file'], string> = {
 		project: '.foreman/project.json',
 		overlay: '.foreman/overlay.json',
-		lock: '.foreman/blueprint.lock.json'
+		blueprintLock: '.foreman/blueprint.lock.json'
 	};
 	const EFFECT: Record<PendingChange['effect'], { text: string; tone: 'attention' | 'pass' }> = {
 		changesPath: { text: 'Changes the path', tone: 'attention' },

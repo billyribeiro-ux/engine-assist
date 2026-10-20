@@ -30,5 +30,47 @@
 			"pinned": null
 		}
 	],
-	"doctor": "failing"
+	"interrupted": [
+		{
+			"runId": "a0000000-0000-4000-8000-000000000071",
+			"chain": "9b5c1e4a-73f6-4d0a-9a2c-4e83b2d6f093",
+			"project": "5e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+			"projectName": "Swings",
+			"step": "7.1",
+			"stepTitle": "Skeleton plan",
+			"tabName": "fm-swings-s07-7-1",
+			"ranWith": "Opus 5.5, high, Plan",
+			"substituted": null,
+			"status": "interrupted",
+			"exitCode": null,
+			"error": null,
+			"startedAt": "2026-09-02T15:40:00Z",
+			"timeToStartMs": 6000,
+			"argv": [
+				"/opt/homebrew/bin/claude",
+				"--session-id",
+				"7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871",
+				"--model",
+				"fable",
+				"--effort",
+				"high",
+				"--permission-mode",
+				"plan",
+				"--name",
+				"fm-swings-s07-7-1",
+				"--settings",
+				"…/runs/r_0188/settings.json",
+				"<prompt sha256:3f9a…c21e>"
+			],
+			"resumable": false,
+			"whyNotResumable": "Transcript removed after 30 days"
+		}
+	],
+	"doctor": "failing",
+	"capabilities": {
+		"claudeVersion": "2.1.293",
+		"desktop": true,
+		"sensor": false,
+		"probesVerified": true
+	}
 }

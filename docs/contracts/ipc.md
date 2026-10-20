@@ -1,6 +1,6 @@
 # Foreman · IPC contract
 
-**Status:** DRAFT for the Stage 4.7 review · 2026-10-19 · Blueprint stage 4.4
+**Status:** DRAFT for the Stage 4.7 review · 2026-10-19 · Blueprint stage 4.4 · amended 2026-10-20 (M2-01: §2.4 settles the Stage 4 gaps, IPC-R12, §7.1 drift checks)
 **Inputs:** `docs/design-doc.md` §3.5 (the design doc points here for the command list), ADR-004 (typed IPC), ADR-006 (PTY), ADR-008 (chains), ADR-014 (capabilities), ADR-021 (launch), ADR-022 (decisions), `docs/requirements.md`, `docs/scope.md`, `spec/council/r6-feature-specs.md`.
 
 This file is the single list of everything that crosses the webview ↔ Rust boundary: **91 commands**, **3 Channel types** and **9 events**. A command, field, Channel or event that isn't in this file doesn't exist. Adding one is a change to this file, to `ipc::COMMANDS`, to `src/lib/ipc/contract.ts` and to `MockIpcClient`, in one commit (§7).
@@ -27,6 +27,7 @@ Library facts this contract relies on were checked on 2026-10-19 in the publishe
 | IPC-R9 | Mutating commands on a project opened read-only (lock mismatch, invalid or newer-schema decision file, missing blueprint) return `ReadOnly` with the reason, except `pending_change_*`, `blueprint_repin`, `project_remove`, `progress_rebuild_*` and `file_open`/`file_reveal`. | `ipc::read_only_refuses_mutation` |
 | IPC-R10 | A command that writes a file goes through `store::Root::write` (ADR-010). A compare-and-swap failure returns `Conflict` naming the file and, for multi-file applies, the list of files already written (§3.5.3 of the design doc). | `pasteback::conflict_reports_written_targets` |
 | IPC-R11 | **Approvals are native, never IPC fields** (SR-24a). No request struct has a field that means approved, confirmed, consented, acknowledged or "idle confirmed". A command that needs Billy's confirmation raises a native macOS dialog from Rust (`tauri-plugin-dialog`, called only in `app::os`) and acts on its answer; declining returns `Cancelled`. The webview may show context (diffs, reasons, the preview) but its own buttons only *request* the action. Native dialogs: config acknowledgement (SR-06), launch and re-arm confirmations (SR-19, SR-13 idle assertion), Terminate, accepting an outside change (SR-40), writing root `CLAUDE.md` (SR-30), confirming a signature written outside Foreman (SR-47), signing (SR-42), terminal links (SR-29), security-relevant settings (pass-through list, tool paths, allowlisted key hashes, project `env` approval, login PATH), item-kind re-confirmation, project removal, Clear run history and the quit guard. | `ipc::security_confirmations_are_native` (a static check over `src/lib/ipc/bindings/*Req.ts`: no field named `confirm*`, `ack*`, `consent*`, `approved*`, `*Confirmed`; plus one integration test per dialog that a scripted "Cancel" leaves state unchanged), `settings::security_fields_require_native_confirm` |
+| IPC-R12 | **Commands not built yet** (Stage 5 build-out). Every command in §4 is registered, granted and validated from M2-01 on. A command whose backend ticket hasn't landed returns `Unsupported { feature: "<command>", why: "notYetAvailable:<ticket>" }` after its request passes validation, and nothing changes. The ticket is named in `docs/progress.md`. A command reaches the UI's "not built yet" state only this way, never as `Internal` or an untyped error. | `ipc::rejects_unknown_fields` (a valid fixture never answers `Invalid` or `Internal`) |
 
 Mutation column legend used below: **no** = reads only; **mem** = in-memory state only (plan or preview IDs); **app** = app-data files; **repo** = project repo files; **clip** = writes the clipboard; **spawn** = starts a process; **git** = makes a git commit.
 
@@ -123,7 +124,7 @@ struct RedactedDiff { source: String, entries: Vec<RedactedEntry> }      // SR-5
 struct RedactedEntry { key_path: String, change: ChangeKind /* "added"|"removed"|"valueChanged" */, before: Option<String>, after: Option<String> }
 
 struct ReadOnly { reason: ReadOnlyReason, detail: String }
-struct Problem { rule: String, line: Option<u32>, message: String, fix: Option<FixAction> }
+struct Problem { rule: String, line: Option<u32>, message: String, fix: Option<Vec<FixAction>> }   // every fix offered (§2.4)
 enum FixAction { Repair, OpenInEditor, CopyFixRequest }     // Repair: P2
 ```
 
@@ -131,7 +132,7 @@ enum FixAction { Repair, OpenInEditor, CopyFixRequest }     // Repair: P2
 
 ```rust
 enum Blocker {
-  NotRunnable { reason: NotRunnableReason },                    // n/a, undecided, needs-annotation, done (non-repeatable)
+  NotRunnable { reason: NotRunnableReason, text: String },      // §2.4: notApplicable, undecided, needsAnnotation, done, needsNewerForeman, waiting, running, notCli, chainNotStarted
   ReadOnly(ReadOnly),
   ClaudeMissing { path: Option<String>, why: ToolPathProblem }, // relative, missing, not executable, in project, symlink
   VersionBelowFloor { found: String, required: String, requirements: Vec<Requirement> },
@@ -156,6 +157,164 @@ enum ConfirmReason { OverlayStep, ModeOrModelChanged { from: Start, to: Start },
 ```
 
 `Blocker` and `ConfirmReason` use `#[serde(tag = "kind", rename_all = "camelCase")]`, so TS gets discriminated unions (`{ kind: "versionBelowFloor"; found: string; … }`).
+
+### 2.4 Types settled in Stage 5 (the UI's 67 `GAP:` notes)
+
+Stage 4 left types that §2–§4 name but never define, and fields the screens need that no response had. They are settled here, for ticket M2-01, consistent with the domain rules. The Rust definitions are in `src-tauri/src/ipc/` (`types.rs`, `dto/*.rs`); the TypeScript below is what ts-rs generates from them into `src/lib/ipc/bindings/` (ADR-004), copied here for review. `src/lib/ipc/types.ts` only re-exports the bindings, so the webview can't use a shape Rust doesn't produce.
+
+**Rules for these fields.**
+- Every text field below is Foreman-written (SR-56) or repo/terminal text already passed through visible escapes (SR-26): plain strings get `‹U+XXXX›` for bidi, zero-width, tag and control characters; `TextSpan[]` gets `escape` spans.
+- `StepSummary.stateText`, `whyNotRunnable` and `conditionNote` come from the derived state (DR-050, DR-065): `Not applicable` with the reason, `Undecided` with `<condition> = undecided`, `Waiting until <date>`, `Skipped: <reason>`.
+- `StepSummary.next` is true when another step of the same chain is running (Run re-arms it, DR-068).
+- `StageView.status` (the sheet strip, `docs/design/components.md`): `signed` (Foreman's signing or a confirmed outside signature, DR-135); `notApplicable`, `needsAnnotation` and `undecided` from the applicable path (DR-054; `undecided` when no step of the stage is on the path and one waits on a condition); `locked` "until Stage N is signed" while the previous applicable stage isn't signed; `waiting` when a wait step is waiting; `inspecting` when every non-gate step on the path is done; `inProgress` when any is copied, running or done; else `ready`.
+- `ProjectSummary.currentStage` is the lowest applicable stage that isn't signed. Before a project is opened in this run, `app_bootstrap` (which reads only `settings.json`, `projects.json` and each `progress.json`, NFR-01) estimates it from `progress.json` as the stage after the highest signed one.
+- `SpecLine`: `model`/`effort`/`mode` are display names with `origin` and `from` set only when the effective value differs from the template's (DR-104); `note` is the `SUBSTITUTIONS:` line; `where` is `project root`, `spec/` or `claude.ai chat, in Project`.
+- `PendingChange.file` uses the `progress.json` wire form (`project`, `overlay`, `blueprintLock`; files.md §4.3).
+- `Problem.fix` lists every fix offered, in order (a packet problem offers `openInEditor` and `copyFixRequest`).
+- `Blocker::NotRunnable` carries `text`, Foreman's sentence for the row. `NotRunnableReason` gains `waiting`, `running`, `notCli` (a `launch_prepare` on a step that isn't CLI) and `chainNotStarted` (a continuing step whose chain hasn't started).
+- `SettingsView.screenReaderMode` is the Settings toggle `settings_update` patches. `settings.json` v1 has no field for it, so it is kept in memory until `settings.json` v2 adds `screenReaderMode` (files.md §4.1, proposal); `runHistory` counts `runs/` once run records exist (M2-10).
+- `AppBootstrap.interrupted` lists runs whose `run.json` says `running` at startup (SR-57: listed, never relaunched); `capabilities` gates Desktop (`--desktop` ≥ 2.1.285), the P2 sensor and the verified probes.
+
+**Nested request objects.** A tagged object inside a request (`EditorSetting`, `LinkSource`, `AttestOutcome`, `SignBranch`) is an enum whose variants hold a struct with `deny_unknown_fields`, so an extra field inside it is `Invalid` too (IPC-R1). The wire form is unchanged (`{ kind: "set", bundleId }`); ts-rs writes it as `{ "kind": "set" } & EditorSet`.
+
+New types:
+
+```ts
+export type RunSummary = { runId: RunId, chain: ChainId, project: ProjectId, projectName: string, step: StepKey | null, stepTitle: string, tabName: string, ranWith: string, substituted: string | null, status: RunStatus, exitCode: number | null, error: string | null, startedAt: Timestamp, timeToStartMs: number | null, argv: Array<string>, resumable: boolean, whyNotResumable: string | null, };
+export type Capabilities = { claudeVersion: string | null, desktop: boolean, sensor: boolean, probesVerified: boolean, };
+export type ToolPathView = { path: string | null, version: string | null, autoDetected: boolean, problem: string | null, };
+export type ToolPaths = { claude: ToolPathView, git: ToolPathView, };
+export type TemplateHealthSummary = { runnable: string, needsAnnotation: string, errors: number, warnings: number, };
+export type VariableSpec = { name: string, label: string, placeholder: string, multiline: boolean, fromSettings: boolean, };
+export type ConditionSpec = { id: ConditionId, label: string, effect: string, late: boolean, };
+export type LoginPathView = { capturedAt: Timestamp, entries: Array<string>, };
+export type AllowlistEntry = { sha256: Sha256, file: string, key: string, addedAt: Timestamp, };
+export type RunHistorySize = { runs: number, megabytes: number, };
+export type InboxKind = "sessionBlocked" | "sessionYourTurn" | "packetLanded" | "packetInvalid" | "gateFailed" | "gateSignable" | "outsideChange" | "tamper" | "chatAwaitingPaste" | "waitElapsed" | "interruptedSession" | "stepReady";
+export type SpecSurface = "chat" | "cli" | "desktop" | "action";
+export type SpecLine = { surface: SpecSurface, where: string, model: Explained<string> | null, effort: Explained<string> | null, mode: Explained<string> | null, agents: Array<string>, droppedAgents: Array<string>, note: string | null, };
+export type SheetStatus = "locked" | "ready" | "inProgress" | "inspecting" | "waiting" | "signed" | "notApplicable" | "needsAnnotation" | "undecided";
+export type SignedInfo = { date: string, commit: string, branch: string, merged: boolean, };
+export type PacketSummary = { path: RepoPath, exists: boolean, problems: number, signed: boolean, };
+export type Applicability = { "kind": "applies" } | { "kind": "notApplicable", reason: string, } | { "kind": "undecided", condition: ConditionId, } | { "kind": "needsAnnotation" };
+export type ConditionView = { value: TriState, locked: boolean, lockRule: string | null, label: string, effect: string, late: boolean, };
+export type BlueprintPin = { version: string, commit: string, };
+export type ConfigChangedNotice = { cwd: CwdKind, fingerprint: Sha256, blocking: boolean, title: string, detail: string, diffs: Array<RedactedDiff>, };
+export type SchemaState = "current" | "older" | "newer";
+export type PlannedAction = "create" | "leaveAlone" | "refuse";
+export type PinPreview = { version: string, commit: string, clean: boolean, };
+export type PathRowStatus = "applies" | "notApplicable" | "undecided" | "needsAnnotation";
+export type ApplicablePathRow = { stages: string, title: string, status: PathRowStatus, why: string, };
+export type StripCell = { stage: Stage, status: SheetStatus, why: string | null, };
+export type ApplicablePathSummary = { applies: number, total: number, summary: string, rows: Array<ApplicablePathRow>, strip: Array<StripCell>, };
+export type CheckGroup = "claude" | "toolchain";
+export type CheckAction = "captureLoginPath";
+export type DoctorCheck = { id: string, group: CheckGroup, name: string, level: DoctorLevel, summary: string | null, detail: Array<TextSpan>, found: string | null, foundMono: boolean, action: CheckAction | null, };
+export type CapabilityRow = { feature: string, code: boolean, minimum: string, found: boolean, blocks: string | null, };
+export type ProbeResult = "pass" | "fail" | "inconclusive";
+export type ProbeOutcome = { probe: Array<TextSpan>, result: ProbeResult, text: string, detail: string | null, };
+export type PathEntryCheck = { entry: string, ok: boolean, why: string | null, };
+export type Counts = { stages: number, runnableSteps: number, items: number, errors: number, warnings: number, };
+export type StageHealthStatus = "runnable" | "warning" | "partial" | "needsAnnotation";
+export type StageHealth = { stages: string, title: string, status: StageHealthStatus, text: string, steps: string, };
+export type Severity = "error" | "warning";
+export type RunInputView = { name: string, label: string, token: string, multiline: boolean, remember: boolean, required: boolean, value: string, warning: string | null, };
+export type SwitchCue = { text: string, };
+export type ChatChip = { id: string, label: string, strong: boolean, };
+export type ChatChips = { chips: Array<ChatChip>, link: string | null, linkLabel: string | null, };
+export type OutView = { path: RepoPath, exists: boolean, };
+export type StepPart = { partId: string, label: string, included: boolean, locked: boolean, };
+export type MissingLink = "project" | "conversation";
+export type PacketFields = { fromStage: Stage, toStage: Stage | null, };
+export type ChangeEffect = "changesPath" | "noEffect" | "reloaded";
+export type ConsequenceGlyph = "lock" | "info" | "check";
+export type Consequence = { glyph: ConsequenceGlyph, text: string, };
+export type ChangeContext = { changed: string, git: string, approved: string, };
+export type PacketHeader = { line: string, fromStage: Stage, toStage: Stage | null, };
+export type PacketFieldView = { key: string, label: string, value: Array<DocNode>, missing: boolean, problems: Array<Problem>, note: Array<TextSpan> | null, };
+export type NormalizationNote = { field: string, message: string, };
+export type Signature = { name: string, date: IsoDate, byForeman: boolean, confirmed: boolean, };
+export type RawLine = { line: number, spans: Array<TextSpan>, bad: boolean, };
+export type BaselineComparison = { baselineMedianMs: number, foremanMedianMs: number, };
+export type GateState = "notStarted" | "inProgress" | "failed" | "passed" | "signed";
+export type ArtifactKind = "path" | "command";
+export type GateArtifact = { kind: ArtifactKind, text: string, };
+export type ItemKind = "attest" | "time";
+export type ItemStatus = "pass" | "fail" | "waiting" | "notApplicable";
+export type Proposed = "pass" | "fail";
+export type GateItemView = { id: ItemId, text: string, kind: ItemKind, how: string | null, status: ItemStatus, evidence: Array<TextSpan> | null, proposed: Proposed | null, note: string | null, waitsFor: string | null, artifacts: Array<GateArtifact>, failures: number, needsReconfirm: boolean, session: string | null, };
+export type CloseoutKey = "gateA" | "results" | "gateB" | "gateC" | "sign";
+export type CloseoutState = "done" | "now" | "failed" | "pending" | "locked";
+export type CloseoutStep = { key: CloseoutKey, label: string, state: CloseoutState, note: string | null, };
+export type LessonRef = { id: string, title: string, };
+export type ManifestRow = { path: RepoPath, exists: boolean, inProject: boolean, producer: StepKey | null, };
+export type AssemblerState = "exists" | "missing" | "empty" | "refused";
+export type LateConditionView = { condition: ConditionId, value: TriState, proposed: TriState | null, evidence: string | null, decided: string | null, };
+export type ImportResult = "pass" | "fail" | "unmatched";
+export type Tag = "core" | "conditional" | "optional" | "added";
+export type StepKind = "prompt" | "followup" | "action" | "manual" | "wait" | "repeatable" | "gate" | "lessons";
+export type NotRunnableReason = "notApplicable" | "undecided" | "needsAnnotation" | "done" | "needsNewerForeman" | "waiting" | "running" | "notCli" | "chainNotStarted";
+export type ToolPathProblem = "relative" | "missing" | "notExecutable" | "inProject" | "symlinkIntoProject";
+export type AuthProblem = { "kind": "wrongMethod", method: string, } | { "kind": "unknownMethod" } | { "kind": "unparsable" } | { "kind": "exit", code: number, } | { "kind": "timeout" };
+export type Requirement = { what: string, version: string, };
+export type DecisionFileKind = "project" | "overlay" | "blueprintLock";
+export type FixAction = "repair" | "openInEditor" | "copyFixRequest";
+export type Problem = { rule: string, line: number | null, message: string, fix: Array<FixAction> | null, };
+export type Blocker = { "kind": "notRunnable", reason: NotRunnableReason, text: string, } | { "kind": "readOnly" } & ReadOnly | { "kind": "claudeMissing", path: string | null, why: ToolPathProblem, } | { "kind": "versionBelowFloor", found: string, required: string, requirements: Array<Requirement>, } | { "kind": "contractFailed", feature: string, version: string, } | { "kind": "configChanged", cwd: CwdKind, fingerprint: Sha256, diffs: Array<RedactedDiff>, } | { "kind": "authKeyBlocked", file: string, key: string, hit: HitId, allowlistable: boolean, } | { "kind": "configTooLarge", file: string, bytes: number, } | { "kind": "projectEnvUnapproved", file: string, sha256: Sha256, } | { "kind": "authFailed", why: AuthProblem, } | { "kind": "transcriptMissing", chain: ChainId, } | { "kind": "signedPacketMissing", stage: Stage, } | { "kind": "packetUnsigned", stage: Stage, } | { "kind": "runInputMissing", name: string, } | { "kind": "unresolvedToken", token: string, } | { "kind": "promptOptionLike", first: string, } | { "kind": "promptControlChar", offset: number, codepoint: number, } | { "kind": "runSettingsPathUnsafe", path: string, } | { "kind": "cwdNotDirectory", cwd: CwdKind, };
+```
+
+Types from §2–§4 with the fields this section adds:
+
+```ts
+export type AppBootstrap = { firstRun: boolean, settingsRev: Rev, projects: Array<ProjectSummary>, interrupted: Array<RunSummary>, doctor: DoctorLevel, capabilities: Capabilities, };
+export type BlueprintRepoInfo = { displayPath: string, commit: string, version: string, grammarVersion: number, dirty: boolean, health: TemplateHealthSummary, variables: Array<VariableSpec>, conditions: Array<ConditionSpec>, };
+export type SettingsView = { rev: Rev, driName: string | null, tools: ToolPaths, editorBundleId: BundleId | null, blueprintRepo: BlueprintRepoInfo | null, theme: Theme, terminal: TerminalPrefs, envPassthrough: Array<EnvName>, loginPath: LoginPathView | null, globalVariables: Record<string, string>, authKeyAllowlist: Array<AllowlistEntry>, screenReaderMode: boolean, runHistory: RunHistorySize, };
+export type InboxItem = { kind: InboxKind, project: ProjectId, step: StepKey | null, stage: Stage | null, at: Timestamp, projectName: string, title: string, detail: string, chain: ChainId | null, run: RunId | null, };
+export type StepSummary = { key: StepKey, number: string, title: string, state: StepState, tag: Tag, surface: Surface | null, specLine: SpecLine | null, whyNotRunnable: string | null, stateText: string, conditionNote: string | null, kind: StepKind, run: RunId | null, next: boolean, };
+export type StageView = { stage: Stage, title: string, applicable: Applicability, signed: SignedInfo | null, steps: Array<StepSummary>, packet: PacketSummary | null, subtitle: string, status: SheetStatus, statusWhy: string | null, };
+export type ProjectView = { summary: ProjectSummary, conditions: { [key in ConditionId]?: ConditionView }, stages: Array<StageView>, pendingChanges: number, readOnly: ReadOnly | null, branch: string, blueprint: BlueprintPin, dri: string | null, chatProjectUrl: string | null, configChanged: ConfigChangedNotice | null, };
+export type NextStepRow = { project: ProjectSummary, next: StepSummary | null, whyNone: string | null, strip: Array<SheetStatus>, stageTitle: string | null, };
+export type DoctorReport = { level: DoctorLevel, checks: Array<DoctorCheck>, capabilities: Array<CapabilityRow>, probes: Array<ProbeOutcome>, probeNote: string | null, ranAt: Timestamp, };
+export type Diagnostic = { severity: Severity, rule: string, file: string, line: number, column: number, message: Array<TextSpan>, stage: Stage, };
+export type TemplateHealth = { version: string, grammarVersion: number, counts: Counts, stages: Array<StageHealth>, diagnostics: Array<Diagnostic>, commit: string, file: string, };
+export type StepView = { summary: StepSummary, prompt: Array<PromptSegment>, inputs: Array<RunInputView>, start: Explained<Start> | null, switches: Array<SwitchCue>, chips: ChatChips | null, argvPreview: Array<string> | null, envNames: Array<EnvName>, blockers: Array<Blocker>, warnings: Array<string>, remaps: Array<string>, outs: Array<OutView>, override: RunOverride | null, parts: Array<StepPart>, copiedAt: Timestamp | null, };
+export type PendingChange = { id: ChangeId, file: DecisionFileKind, detectedAt: Timestamp, seenSha256: Sha256, diff: RedactedDiff, effect: ChangeEffect, consequences: Array<Consequence>, context: ChangeContext, };
+export type PacketView = { path: RepoPath, exists: boolean, sha256: Sha256 | null, header: PacketHeader | null, fields: Array<PacketFieldView>, problems: Array<Problem>, normalization: Array<NormalizationNote>, signed: Signature | null, tamper: Diff | null, raw: Array<RawLine>, writtenBy: string | null, summary: string, };
+export type MetricsView = { perSurface: Array<SurfaceMetrics>, manualEditsByStage: Array<StageEdits>, stagesThroughForeman: number, baseline: BaselineComparison | null, runsCounted: number, p95AllMs: number, };
+export type RunsPage = { runs: Array<RunSummary>, next: string | null, total: number, };
+export type GateView = { stage: Stage, state: GateState, items: Array<GateItemView>, closeout: Array<CloseoutStep>, signable: boolean, whyNot: Array<string>, importedFrom: string | null, };
+export type SignPreview = { previewId: PreviewId, packetSha256: Sha256, short: string, addedFields: Diff, paths: Array<RepoPath>, confirmConditions: Array<ConditionId> | null, chainBusy: boolean, blockers: Array<string>, branch: string, commitMessage: string, pathNotes: Record<string, string>, };
+export type AssemblerRow = { path: string, state: AssemblerState, rule: string | null, note: string | null, };
+```
+
+Nested request payloads:
+
+```ts
+export type EditorSetting = { "kind": "set" } & EditorSet | { "kind": "clear" } & Empty;
+export type EditorSet = { bundleId: BundleId, };
+export type LinkSource = { "kind": "clipboard" } & Empty | { "kind": "text" } & LinkText;
+export type LinkText = { url: ClaudeUrl, };
+export type AttestOutcome = { "kind": "done" } & AttestDone | { "kind": "notApplicable" } & AttestNotApplicable | { "kind": "clear" } & Empty;
+export type AttestDone = { note: Note, link: string | null, };
+export type AttestNotApplicable = { reason: Note, };
+export type SignBranch = { "kind": "current" } & Empty | { "kind": "other" } & SignOther;
+export type SignOther = { branch: ShortText, };
+export type Empty = Record<symbol, never>;
+```
+
+Event payloads (§6), generated from Rust so the webview and the emitter agree:
+
+```ts
+export type ProjectChanged = { projectId: ProjectId, rev: Rev, };
+export type ProjectsChanged = { rev: Rev, };
+export type PacketChanged = { projectId: ProjectId, stage: Stage, rev: Rev, };
+export type DecisionPending = { projectId: ProjectId, count: number, };
+export type TamperDetected = { projectId: ProjectId, stage: Stage, rev: Rev, };
+export type RunStatusChanged = { runId: RunId, status: RunStatus, rev: Rev, };
+export type ConfigChanged = { projectId: ProjectId, cwd: CwdKind, };
+export type DoctorStatus = { level: DoctorLevel, };
+export type SettingsChanged = { rev: Rev, };
+```
 
 ## 3. Errors
 
@@ -194,7 +353,7 @@ Each entry: request struct (Rust) and its generated TS shape, response, error co
 Rust  AppBootstrapReq {}
 TS    Record<symbol, never>
 Res   AppBootstrap { first_run: bool, settings_rev: Rev, projects: Vec<ProjectSummary>, interrupted: Vec<RunSummary>,
-                     doctor: DoctorLevel, capabilities: Capabilities }
+                     doctor: DoctorLevel, capabilities: Capabilities }       // RunSummary, Capabilities: §2.4
 Err   Io
 ```
 F-017, F-019, F-020 · AC-F019-01, AC-F020-10, AC-F017-03 · SR-57 (interrupted runs never relaunched). Reads only `settings.json`, `projects.json` and each `progress.json` (NFR-01).
@@ -1168,7 +1327,7 @@ Rules: `events::payload_snapshot` (insta, every event), `events::no_content_fiel
 |---|---|---|
 | `bindings-drift` | `cargo test -p foreman-app --features ts export_bindings` (ts-rs runs one `export_bindings_<type>` test per exported type, writing to `TS_RS_EXPORT_DIR=src/lib/ipc/bindings`), then `git diff --exit-code src/lib/ipc/bindings`. Any Rust DTO change without regenerated bindings fails. | CI |
 | `ipc::commands_json` | Rust writes `ipc::COMMANDS` to `src/lib/ipc/bindings/commands.json` (sorted). | cargo test |
-| `ipc/contract.test.ts` | `Object.keys(COMMAND_MAP)` of `TauriIpcClient` equals `commands.json`; `MockIpcClient` is declared `implements IpcClient` (tsc enforces every method and signature); `commands.json` equals the command list in this document (the test parses §4.15's table from `docs/contracts/ipc.md`). | Vitest |
+| `ipc/contract.test.ts` | `Object.keys(COMMAND_MAP)` of `TauriIpcClient` equals `commands.json` exactly (all 91; drift either way fails); every `Requests[cmd]` is the generated `<Name>Req` binding; `MockIpcClient` is declared `implements IpcClient` (tsc enforces every method and signature); `commands.json` equals the command list in this document (the test parses §4.15's table from `docs/contracts/ipc.md`). | Vitest |
 | `capabilities::every_command_declared_and_granted` | `COMMANDS` = `generate_handler!` set = `allow-*` grants in `capabilities/main-window.json`. | cargo test |
 | `ipc::fixture_requests_deserialize` | For every command, `src/lib/ipc/fixtures/requests/<command>.json` (type-checked in TS with `satisfies <Req>`) deserializes in Rust into the request struct. Catches serde/ts-rs divergences (renames, tags, `Option` handling). | cargo test + tsc |
 | `ipc::fixture_responses_roundtrip` | The mock's fixture responses (`src/lib/ipc/fixtures/responses/<command>.json`) deserialize in Rust into the response type and re-serialize byte-identically. | cargo test |
