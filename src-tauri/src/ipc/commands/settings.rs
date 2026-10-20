@@ -158,15 +158,28 @@ fn global_variable_name(k: &str) -> bool {
 fn security_lines(p: &SettingsPatch, s: &SettingsFile) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(list) = &p.env_passthrough {
-        let names: Vec<&str> = list.iter().map(EnvName::as_str).collect();
-        out.push(if names.is_empty() {
+        let mut names: Vec<&str> = list.iter().map(EnvName::as_str).collect();
+        names.sort_unstable();
+        names.dedup();
+        // AC-F029-05: an always-removed name stays removed; the dialog says so.
+        let (removed, passed): (Vec<&str>, Vec<&str>) = names
+            .into_iter()
+            .partition(|n| foreman_core::launch::env::is_removed(n));
+        out.push(if passed.is_empty() {
             "Pass no extra environment variables to Claude Code.".to_owned()
         } else {
             format!(
                 "Pass these environment variables to Claude Code: {}.",
-                names.join(", ")
+                passed.join(", ")
             )
         });
+        if !removed.is_empty() {
+            out.push(format!(
+                "Foreman always removes {}; listing {} changes nothing.",
+                removed.join(", "),
+                if removed.len() == 1 { "it" } else { "them" }
+            ));
+        }
     }
     if let Some(t) = p.reset_tool {
         let (name, cur) = match t {
