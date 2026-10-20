@@ -425,6 +425,7 @@ pub fn on_exit(app: &App, run_id: &str, info: ExitInfo) {
         };
         f.exit_code = info.code;
         f.t.exited = Some(ms_since(live.started));
+        tracing::info!(target: "run", run_id, code = ?info.code, "exited");
         // P2: what the sensor saw (model, effort, mode); `null` without it (files.md §4.6).
         f.observed = crate::sensor_ingest::observed(&root, run_id).or(f.observed);
         if write_run(&root, &f, &stamp).is_ok() {
@@ -618,6 +619,8 @@ pub fn interrupted(app: &App) -> Result<Vec<RunSummary>, IpcError> {
             f.status = FileStatus::Interrupted;
             if write_run(&root, &f, &stamp).is_ok() {
                 append_index(&root, &f, IndexStatus::Interrupted);
+                // AC-XC-18: after a crash the run-log entry is the run's `interrupted` status.
+                tracing::warn!(target: "run", run_id = id.as_str(), "interrupted by a crash or forced quit");
             }
         }
         if f.status == FileStatus::Interrupted {

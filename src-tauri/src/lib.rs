@@ -148,6 +148,9 @@ pub fn run() -> tauri::Result<()> {
                 app_data: app.path().app_data_dir()?,
                 home: app.path().home_dir()?,
             };
+            if logging::attach(&paths.app_data).is_ok() {
+                tracing::info!(target: "app", version = env!("CARGO_PKG_VERSION"), "started");
+            }
             let os = Arc::new(os::TauriOs::new(app.handle().clone()));
             let state = state::App::new(os, paths);
             watch::start(state.weak());

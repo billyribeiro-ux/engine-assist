@@ -108,10 +108,29 @@ pub fn run_caught<T, R, F>(app: &App, req: T, f: F) -> Result<R, IpcError>
 where
     F: FnOnce(&App, T) -> Result<R, IpcError>,
 {
-    std::panic::catch_unwind(AssertUnwindSafe(|| f(app, req))).unwrap_or_else(|_| {
+    let started = std::time::Instant::now();
+    let out = std::panic::catch_unwind(AssertUnwindSafe(|| f(app, req))).unwrap_or_else(|_| {
         crate::logging::panic_caught();
         Err(IpcError::internal())
-    })
+    });
+    // SR-54: the command's name, its error code and how long it took; never request or response
+    // values. Errors and slow commands only (a keystroke is a command too).
+    let ms = started.elapsed().as_millis();
+    if out.is_err() || ms >= 500 {
+        let command = command_name::<F>();
+        let code = out.as_ref().err().map_or("ok", |e| e.code.as_str());
+        tracing::info!(target: "ipc", command, code, ms = u64::try_from(ms).unwrap_or(u64::MAX), "command");
+    }
+    out
+}
+
+/// A handler's own name (`foreman_app::ipc::commands::chat::paste_back_preview` →
+/// `paste_back_preview`).
+fn command_name<F>() -> &'static str {
+    std::any::type_name::<F>()
+        .rsplit("::")
+        .find(|s| !s.starts_with('{') && !s.is_empty())
+        .unwrap_or("unknown")
 }
 
 #[cfg(test)]

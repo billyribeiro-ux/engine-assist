@@ -627,6 +627,7 @@ pub fn start(
     // P2 (ADR-009): the run's empty event folder exists before spawn; its token goes in run.json.
     file.sensor_token = crate::sensor::begin_run(app, &p.app_root, &run_id);
     let stamp = runs::write_run(&p.app_root, &file, &ReadStamp::Absent)?;
+    tracing::info!(target: "launch", run_id = run_id.as_str(), step = held.step.as_str(), "run record written");
     let outputs = Arc::new(Outputs::default());
     if let Some(ch) = output {
         outputs.attach(ch);
@@ -643,6 +644,7 @@ pub fn start(
         Err(e) => {
             file.status = foreman_core::schema::run::RunStatus::Errored;
             let _ = runs::write_run(&p.app_root, &file, &stamp);
+            tracing::warn!(target: "launch", run_id = run_id.as_str(), "spawn failed");
             runs::emit_status(app, &run_id, RunStatus::Errored);
             return Err(IpcError::tool_failed(
                 "claude",
@@ -657,6 +659,7 @@ pub fn start(
     file.time_to_start_ms = Some(spawned);
     file.pid = session.pid();
     let _ = runs::write_run(&p.app_root, &file, &stamp);
+    tracing::info!(target: "launch", run_id = run_id.as_str(), ms = spawned, "spawned");
     let chain = runs::chain_of(&held.plan).unwrap_or_default();
     app.runs().insert(Arc::new(LiveRun {
         run_id: run_id.clone(),
