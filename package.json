@@ -33,7 +33,8 @@
 		"verify:fast": "node scripts/verify.mjs --fast",
 		"fixtures:hostile": "node scripts/make-hostile-repo.mjs",
 		"release": "scripts/build-release",
-		"test:flows": "playwright test"
+		"test:flows": "playwright test",
+		"spikes": "node scripts/spikes/run.mjs"
 	},
 	"dependencies": {
 		"@tauri-apps/api": "2.12.4"
