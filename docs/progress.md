@@ -39,6 +39,7 @@ releases) is approved; there is no CR-005 in `docs/change-requests/`.
 | 10 | M1-33 exit review (`code-reviewer`, Gate A–C, the Stage 6 packet). | M1 | Billy's gate run (`review-pending`). |
 | 11 | AC-F012-13's "explicit Open action" for links in pasted content has no command in `ipc.md`; links show as text only. | M3-24 | Decide: a command (CR) or text only. |
 | 12 | The P1 close-out checklist (M3-25) still says "add the entries to docs/lessons.md yourself", and `paste_back_preview { kind: "auto" }` on an F.2 step still answers `appends-in-p1` (AC-F012-14, "in P1"). F-016 now writes lessons (`kind: "lessons"`, which the step row's Paste back sends for F.2). | M3-25, M4-18 | Decide whether the P1 wording and the `auto` answer change now that P2 lessons capture is built (core text, snapshot and `ipc.md`). |
+| 13 | [CR-011](change-requests/CR-011-window-vibrancy-not-applied.md): v1 ships an opaque window; the display report reaches Rust and clears any window effect, but no effect is applied (ADR-014 says `windowEffects`). | M5-04 | **Proposed.** Approve or amend ADR-001 and ADR-014; the visible check is Mac checks, item 12. |
 
 ## Mac checks
 
