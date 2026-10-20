@@ -426,7 +426,7 @@ pub fn setup_preview(app: &App, req: SetupPreviewReq) -> Result<SetupPreview, Ip
     }
     // CR-003: the pin's annotation check, before anything is written; `setup_apply` pins the
     // same blob (its oid is compared), so it can't meet a different answer.
-    foreman_core::pin_check::p1_annotation_errors(&String::from_utf8_lossy(&r.bytes))?;
+    lock::p1_annotation_errors(&String::from_utf8_lossy(&r.bytes))?;
     let adopt = foreman_schema(&folder).map(|(_, h)| h);
     let git_init = !is_own_repo(app, &folder)?;
     let conditions: BTreeMap<CoreCondition, CoreTri> = CoreCondition::ALL

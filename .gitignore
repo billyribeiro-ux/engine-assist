@@ -28,5 +28,8 @@ src-tauri/gen/
 test-results/
 playwright-report/
 
+# Vitest browser-mode attachments and failure screenshots
+.vitest/attachments/
+
 # Plant scratch
 scripts/plants/__plant-*

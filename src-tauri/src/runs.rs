@@ -691,7 +691,7 @@ pub fn of_project(index: Vec<RunIndexLine>, project: Option<&str>) -> Vec<RunInd
     }
 }
 
-/// What a chat step's Copy and open recorded (M3-23 calls [`record_chat_copy`]).
+/// What a chat step's Copy and open recorded (`chat_copy_and_open` calls [`record_chat_copy`]).
 #[derive(Debug)]
 pub struct ChatCopy<'a> {
     /// Project.
@@ -708,6 +708,8 @@ pub struct ChatCopy<'a> {
     pub kind: RunKind,
     /// What the step was meant to run with.
     pub intended: Option<foreman_core::ids::Start>,
+    /// A per-run override was applied (and is consumed by this copy, DR-103).
+    pub over: bool,
     /// SHA-256 of the prompt text; the text itself is never stored (SR-52).
     pub prompt_sha256: Option<String>,
     /// Milliseconds from the start of looking (preparing the step) to now: the filled prompt is on
@@ -750,7 +752,7 @@ pub fn record_chat_copy(app: &App, i: &ChatCopy<'_>) -> Result<String, IpcError>
         prompt_sha256: i.prompt_sha256.clone(),
         run_settings_sha256: None,
         intended: i.intended,
-        r#override: false,
+        r#override: i.over,
         observed: None,
         entry_point: i.entry,
         t: Timings {

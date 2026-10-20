@@ -28,6 +28,8 @@ use crate::state::App;
 /// `NotAllowed("not-signable" | "detached-head")`, `ToolMissing(git)`, `ReadOnly`, `Invalid`,
 /// `NotFound`.
 pub fn sign_preview(app: &App, req: SignPreviewReq) -> Result<SignPreview, IpcError> {
+    // ADR-013: the interest set is re-stat'ed before every sign.
+    crate::watch::restat_before_acting(app, req.project_id.as_str());
     let p = project::open(app, req.project_id.as_str())?;
     let inp = PreviewInput {
         stage: req.stage.0,
@@ -53,11 +55,13 @@ pub fn sign_apply_with(
     progress: tauri::ipc::Channel<SignProgress>,
     seams: &Seams<'_>,
 ) -> Result<SignResult, IpcError> {
-    let _w = app.writing();
     let held = match app.inner().previews.take(req.preview_id.as_str())? {
         Preview::Sign(h) => h,
         _ => return Err(IpcError::expired()),
     };
+    // ADR-013: re-stat before signing (outside the write lock: a decision change takes it).
+    crate::watch::restat_before_acting(app, &held.project_id);
+    let _w = app.writing();
     let send = |m: SignProgress| {
         let _ = progress.send(m);
     };
@@ -116,9 +120,8 @@ pub fn tamper_restore(app: &App, req: TamperRestoreReq) -> Result<PacketView, Ip
     let _w = app.writing();
     let n = req.stage.0;
     let p = signing::restore(app, req.project_id.as_str(), n, req.seen_sha256.as_str())?;
-    let mut v = crate::ipc::commands::packets::view_of(&p, n)?;
-    v.tamper = signing::tamper_diff(&p, n);
-    Ok(v)
+    // `view_of` carries the tamper diff (none once the committed text is back).
+    crate::ipc::commands::packets::view_of(&p, n)
 }
 
 /// `packet_repair_prepare` (AC-F013-11; M4-23): prepares a re-arm of the stage's chain with

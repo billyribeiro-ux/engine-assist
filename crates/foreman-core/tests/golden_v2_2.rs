@@ -343,7 +343,7 @@ mod template {
     /// and doesn't block the pin (only P1 errors do).
     #[test]
     fn pin_clean_through_stage_5() {
-        use foreman_core::pin_check::p1_annotation_errors;
+        use foreman_core::lock::p1_annotation_errors;
         use foreman_core::template::StepStatus;
         assert!(p1_annotation_errors(&blueprint()).is_ok());
         for (id, stage) in [("0.2", 0u8), ("3.2", 3), ("4.3", 4), ("5.3", 5)] {
