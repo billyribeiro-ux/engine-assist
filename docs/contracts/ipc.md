@@ -172,6 +172,7 @@ enum IpcErrorDetail {
   Stale { what: StaleWhat /* "projectRev"|"readStamp"|"fingerprint"|"plan" */, fresh: Option<serde_json::Value> },
   ReadOnly(ReadOnly),
   NotAllowed { rule: String },                    // e.g. "core-step-skip", "condition-locked-after-stage-2", "pty-not-live"
+  AnnotationErrors { errors: Vec<AnnotationProblem> },   // (CR-003) code NotAllowed, rule "p1-annotation-errors": a pin refused for errors in Stages 1–2 or F.2
   Conflict { path: RepoPath, written: Vec<RepoPath> },
   PolicyViolation { path: String, rule: String },  // the path is shown with visible escapes
   ToolMissing { tool: ToolKind, path: Option<String> },
@@ -180,6 +181,8 @@ enum IpcErrorDetail {
   Unsupported { feature: String, why: String },
 }
 ```
+
+(CR-003) `AnnotationProblem { stage: Option<Stage>, step: Option<String>, diagnostic: Diagnostic }` (`Diagnostic` as in `template_health`); `step` is the annotation ID (`2.3`, `F.2`). The list is in line order and holds every error that stops the pin; `message` already reads "Stage 2 step 2.3 has an annotation error on line 214: … Fix the blueprint, then pin again." for one error and lists each for several.
 
 `message` is Foreman-written text for display; the UI branches only on `code` and `detail.kind` (ADR-004 §5). `ToolFailed.stderr_tail` passes through the SR-54 redaction layer. In TS, `fresh` is `unknown` and is narrowed by the calling method's own type.
 
@@ -366,7 +369,7 @@ TS    { pickId: string; name: string; slug: string; variables: Record<string, st
 Res   SetupPreview { preview_id: PreviewId, writes: Vec<PlannedWrite>, git_init: bool, pin: PinPreview,
                      path: ApplicablePathSummary }
       PlannedWrite { path: RepoPath, action: "create" | "leaveAlone" | "refuse", reason: Option<String> }
-Err   Expired (pick) · NotAllowed (pin refused: blueprint file differs from HEAD, AC-F002-02, shown as both hashes instead of `git status` output) · ToolMissing (git) · PolicyViolation
+Err   Expired (pick) · NotAllowed (pin refused: blueprint file differs from HEAD, AC-F002-02, shown as both hashes instead of `git status` output; or, (CR-003) a step in Stages 1–2 or F.2 has an annotation error, `detail: AnnotationErrors` listing each, AC-F002-02) · ToolMissing (git) · PolicyViolation
 ```
 F-018, F-002, F-004 · AC-F018-01, -02, -04, -08, AC-F002-01, -02 · SR-30, SR-34, SR-44. A folder inside an enclosing repo but without its own (`rev-parse --show-toplevel` ≠ the folder) gets `gitInit: true`; Foreman never acts on the enclosing repo. Variable keys must be blueprint variable names (`^[A-Z][A-Z0-9_]*$`); `slug` must match `^[a-z0-9-]{1,40}$` (it becomes part of `--name`, DR-121).
 
@@ -425,9 +428,9 @@ F-018, F-006 · AC-F006-03 · SR-40.
 Rust  BlueprintRepinReq { project_id: ProjectId }
 TS    { projectId: string }
 Res   ProjectView
-Err   NotAllowed ("repin-after-stage-1-signed", "blueprint-dirty") · ToolMissing · Conflict
+Err   NotAllowed ("repin-after-stage-1-signed", "blueprint-dirty", "p1-annotation-errors" with `detail: AnnotationErrors`, CR-003) · ToolMissing · Conflict
 ```
-F-002 · AC-F002-02, -03 · SR-41, SR-44.
+F-002 · AC-F002-02, -03 · SR-41, SR-44. (CR-003) A re-pin runs the same checks as the first pin; on refusal the existing lock and stored text are untouched.
 
 **`project_remove`** · P1 (registry) + P2 (full deletion UI) · M4 · **app** (deletes `projects/<id>/`, `approvals/<id>*`, its fingerprint snapshots)
 ```text

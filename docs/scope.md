@@ -270,7 +270,7 @@ Stories are numbered `US-Fnnn-n`. "Billy" is the only user.
 | ID | Criterion | Test | M |
 |---|---|---|---|
 | AC-F002-01 | **Given** a clean blueprint repo **when** a project is pinned **then** `.foreman/blueprint.lock.json` holds `schemaVersion, blueprintRepoCommit, blueprintPath, sourceSha256, blueprintVersion, grammarVersion, pinnedAt` and `{textSha256, kind}` per item; the full text is in app data at `templates/<sourceSha256>.md`; the repo holds no copy | int | M1 |
-| AC-F002-02 | **Given** the blueprint file has uncommitted changes **when** pinning **then** the pin is refused, showing the working-file and HEAD hashes (`hash-object --no-filters` vs `rev-parse HEAD:<path>`, DR-142) | int | M1 |
+| AC-F002-02 | **Given** the blueprint file has uncommitted changes **when** pinning **then** the pin is refused, showing the working-file and HEAD hashes (`hash-object --no-filters` vs `rev-parse HEAD:<path>`, DR-142). (CR-003) **Given** a step in Stages 1–2 or F.2 has an annotation error **when** pinning **then** the pin is also refused, listing each error with its stage, step, line and message and ending "Fix the blueprint, then pin again."; nothing is written. Errors only in other stages don't refuse (those steps stay not runnable, AC-F001-15) | int | M1 |
 | AC-F002-03 | **Given** Stage 1 is signed **when** a re-pin is attempted **then** it is refused ("upgrading the pin is v1.1"); before Stage 1 is signed it is allowed | unit | M1 |
 
 **US-F002-2.** As Billy, I want a project to recover its template on a new machine and to refuse a tampered one, so that I never run steps from the wrong text.
