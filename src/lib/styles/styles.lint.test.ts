@@ -156,4 +156,31 @@ describe('contrast (WCAG 2.2 AA, both themes)', () => {
 		expect(fails).toEqual([]);
 		expect(checked).toBeGreaterThan(pairs.length);
 	});
+
+	it('Increase Contrast: every text pair reaches 7:1 in Night and Vellum (AC-XC-23)', () => {
+		const text = readFileSync(tokensPath, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+		const { night, vellum } = themes();
+		const hcNight = block(text, /@media \(prefers-contrast: more\) \{\s*:root:root \{/);
+		const hcVellum = block(text, /:root:root\[data-theme="vellum"\] \{/);
+		const hcLight = block(
+			text,
+			/@media \(prefers-contrast: more\) and \(prefers-color-scheme: light\) \{\s*:root:root:not\(\[data-theme="night"\]\) \{/
+		);
+		expect(Object.keys(hcNight).length).toBeGreaterThan(5);
+		expect(hcLight).toEqual(hcVellum);
+		const sets = {
+			Night: { ...night, ...hcNight },
+			Vellum: { ...vellum, ...hcNight, ...hcVellum }
+		};
+		const fails: string[] = [];
+		for (const [name, theme] of Object.entries(sets))
+			for (const p of pairs.filter((x) => x.min === 4.5)) {
+				const fg = resolve(theme, theme[p.fg] ?? '');
+				const bg = resolve(theme, theme[p.bg] ?? '');
+				if (!/^#[0-9a-fA-F]{6}$/.test(fg) || !/^#[0-9a-fA-F]{6}$/.test(bg)) continue;
+				const r = ratio(fg, bg);
+				if (r < 7) fails.push(`${name} ${p.fg} on ${p.bg}: ${r.toFixed(2)} < 7`);
+			}
+		expect(fails).toEqual([]);
+	});
 });

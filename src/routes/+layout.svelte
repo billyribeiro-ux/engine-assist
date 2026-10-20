@@ -24,6 +24,7 @@
 		registerShortcuts
 	} from '#lib/keyboard/registry.ts';
 	import { to } from '#lib/nav/routes.ts';
+	import { watchOsDisplay } from '#lib/os-display.ts';
 	import { refresh } from '#lib/stores/bus.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
@@ -75,36 +76,7 @@
 			}
 		})();
 
-		// Reduce Transparency and Increase Contrast are reported to Rust, which turns the window's
-		// vibrancy off (ADR-014, AC-XC-23). The value isn't stored.
-		const rt = matchMedia('(prefers-reduced-transparency: reduce)');
-		const hc = matchMedia('(prefers-contrast: more)');
-		const report_ = () => {
-			void ipc().then(async (c) => {
-				const s = await c.settingsGet({});
-				await c
-					.settingsUpdate({
-						expectRev: s.rev,
-						patch: {
-							driName: null,
-							editor: null,
-							theme: null,
-							terminal: null,
-							envPassthrough: null,
-							globalVariables: null,
-							resetTool: null,
-							clearLoginPath: null,
-							removeAllowlistEntry: null,
-							screenReaderMode: null,
-							osDisplay: { reduceTransparency: rt.matches, increaseContrast: hc.matches }
-						}
-					})
-					.catch(() => undefined);
-			});
-		};
-		report_();
-		rt.addEventListener('change', report_);
-		hc.addEventListener('change', report_);
+		const stopDisplay = watchOsDisplay();
 
 		const off = registerShortcuts({
 			palette: () => {
@@ -163,8 +135,7 @@
 		});
 		return () => {
 			off();
-			rt.removeEventListener('change', report_);
-			hc.removeEventListener('change', report_);
+			stopDisplay();
 		};
 	});
 

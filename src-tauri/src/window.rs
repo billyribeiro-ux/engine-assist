@@ -38,7 +38,7 @@ pub fn navigation_allowed(u: &Url) -> bool {
 static REDUCED_EFFECTS: AtomicBool = AtomicBool::new(false);
 
 /// Records what the webview's `prefers-reduced-transparency`/`prefers-contrast` report
-/// (`settings_update.osDisplay`, AC-XC-23). Window vibrancy arrives with M2-03 and reads this.
+/// (`settings_update.osDisplay`, AC-XC-23). The window is opaque today (a solid `--sidebar` stands in for vibrancy); `Os::set_window_reduced_effects` clears any window effect when this is on.
 pub fn set_reduced_effects(on: bool) {
     REDUCED_EFFECTS.store(on, Ordering::Relaxed);
 }
@@ -61,7 +61,7 @@ pub fn build_main<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Webvi
         .on_navigation(navigation_allowed)
         .on_new_window(|_, _| NewWindowResponse::Deny)
         .disable_drag_drop_handler();
-    // macOS-only chrome (ADR-014). Window effects (vibrancy) arrive with M2-03.
+    // macOS-only chrome (ADR-014). No window effect is applied yet; Reduce Transparency or Increase Contrast would clear one (`Os::set_window_reduced_effects`).
     #[cfg(target_os = "macos")]
     let builder = builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)

@@ -108,6 +108,10 @@ pub trait Os: Send + Sync {
     fn notify(&self, n: &Notice) -> Result<(), String>;
     /// Sets the Dock badge (`None` clears it; AC-F017-09).
     fn set_badge(&self, count: Option<u32>);
+    /// Reduce Transparency or Increase Contrast is on, as the webview's media queries report it
+    /// (AC-XC-23, ADR-014): the main window's effects are cleared. Rust never reads the OS
+    /// preference itself.
+    fn set_window_reduced_effects(&self, reduced: bool);
     /// Whether Foreman's window is the focused one (notifications only fire when it isn't).
     fn app_focused(&self) -> bool;
     /// Now, UTC.
@@ -240,6 +244,15 @@ impl<R: tauri::Runtime> Os for TauriOs<R> {
         }
     }
 
+    fn set_window_reduced_effects(&self, reduced: bool) {
+        use tauri::Manager as _;
+        crate::window::set_reduced_effects(reduced);
+        if reduced && let Some(w) = self.app.get_webview_window("main") {
+            // `None` clears any effect; a window without one answers Ok, and nothing depends on it.
+            let _ = w.set_effects(None::<tauri::utils::config::WindowEffectsConfig>);
+        }
+    }
+
     fn app_focused(&self) -> bool {
         use tauri::Manager as _;
         self.app
@@ -329,6 +342,7 @@ pub struct ScriptedOs {
     open_fails: Mutex<bool>,
     notices: Mutex<Vec<Notice>>,
     badge: Mutex<Option<u32>>,
+    reduced_effects: Mutex<Vec<bool>>,
     focused: Mutex<bool>,
     now: Mutex<jiff::Timestamp>,
 }
@@ -348,6 +362,7 @@ impl Default for ScriptedOs {
             open_fails: Mutex::new(false),
             notices: Mutex::new(Vec::new()),
             badge: Mutex::new(None),
+            reduced_effects: Mutex::new(Vec::new()),
             focused: Mutex::new(true),
             // ipc.md §7.2: the mock's fixed clock.
             now: Mutex::new(jiff::Timestamp::from_second(1_792_400_400).unwrap_or_default()),
@@ -418,6 +433,11 @@ impl ScriptedOs {
     pub fn notices(&self) -> Vec<Notice> {
         lock(&self.notices).clone()
     }
+    /// Every reduced-effects value the webview reported, in order.
+    #[must_use]
+    pub fn reduced_effects(&self) -> Vec<bool> {
+        lock(&self.reduced_effects).clone()
+    }
     /// The Dock badge as last set.
     #[must_use]
     pub fn badge(&self) -> Option<u32> {
@@ -480,6 +500,10 @@ impl Os for ScriptedOs {
 
     fn set_badge(&self, count: Option<u32>) {
         *lock(&self.badge) = count;
+    }
+
+    fn set_window_reduced_effects(&self, reduced: bool) {
+        lock(&self.reduced_effects).push(reduced);
     }
 
     fn app_focused(&self) -> bool {

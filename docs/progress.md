@@ -18,6 +18,7 @@ the commit named, until someone checks it against its acceptance criteria.
 | M2 | in-progress | 49/61 required tests present. |
 | M3 | in-progress | 64/73 required tests present. |
 | M4 | in-progress | 52/66 required tests present. |
+| M5 (UI wave) | in-progress | M5-02, M5-03 and M5-04 done (component tests, Playwright flows and the 7:1 contrast pairs); M5-01, M5-05 and later are not started. |
 
 ## Waiting on Billy
 
@@ -56,6 +57,7 @@ Everything that only Billy's Mac can settle, to record in the Stage 5 packet.
 | 9 | Confirm `open -u https://claude.ai/` opens the browser. | CR-006 (M3-12, M3-23) |
 | 10 | The S-0 real-TUI paste check (Claude Code's TUI receiving `pty_paste`). | M3-12 |
 | 11 | AC-F017-09: with Foreman unfocused, a session-blocked or packet-landed item shows a macOS notification (Foreman text only), clicking it only focuses Foreman, and the Dock badge counts the first four kinds. Also `open -b com.apple.Terminal <project folder>` from "Open terminal here". | M3-07, M4-25 |
+| 12 | AC-XC-23 and NFR-34 manual pass: with Reduce Motion, Reduce Transparency and Increase Contrast each switched on in System Settings, check that the stamp doesn't animate, the sidebar stays solid, and the high-contrast tokens read well in Night and Vellum. The `Os::set_window_reduced_effects` clear is real code but no window effect is applied yet, so there is nothing to see turn off; WKWebView's `prefers-reduced-transparency` support is UNVERIFIED on his Mac. | M5-04 |
 
 ## M1 tickets
 
@@ -221,6 +223,14 @@ branch isn't taken.
 | M4-28 | `assembler_view`, `assembler_paste_preview`, `assembler_paste_apply` |
 | M4-29 | `desktop_open`, `desktop_handoff` |
 | M4-32 | `run_sheet_export` |
+
+## M5 tickets
+
+| Ticket | Status | Title | Req. tests | Built, and what's left |
+| ------ | ------ | ----- | ---------- | ---------------------- |
+| M5-02 | done | Sheet strip | none named | `SheetStrip.svelte` was already built (M2); this wave added `SheetStrip.svelte.test.ts` (19 sheets in six phase groups, every status named by words and a different mark, hover title, click target, roving tabindex and ← → Home End, the wizard preview, the stamp on the signed sheet) and fixed the last group's "Ownership" label, which made the strip scroll sideways by 3 px at 1280 (now centered under its sheet, and hidden below 920 px of strip width, where the group keeps its accessible name). |
+| M5-03 | done | Title block, inspector and responsive layout | none named | `TitleBlock.svelte.test.ts` (sheet, project, revision, DRI, status and signed date, locked, n/a, needs annotation, truncation) and `Inspector.svelte.test.ts` (tabs, keyboard, empty states, chat knowledge, collapse, overlay); Playwright `tests/flows/display.spec.ts` for 1440, 1280 × 800 (inspector collapsed, ⌘⌥I overlay, no sideways scroll) and 1000 (sidebar icons). The icon-only sidebar now keeps each link's words visually hidden instead of `display: none` (the links had no name). |
+| M5-04 | done | Stamp and system display settings | none named | The stamp is `Icon`'s landing state inside `SheetStrip` (no separate `Stamp.svelte`; `motion.css` isn't needed because the durations are tokens that `prefers-reduced-motion` zeroes). Flows: the stamp runs 220 ms after a signature, `none` under Reduce Motion. `os-display.ts` (extracted from the root layout) reports `prefers-reduced-transparency` and `prefers-contrast: more` through `settings_update.osDisplay` (`os-display.svelte.test.ts`); `Os::set_window_reduced_effects` clears the window's effects (`display::os_display_reaches_the_window_effects_seam`). `tokens.css` carries the full `prefers-contrast: more` set; `contrast-check.py` checks every text pair at ≥ 7:1 in Night and Vellum with it on (316 of 316 checks), mirrored by a `styles.lint.test.ts` test and a flow that reads the tokens in the browser. Left: the manual pass (Mac check 12). |
 
 ## Run metrics: definitions and assumptions (M3-26, M4-02, M4-03)
 

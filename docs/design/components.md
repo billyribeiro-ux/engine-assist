@@ -198,7 +198,7 @@ Check rows: glyph, name, detail (what was found and the fix in plain words), fou
 ## Focus, motion and theming notes
 
 - Focus ring: 2 px `--focus` with 2 px offset everywhere (`--linework` in Night, `--cyanotype` in Vellum, `--focus-on-strip` on the strip). Never removed; `:focus-visible` only hides it for pointer clicks.
-- Reduce Motion (`prefers-reduced-motion`): all durations become 0 and the stamp doesn't animate. Reduce Transparency (`prefers-reduced-transparency: reduce`): the sidebar uses solid `--sidebar`, and the webview reports it to Rust, which turns the window's vibrancy off. Increase Contrast (`prefers-contrast: more`): the high-contrast token set applies, with every text/background pair ≥ 7:1 (AC-XC-23; today's block only steps up `--rule` and muted text, and M5 completes it).
+- Reduce Motion (`prefers-reduced-motion`): all durations become 0 and the stamp doesn't animate. Reduce Transparency (`prefers-reduced-transparency: reduce`): the sidebar uses solid `--sidebar`, and the webview reports it to Rust, which turns the window's vibrancy off. Increase Contrast (`prefers-contrast: more`): the high-contrast token set applies, with every text/background pair ≥ 7:1 (AC-XC-23; built in M5-04: `--rule` and `--ink-muted` step up, the status, accent, strip, terminal and disabled-control colors are darker in Vellum and lighter in Night, and `contrast-check.py` checks every text pair at 7:1 with the set on).
 - Themes follow the system unless Settings picks Night or Vellum (`data-theme` on the root).
 - Fonts are local only. The drafting face (IBM Plex Sans Condensed SemiBold, OFL) ships in the bundle; mockups fall back to a local condensed face.
 

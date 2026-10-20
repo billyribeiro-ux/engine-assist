@@ -1161,11 +1161,19 @@ details.argv pre {
 	:root {
 		--sidebar-width: 56px;
 	}
-	.sidebar .label,
-	.sidebar .meta,
 	.sidebar .side-head,
 	.sidebar .side-stages {
 		display: none;
+	}
+	/* Icon-only, but each link keeps its words for assistive technology. */
+	.sidebar .label,
+	.sidebar .meta {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 	.sidebar .side-item {
 		justify-content: center;

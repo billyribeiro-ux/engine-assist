@@ -21,6 +21,12 @@
 		width?: 'wide' | 'narrow';
 	} = $props();
 
+	/** Moves the layer to <body> (a portal), and takes it away again when the dialog closes. */
+	function toBody(node: HTMLElement): () => void {
+		document.body.append(node);
+		return () => node.remove();
+	}
+
 	const id = `dlg-${Math.random().toString(36).slice(2, 8)}`;
 	let box = $state<HTMLDivElement>();
 
@@ -66,26 +72,33 @@
 	}
 </script>
 
-<div class="scrim" aria-hidden="true"></div>
-<div
-	class={['dialog', width === 'narrow' && 'narrow']}
-	role="dialog"
-	aria-modal="true"
-	aria-labelledby="{id}-t"
-	aria-describedby={description ? `${id}-d` : undefined}
-	tabindex="-1"
-	bind:this={box}
-	onkeydown={onKey}
->
-	<div class="dialog-head">
-		<h2 class="dialog-title" id="{id}-t">{title}</h2>
-		{#if description}<p class="hashline" id="{id}-d">{description}</p>{/if}
+<!-- The sheet lives under <body>, outside `.app`: the app is made inert while it is open, and a
+     dialog inside it would be inert too. -->
+<div class="layer" {@attach toBody}>
+	<div class="scrim" aria-hidden="true"></div>
+	<div
+		class={['dialog', width === 'narrow' && 'narrow']}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="{id}-t"
+		aria-describedby={description ? `${id}-d` : undefined}
+		tabindex="-1"
+		bind:this={box}
+		onkeydown={onKey}
+	>
+		<div class="dialog-head">
+			<h2 class="dialog-title" id="{id}-t">{title}</h2>
+			{#if description}<p class="hashline" id="{id}-d">{description}</p>{/if}
+		</div>
+		<div class="dialog-body">{@render children()}</div>
+		<div class="dialog-foot">{@render footer()}</div>
 	</div>
-	<div class="dialog-body">{@render children()}</div>
-	<div class="dialog-foot">{@render footer()}</div>
 </div>
 
 <style>
+	.layer {
+		display: contents;
+	}
 	.narrow {
 		width: 520px;
 	}

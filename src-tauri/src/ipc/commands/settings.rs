@@ -295,7 +295,8 @@ pub fn settings_update(app: &App, req: SettingsUpdateReq) -> Result<SettingsView
     }
     // `osDisplay` isn't stored: it only drives the window's vibrancy (ADR-014, AC-XC-23).
     if let Some(d) = p.os_display {
-        crate::window::set_reduced_effects(d.reduce_transparency || d.increase_contrast);
+        app.os()
+            .set_window_reduced_effects(d.reduce_transparency || d.increase_contrast);
     }
     app.save_settings(&s, &stamp)?;
     view(app, &s)

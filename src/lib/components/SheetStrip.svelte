@@ -327,12 +327,19 @@
 	.phase-dim span {
 		padding: 0 var(--space-1);
 	}
+	/* The last group is one sheet wide, so its label is centered under the sheet with no dimension
+	   line (it would not fit), and it grows evenly into the strip's padding (AC-F030-10). */
 	.phase-maint .phase-dim {
 		overflow: visible;
+		justify-content: center;
+		border-color: transparent;
 	}
 	.phase-maint .phase-dim::before,
 	.phase-maint .phase-dim::after {
-		min-width: 2px;
+		display: none;
+	}
+	.phase-maint .phase-dim span {
+		padding: 0;
 	}
 	@container (max-width: 920px) {
 		.sheet {
@@ -354,6 +361,10 @@
 		}
 		.phase-sheets {
 			gap: 3px;
+		}
+		/* One sheet is too narrow for its label; the group still has its name for screen readers. */
+		.phase-maint .phase-dim span {
+			display: none;
 		}
 	}
 </style>
