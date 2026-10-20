@@ -280,7 +280,7 @@ The one real fork in the road is **SvelteKit 3 vs plain Svelte 5 + Vite**. Every
 | @tauri-apps/plugin-opener · plugin-clipboard-manager · plugin-dialog · plugin-window-state | 2.7.2 · 2.5.0 · 2.8.3 · 2.5.0 |
 | @xterm/xterm | 6.0.0 |
 | @xterm/addon-fit · addon-webgl · addon-unicode11 · addon-search · addon-web-links | 0.11.0 · 0.19.0 · 0.9.0 · 0.16.0 · 0.12.0 |
-| bits-ui | 2.19.5 (peer `@internationalized/date` 3.12.4) |
+| bits-ui | 2.19.5 (peer `@internationalized/date` 3.12.4). **Not adopted (2026-10-20):** not in `package.json`; the UI uses hand-built primitives (ADR-020 amendment). Kept here as the council record. |
 | vitest · @vitest/browser-playwright · @vitest/coverage-v8 | 5.0.5 |
 | vitest-browser-svelte | 3.1.0 |
 | @playwright/test | 1.64.1 |

@@ -445,7 +445,7 @@ Stage: 6
 Depends on: M1-07, M0-03
 ADRs: ADR-012
 Threats mitigated: T-039, T-040, T-041, T-042, T-043
-Likely files: crates/foreman-core/src/git.rs (closed `GitOp` enum, arg builders), crates/foreman-sys/src/git.rs, crates/foreman-sys/tests/git.rs, crates/foreman-sys/tests/fixtures/hostile-repo/, the closed `GitOp` enum equal to DR-140's list (no `Status`, `Diff`, `Add`, `Commit`, `LsFiles`; ADR-012 decision 1)
+Likely files: crates/foreman-core/src/git.rs (closed `GitOp` enum, arg builders), crates/foreman-sys/src/git.rs, crates/foreman-sys/tests/git.rs, crates/foreman-sys/tests/common/mod.rs (`hostile_repo`, generated in code each run; no `fixtures/hostile-repo/` directory), the closed `GitOp` enum equal to DR-140's list (no `Status`, `Diff`, `Add`, `Commit`, `LsFiles`; ADR-012 decision 1)
 Acceptance criteria:
 - AC-XC-04
 - Given a folder with no repo of its own inside an enclosing repo, when any git op runs, then `git::run` refuses (rev-parse `--show-toplevel` must equal the project root)
@@ -831,7 +831,7 @@ Stage: 6
 Depends on: M1-16, M1-22
 ADRs: ADR-015
 Threats mitigated: none
-Likely files: crates/foreman-core/benches/template.rs, crates/foreman-core/benches/resolver.rs, crates/foreman-core/tests/fixtures/blueprint-20k.md
+Likely files: crates/foreman-core/benches/template.rs, crates/foreman-core/benches/resolver.rs (the 20,000-line blueprint is generated deterministically in `benches/template.rs`, not committed as `tests/fixtures/blueprint-20k.md`)
 Acceptance criteria:
 - AC-F001-07
 - AC-F006-16
@@ -912,7 +912,7 @@ Threats mitigated: none
 Likely files: src/routes/+layout.svelte, src/routes/+page.svelte, src/routes/first-run/+page.svelte, src/routes/setup/+page.svelte, src/routes/doctor/+page.svelte, src/routes/settings/+page.svelte, src/routes/projects/[projectId]/+layout.svelte, src/routes/projects/[projectId]/stages/[stage]/+page.svelte, src/lib/components/ui/, src/lib/stores/, src/lib/nav/, docs/design/tokens.css → src/lib/styles/tokens.css
 Acceptance criteria:
 - EX-M2-01 (routes exist; real data arrives with each screen ticket)
-- Given each P1 route, then it renders under the root layout (sidebar, terminal drawer host, aria-live region) in mock mode, with bits-ui 2.19.5 wrappers styled only by tokens
+- Given each P1 route, then it renders under the root layout (sidebar, terminal drawer host, aria-live region) in mock mode, with hand-built primitives (ADR-020 amendment 2026-10-20; bits-ui is not used) styled only by tokens
 Required tests:
 - none named (one component test per route stub)
 Out of scope: screen content (later M2 tickets).

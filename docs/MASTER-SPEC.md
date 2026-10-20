@@ -245,7 +245,7 @@ Evidence and alternatives: `spec/council/r7-stack.md`. Frontend: **Billy's decis
 | Process spawning | `std::process` / `tokio::process`, argv only | No shell plugin. |
 | File watching | notify 8.2.0 + notify-debouncer-full 0.7.0 | FSEvents; 9.x is an RC. |
 | Markdown | comrak =0.56.0 | Line and column on every node. |
-| UI primitives | bits-ui 2.19.5 | Svelte 5 native, including Command for ⌘K. |
+| UI primitives | Hand-built, keyboard-complete (ADR-020 amendment 2026-10-20) | bits-ui was not adopted: its Command primitive (⌘K) ships static `style` attributes that violate `style-src 'self'`. |
 | State | Svelte 5 runes in `.svelte.ts`, mirroring Rust over commands, Channels and events | Rust is the source of truth. |
 | Tests | cargo test + proptest 1.12.0 + insta 1.49.0 + criterion 0.8.2 (benchmarks) · Vitest 5.0.5 (browser mode) · Playwright 1.64.1 + axe 4.14.0 with mocked IPC · @wdio/tauri-service 1.5.0 smoke (webdriverio 9.32.0) behind an `e2e` feature | `tauri-driver` has no macOS support. |
 | Lint and format | eslint 10.13.0 + eslint-plugin-svelte 3.23.1 + typescript-eslint 8.72.0 · svelte-check 4.7.7 · prettier 3.9.10 · rustfmt + clippy `-D warnings` | Zero-warning gates. |

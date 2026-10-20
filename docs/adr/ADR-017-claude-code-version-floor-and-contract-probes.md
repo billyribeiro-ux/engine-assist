@@ -73,3 +73,28 @@ The effective floor is the maximum over the steps' models, flags and the pinned 
 ## Exit path
 
 The floor table and the probe set are data. If `--init-only` disappears, probes become "inconclusive" (state kept), and floors plus Billy's confirmation carry compatibility until a replacement probe is designed.
+
+## Amended 2026-10-20 (M3 runners): probe B redesigned
+
+**Evidence** (Claude Code 2.1.304 on Linux, `env -i HOME=<tmp>`, zero tokens; the S-1′ rehearsal note in `docs/spikes/S-1prime.md`):
+
+| argv | exit | stderr |
+|---|---|---|
+| `--init-only --resume <random uuid>` | 0 | (none) |
+| `--init-only --resume not-a-uuid` | 0 | (none) |
+| `--init-only --resume <r> --fork-session --session-id <n>` | 0 | (none) |
+| `--init-only --resume <r> --session-id <n>` | 1 | `Error: --session-id can only be used with --continue or --resume if --fork-session is also specified.` |
+| `--init-only --bogus-flag` | 1 | `error: unknown option '--bogus-flag'` |
+| `--init-only --permission-mode nope` | 1 | `error: option '--permission-mode <mode>' argument 'nope' is invalid. Allowed choices are …` |
+| `--init-only --effort bogus` | **0** | `Warning: Unknown --effort value 'bogus' — ignoring it and using the default effort. …` |
+| `--init-only --settings /nonexistent.json` | 1 | `Error: Settings file not found: …` |
+
+So the original probe B criterion ("exit ≠ 0 with a no-conversation-found message") can never pass, and exit codes alone can't tell a parsed flag from an ignored one; a bad `--effort` exits 0.
+
+**Decision.**
+
+- **Probe B** is two runs: **B1** `--init-only --resume <r> --fork-session --session-id <n>` (Foreman's fork form) must exit 0 with no flag error; **B2** `--init-only --resume <r> --session-id <n>` (SR-14's forbidden form) must be **refused**: exit ≠ 0 with a message naming `--session-id` and `--resume`/`--fork-session`. B2's refusal proves the parser read `--resume` and still enforces the combination Foreman relies on. B1 refused → flag failure (`--fork-session`, or `--resume`); B2 accepted → inconclusive (state kept).
+- **Flag-failure classification** reads stderr line by line for `unknown option`, `unrecognized`, `is invalid`, `invalid value` and `Unknown --<flag> value`, and names the first `--flag` on that line. Probe A is a flag failure on such a line **even with exit 0** (the `--effort` warning case).
+- **Probe A's marker** is the `SessionStart` event file the hash-checked sensor writes to `events/<probeRunId>/` with the probe's token (files.md §4.11 amended); probe A passes only with exit 0, no flag error and the marker.
+- Code: `foreman_core::probe` (`classify_a`, `classify_b`, `disabled_features`, `due`, `merge`), `foreman_core::launch::argv::{probe_a, probe_b}`, `foreman_sys::claude::run_probes`, `foreman_sys::launch::{probe_settings, reset_probe_dir, probe_marker}`. Tests: `probe::*` in `crates/foreman-core/tests/launch.rs` and `crates/foreman-sys/tests/probe.rs` (fake-claude mirrors the table above).
+- Billy's Mac run of S-1′ still records the macOS behavior; if it differs, this table and the patterns are updated.

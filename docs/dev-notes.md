@@ -115,7 +115,7 @@ Contract gaps: the 67 `GAP:` notes once in `src/lib/ipc/types.ts` are settled in
 
 Deviations from the mockups, with reasons:
 - No drawn traffic lights: the real window uses the macOS overlay title bar.
-- bits-ui isn't used: its primitives set inline styles, which the CSP (`style-src 'self'`) blocks. Dialog, palette, segmented control, tabs and the strip are hand-built and keyboard-complete; dynamic sizes go through CSSOM.
+- bits-ui isn't used: its Command primitive (⌘K) ships static `style="display: contents;"` attributes that the CSP (`style-src 'self'`) reports as violations (evidence and the narrower scope of the problem: ADR-020 amendment 2026-10-20). Dialog, palette, segmented control, tabs and the strip are hand-built and keyboard-complete; dynamic sizes go through CSSOM.
 - P2 tags on step rows are not shown; redacted config diffs have no context lines (the redacted diff carries none); setup lists writes per path rather than grouped; Settings doesn't show an invalid `claude` path by default (paths come only from Rust's picker).
 - The mock's TradeLog world follows the mockups (commercial = no, payments undecided), not ipc.md §7.2's "all yes".
 - Terminal dim text (SGR 2) uses `--term-muted` instead of 50% alpha, so it passes AA.

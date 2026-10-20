@@ -97,7 +97,7 @@ Checked in source, 2026-10-19:
 
 **S-0 decision rule (MASTER-SPEC §9, SR-20):**
 
-- If runtime styles (SvelteKit's `app.html` style attribute, Svelte transitions, bits-ui, xterm) fail under `style-src 'self'` plus nonces, `style-src` alone gets `'unsafe-inline'`, and this ADR is amended to record the accepted risk (CSS injection without script execution).
+- If runtime styles (SvelteKit's `app.html` style attribute, Svelte transitions, xterm; bits-ui is not used, ADR-020) fail under `style-src 'self'` plus nonces, `style-src` alone gets `'unsafe-inline'`, and this ADR is amended to record the accepted risk (CSS injection without script execution).
 - If SvelteKit's `version.json` focus check still fetches with `pollInterval: 0` (ADR-002, UNVERIFIED), `connect-src` gains `'self'`.
 
 ## Alternatives considered

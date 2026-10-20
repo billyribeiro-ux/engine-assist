@@ -226,14 +226,51 @@ mod steps {
                 .state,
             S::Done
         );
-        // CLI: on exit, any code (recorded elsewhere); never by hand.
+        // CLI: the run ends on any exit code (the code is recorded in the run record, DR-066),
+        // but only exit 0 makes the step done (DR-065); a non-zero exit goes back to
+        // notStarted so Billy can run it again. Never marked done by hand.
         let cli = ctx(K::Prompt, Some(Surface::Cli), A::Applicable);
+        let ok = transition(&at(S::Running), &cli, &E::Exited(0)).unwrap();
+        assert_eq!((ok.state, ok.run_count), (S::Done, 1));
+        for code in [1, 2, 127, 130, -1] {
+            let failed = transition(&at(S::Running), &cli, &E::Exited(code)).unwrap();
+            assert_eq!(
+                (failed.state, failed.run_count),
+                (S::NotStarted, 1),
+                "exit {code} is a finished run, not a done step"
+            );
+        }
+        // The same for a followup's relaunch; a repeatable never becomes done (DR-069).
+        let follow = ctx(K::Followup, Some(Surface::Cli), A::Applicable);
         assert_eq!(
-            transition(&at(S::Running), &cli, &E::Exited(2))
+            transition(&at(S::Running), &follow, &E::Exited(0))
                 .unwrap()
                 .state,
             S::Done
         );
+        assert_eq!(
+            transition(&at(S::Running), &follow, &E::Exited(1))
+                .unwrap()
+                .state,
+            S::NotStarted
+        );
+        // A re-run of a done step that fails leaves it re-runnable, not done.
+        let rerun = transition(&at(S::Done), &cli, &E::Spawn).unwrap();
+        assert_eq!(
+            transition(&rerun, &cli, &E::Exited(1)).unwrap().state,
+            S::NotStarted
+        );
+        // Errored and interrupted runs: run again (DR-065).
+        for e in [E::Errored, E::Interrupted] {
+            assert_eq!(
+                transition(&at(S::Running), &cli, &e).unwrap().state,
+                S::NotStarted
+            );
+        }
+        // An exit with no run in flight is refused.
+        for s in [S::NotStarted, S::Copied, S::Done] {
+            assert!(transition(&at(s), &cli, &E::Exited(0)).is_err());
+        }
         assert!(
             transition(&at(S::Running), &cli, &E::MarkDone)
                 .unwrap_err()

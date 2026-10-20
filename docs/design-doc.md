@@ -281,6 +281,54 @@ pub fn export_metrics(index: &[RunIndexLine], baseline: Option<&Baseline>) -> St
 
 At startup: `rustix::process::umask(0o022)` (SR-57); app-data directories `0700`, files `0600` (SR-53).
 
+#### 3.2.3 Runner APIs (M3, as built 2026-10-20)
+
+The signatures differ from §3.2.1's sketch where noted; `foreman-app` calls these and owns the IPC shapes, native dialogs, the one-time plan IDs and `run.json`.
+
+**Pure (`foreman-core`).**
+
+```rust
+// launch — blockers and progress (ipc.md §2.3, §5)
+launch::{Blocker, ConfirmReason, LaunchProgress, AuthProblem, NotRunnableReason /* + NotCli, ChainNotStarted */};
+launch::argv::build_argv(&LaunchInputs) -> Result<Argv, ArgvError>;   // SessionArgs::{New, Resume, Fork}
+launch::argv::{SessionName::for_step, probe_a, probe_b, desktop, KNOWN_FLAGS, is_forbidden};
+launch::env::{build_env(own, passthrough, &BuiltPath, run_id) -> ChildEnv, build_path(cands, projects, facts) -> BuiltPath};
+launch::run_settings::{build(repo, app_data, &RunSettingsOpts) -> Result<RunSettingsFile, Blocker>, to_bytes};
+launch::preflight::{Phase::ORDER, PreflightFacts, evaluate_preflight, needs_confirmation(policy, effective, &ConfirmCtx)};
+chain::{plan_session(step, chains, new_id, ChainStartState, HandoffConfirm) -> SessionPlan,  // 5 args, not 3
+        check_transcript, transcript_path, project_dir_name, session_args(&plan, ForkIds),
+        effort_carry(&args, effort, EffortOnResume) -> EffortCarry, apply_launch, mark_broken, mark_handed_off};
+fingerprint::{sources(cwd, repo, home, cfg, managed), derived_sources, fingerprint, auth_key_hits(files, allow),
+              redact, snapshot, diff(prev, now) -> Vec<RedactedDiff>, allowlist_hash};
+rearm::{step(State, Event) -> (State, Vec<Action>), UserAction::from_ipc_invoke, divider(step, title, start)};
+probe::{classify_a, classify_b, disabled_features, due, merge};
+session_state::{SessionState, ingest, apply, token_matches};  interest::{repo_interest, app_data_interest, restat_paths};
+store::config_read (fingerprint reads), store::app_dirs::{list_app_data_dir, reset_dir}.
+```
+
+**Imperative (`foreman-sys`, no Tauri).**
+
+```rust
+launch::prepare_launch(&LaunchFacts, &mut dyn FnMut(LaunchProgress)) -> Prepared
+    // Prepared { outcome: Ready(LaunchPlan) | Blocked{blockers, warnings}, cache, pending_ack, broken_chain, version, phases }
+launch::{load_cache, save_cache, acknowledge /* config_ack after the native dialog */, cache_rel,
+         write_run_settings, start_session(app_data, ctx, &plan, PtySize, Arc<dyn Sink>) -> PtySession,
+         run_settings_path, child_env, probe_settings, reset_probe_dir, probe_marker};
+LaunchPlan::same_as(&other)                                    // DR-116 comparison
+pty::PtySession::{spawn, write /* ≤64 KB, live only */, interrupt, resize, set_flow, tail, wait_exit,
+                  terminate(grace) /* only after the native Terminate dialog */, hangup /* quit */, is_live, status};
+pty::{Sink /* chunk(&[u8]) → Response::new, exited(ExitInfo) */, sanitize_paste -> PasteText, bracketed, size(cols, rows)};
+rearm::{rearm_start(UserAction, old, IdleSource, &confirmed, &dyn RearmUi, &mut Hooks), rearm_continue, rearm_start_with(…, Timings)};
+    // RearmUi: confirm_idle / confirm_busy / end_yourself (native dialogs), progress
+    // Hooks: prepare_again (re-run prepare_launch), archive (buffer + divider), relaunch (start_session)
+claude::{version, auth_status(ctx, cwd, env) -> AuthCheck, parse_auth, run_probes};
+watch::{ProjectWatcher::start(root, outs) -> next/drain/set_outs, check_root, judge, restat};   // hints → Change
+sensor::{read_events, ingest(app_data, run_id, token, SessionState) -> SessionState};
+spawn::{SpawnRequest::{ClaudeAuthStatusInLaunch, ClaudeProbe}, claude_pty_command, check_claude_args, check_session_cwd, path_dir_facts};
+```
+
+The watcher (ADR-013 places it in `foreman-app::watch`) lives in `foreman-sys::watch` so it can be tested without Tauri; the app maps `Change` to `packet:changed`, `decision:pending`, `project:changed` and `config:changed`. Spike branches are explicit inputs with the specified default: `ForkIds::Pass` (S-8), `EffortOnResume::Flag` (S-3), `CaseVariants::NotListed` (S-1′).
+
 ### 3.3 The Svelte app (ADR-002, ADR-004, ADR-020)
 
 SvelteKit **3.1.0** SPA, as verified in r1 §A4: `@sveltejs/adapter-static` 4.0.0, Svelte 5.57.2, Vite 8.3.4, TypeScript 6.0.3 strict.
@@ -307,7 +355,7 @@ src/
     ipc/  bindings/ (ts-rs, checked in) · contract.ts (IpcClient) · tauri.ts · mock.ts · index.ts
     stores/      *.svelte.ts rune modules (projects, today, workspace, terminals, doctor, settings)
     terminal/    xterm host, key router, link handler, paste path, archive sections
-    components/ui/  bits-ui wrappers;  components/  step block, spec line, prompt block, packet view
+    components/  hand-built primitives (Dialog, Palette, Segmented; ADR-020), step block, spec line, prompt block, packet view
     render/      Rust node tree → Svelte components (no HTML strings)
     keyboard/    shortcut registry;  nav/  goto/$app/state wrapper
 ```
@@ -574,7 +622,7 @@ recovered/<timestamp>-<name>                  leftover temp files that differed 
 
 ### 5.4 Accessibility
 
-- WCAG 2.2 AA through bits-ui primitives in `#lib/components/ui` wrappers and the tokens (Stage 4.5 contrast table, NFR-35).
+- WCAG 2.2 AA through hand-built, keyboard-complete primitives in `#lib/components` (ADR-020 amendment 2026-10-20) and the tokens (Stage 4.5 contrast table, NFR-35).
 - Keyboard: the shortcut registry; xterm's `attachCustomKeyEventHandler` routes ⌘-chords to the app (except ⌘C/⌘V/⌘A/⌘F); ⌘⇧E leaves the terminal, so there's no trap.
 - VoiceOver: an `aria-live` region. A Settings toggle, "Screen reader mode", turns on xterm `screenReaderMode` and adds `--ax-screen-reader` to CLI launches (Foreman doesn't detect VoiceOver).
 - Reduce Motion and Increase Contrast are CSS media queries in the webview (`prefers-reduced-motion`, `prefers-contrast: more`, whose tokens reach ≥ 7:1). Reduce Transparency is detected the same way (`prefers-reduced-transparency`); the webview reports it and Increase Contrast to Rust (`settings_update` `osDisplay`), which turns the window's vibrancy off (ADR-014).
@@ -647,7 +695,7 @@ A failed probe disables only the dependent feature; an inconclusive one keeps th
 | Risk | Mitigation | Owner |
 |---|---|---|
 | xterm 6 in WKWebView with the real TUI | S-0 decision rule | S-0 |
-| Strict `style-src` with SvelteKit's `app.html` style attribute, Svelte transitions, bits-ui, xterm | S-0 rule: `style-src 'unsafe-inline'` only, recorded in ADR-014 | S-0 |
+| Strict `style-src` with SvelteKit's `app.html` style attribute, Svelte transitions, xterm (bits-ui is not used, ADR-020) | S-0 rule: `style-src 'unsafe-inline'` only, recorded in ADR-014 | S-0 |
 | SvelteKit 3 `version.json` focus/visibility check with `pollInterval: 0` (**UNVERIFIED**) | S-0. If it fetches, `connect-src` gains `'self'` | S-0 |
 | Non-PTY children get `process_group(0)`, not `setsid` (no safe stable `setsid` in std 1.99.1) | Accepted in Stage 4.7 (SR-57 amended); fallback is spawning via portable-pty | ADR-007, `spawn::no_inherited_fds` |
 | Fds inherited by non-PTY children from system frameworks | `spawn::no_inherited_fds` in M2; same fallback | ADR-007 |

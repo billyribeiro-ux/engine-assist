@@ -98,6 +98,11 @@ pub enum SpawnRequest {
     ClaudeVersion,
     /// `claude auth status` outside a launch.
     ClaudeAuthStatus,
+    /// `claude auth status` inside the launch pipeline: in the step cwd with the exact launch
+    /// environment (SR-08). `RunOpts::cwd` must be `Cwd::Dir`.
+    ClaudeAuthStatusInLaunch,
+    /// A zero-token contract probe (`--init-only …`, ADR-017), always in `<app-data>/probe/`.
+    ClaudeProbe(Vec<String>),
     /// `<tool> --version` for `node`, `pnpm`, `cargo`.
     ToolVersion(Program),
     /// git with validated arguments (built by `foreman_core::git`).
@@ -263,7 +268,18 @@ pub fn resolve(program: Program, ctx: &SpawnCtx) -> Result<PathBuf, SpawnError> 
 fn program_and_args(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnError> {
     Ok(match req {
         SpawnRequest::ClaudeVersion => (Program::Claude, vec!["-v".into()]),
-        SpawnRequest::ClaudeAuthStatus => (Program::Claude, vec!["auth".into(), "status".into()]),
+        SpawnRequest::ClaudeAuthStatus | SpawnRequest::ClaudeAuthStatusInLaunch => {
+            (Program::Claude, vec!["auth".into(), "status".into()])
+        }
+        SpawnRequest::ClaudeProbe(args) => {
+            check_claude_args(args)?;
+            if args.first().map(String::as_str) != Some("--init-only") {
+                return Err(SpawnError::InvalidRequest(
+                    "a probe starts with --init-only".into(),
+                ));
+            }
+            (Program::Claude, args.clone())
+        }
         SpawnRequest::ToolVersion(p) => {
             if !matches!(p, Program::Node | Program::Pnpm | Program::Cargo) {
                 return Err(SpawnError::InvalidRequest(format!("{p:?} --version")));
@@ -296,6 +312,103 @@ fn program_and_args(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnE
             )
         }
     })
+}
+
+/// Checks a `claude` argument vector: every flag from the fixed list, no forbidden spelling
+/// (SR-03, SR-16). Values follow their flags; the prompt (a non-flag last element) is allowed.
+///
+/// # Errors
+/// [`SpawnError::InvalidRequest`] naming the argument.
+pub fn check_claude_args(args: &[String]) -> Result<(), SpawnError> {
+    use foreman_core::launch::argv::{KNOWN_FLAGS, is_forbidden};
+    const TAKES_VALUE: [&str; 7] = [
+        "--session-id",
+        "--resume",
+        "--model",
+        "--effort",
+        "--permission-mode",
+        "--name",
+        "--settings",
+    ];
+    let mut i = 0;
+    while i < args.len() {
+        let a = &args[i];
+        if is_forbidden(a) {
+            return Err(SpawnError::InvalidRequest(format!(
+                "forbidden argument {a}"
+            )));
+        }
+        if a.starts_with('-') {
+            if !KNOWN_FLAGS.contains(&a.as_str()) {
+                return Err(SpawnError::InvalidRequest(format!("unknown flag {a}")));
+            }
+            if TAKES_VALUE.contains(&a.as_str()) {
+                let v = args
+                    .get(i + 1)
+                    .ok_or_else(|| SpawnError::InvalidRequest(format!("{a} needs a value")))?;
+                if is_forbidden(v) {
+                    return Err(SpawnError::InvalidRequest(format!("forbidden value {v}")));
+                }
+                i += 1;
+            }
+        } else if i + 1 != args.len() {
+            return Err(SpawnError::InvalidRequest(
+                "only the last argument may be positional (the prompt)".into(),
+            ));
+        } else {
+            foreman_core::sanitize::check_prompt(a)
+                .map_err(|e| SpawnError::InvalidRequest(e.to_string()))?;
+        }
+        i += 1;
+    }
+    Ok(())
+}
+
+/// A checked interactive `claude` command for a PTY (ADR-006): the re-resolved absolute program,
+/// argv from the core builder, exactly the built environment (`env_clear` first), the step cwd
+/// (canonical, an existing directory: portable-pty would silently fall back to `$HOME`), and
+/// umask 022 (SR-57). This is the only `CommandBuilder` construction site.
+///
+/// # Errors
+/// [`SpawnError`] for the program checks, bad args, or a cwd that isn't a canonical directory.
+pub fn claude_pty_command(
+    ctx: &SpawnCtx,
+    args: &[String],
+    env: &[(String, String)],
+    cwd: &Path,
+) -> Result<(portable_pty::CommandBuilder, PathBuf), SpawnError> {
+    check_claude_args(args)?;
+    check_session_cwd(cwd)?;
+    let exe = resolve(Program::Claude, ctx)?;
+    let mut cmd = portable_pty::CommandBuilder::new(&exe);
+    cmd.args(args);
+    cmd.env_clear();
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    cmd.cwd(cwd);
+    cmd.umask(Some(0o022));
+    Ok((cmd, exe))
+}
+
+/// The session cwd must be absolute, canonical (no symlink anywhere in it) and a directory.
+///
+/// # Errors
+/// [`SpawnError::InvalidRequest`].
+pub fn check_session_cwd(cwd: &Path) -> Result<(), SpawnError> {
+    let bad =
+        || SpawnError::InvalidRequest(format!("{}: not a canonical directory", cwd.display()));
+    if !cwd.is_absolute() {
+        return Err(bad());
+    }
+    match std::fs::canonicalize(cwd) {
+        Ok(c) if c == cwd => {}
+        _ => return Err(bad()),
+    }
+    match std::fs::symlink_metadata(cwd) {
+        Ok(m) if m.is_dir() => Ok(()),
+        _ => Err(bad()),
+    }
 }
 
 fn reader<R: std::io::Read + Send + 'static>(
@@ -332,6 +445,15 @@ pub fn run(req: &SpawnRequest, opts: &RunOpts, ctx: &SpawnCtx) -> Result<Output,
     let (program, args) = program_and_args(req)?;
     let exe = resolve(program, ctx)?;
     let cwd = match (&opts.cwd, req) {
+        // Probes run only in the probe folder (SR-17).
+        (_, SpawnRequest::ClaudeProbe(_)) => ctx.app_data.join("probe"),
+        // In-launch auth runs in the step cwd (SR-08) and nowhere else.
+        (Cwd::Dir(d), SpawnRequest::ClaudeAuthStatusInLaunch) => d.clone(),
+        (Cwd::AppData, SpawnRequest::ClaudeAuthStatusInLaunch) => {
+            return Err(SpawnError::InvalidRequest(
+                "auth status in a launch needs the step cwd".into(),
+            ));
+        }
         // Non-session helpers always run in app data, whatever was asked (T-038).
         (
             _,
@@ -407,4 +529,22 @@ pub fn run(req: &SpawnRequest, opts: &RunOpts, ctx: &SpawnCtx) -> Result<Output,
         stdout,
         stderr,
     })
+}
+
+/// What `PATH` sanitizing needs to know about a candidate folder (SR-05): it exists as a
+/// directory, and neither it nor an ancestor is world-writable without the sticky bit.
+#[must_use]
+pub fn path_dir_facts(p: &Path) -> foreman_core::launch::env::DirFacts {
+    let is_dir = std::fs::metadata(p).is_ok_and(|m| m.is_dir());
+    let world = |a: &Path| {
+        std::fs::metadata(a).is_ok_and(|m| {
+            m.is_dir()
+                && m.permissions().mode() & 0o002 != 0
+                && m.permissions().mode() & 0o1000 == 0
+        })
+    };
+    foreman_core::launch::env::DirFacts {
+        is_dir,
+        world_writable: is_dir && p.ancestors().any(world),
+    }
 }

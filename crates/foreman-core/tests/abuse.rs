@@ -56,6 +56,27 @@ fn launch_inputs(t: &Template, fx: &Fixture, path: &ApplicablePath) -> String {
             s.appends,
             run_config(s)
         ));
+        // M2-06: the built argv's flags (the prompt is the only content-derived element).
+        if s.surface == Some(foreman_core::ids::Surface::Cli)
+            && let Ok(e) = effective_start(s, &fx.project.model_policy, None)
+        {
+            use foreman_core::launch::argv::{LaunchInputs, SessionArgs, SessionName, build_argv};
+            let id = uuid::Uuid::parse_str(ID).unwrap();
+            let session = match s.session {
+                foreman_core::template::Session::New => SessionArgs::New { id },
+                foreman_core::template::Session::Continue => SessionArgs::Resume { id },
+            };
+            let li = LaunchInputs {
+                session,
+                start: e.value,
+                pass_effort: true,
+                name: SessionName::for_step("tradelog", s.stage, s.key.as_str()),
+                settings: std::path::PathBuf::from("/app/runs/x/settings.json"),
+                screen_reader: false,
+                prompt: None,
+            };
+            out.push_str(&format!("  argv={:?}\n", build_argv(&li).map(|a| a.0)));
+        }
     }
     out
 }

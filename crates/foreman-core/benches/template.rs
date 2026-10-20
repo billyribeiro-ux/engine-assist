@@ -1,6 +1,12 @@
 //! NFR-03 / NFR-24 / AC-F001-07: template load (parse + validate + lint) on the v2.2 blueprint
 //! and on a 20,000-line blueprint, uncached and cached. Targets: p95 ≤ 50 ms uncached, ≤ 5 ms
 //! cached.
+//!
+//! Measurement note (2026-10-20): the cached 20,000-line load measured 7.4 ms against the 5 ms
+//! target on a shared 2-core Xeon @ 2.8 GHz Linux container, which is not the target hardware.
+//! The target is unchanged. NFR-03 is verified by running this bench on Billy's Mac (task in
+//! docs/progress.md, "Performance measurements still owed"); do not tune against the Linux
+//! figure.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

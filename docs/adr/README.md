@@ -27,7 +27,7 @@ The design overview is in `docs/design-doc.md`.
 | [ADR-017](ADR-017-claude-code-version-floor-and-contract-probes.md) | Claude Code compatibility: a computed version floor checked every launch, zero-token contract probes on version change, and fake-claude contract tests | Proposed | M2 (floor), M4 (probes) |
 | [ADR-018](ADR-018-run-log-metrics-and-diagnostics.md) | Run log as per-run JSON plus monthly JSONL indexes; metrics exported as Markdown; local redacted diagnostics | Proposed | M2–M3 (panel M4) |
 | [ADR-019](ADR-019-typescript-6-pin.md) | Pin TypeScript 6.0.3 (strict) until the Svelte and ESLint toolchain accepts TypeScript 7 | Proposed | M0 |
-| [ADR-020](ADR-020-ui-primitives.md) | UI primitives from bits-ui 2.19.5, styled with Foreman's own tokens | Proposed | M2 (M5 design system) |
+| [ADR-020](ADR-020-ui-primitives.md) | UI primitives: hand-built and keyboard-complete, styled with Foreman's own tokens (bits-ui 2.19.5 was proposed, not adopted; amended 2026-10-20) | Proposed | M2 (M5 design system) |
 | [ADR-021](ADR-021-launch-preflight-config-fingerprint.md) | One launch pipeline: fingerprint every Claude Code input, block auth-changing keys, check auth fail-closed, write a fresh run settings file | Proposed | M3 (run settings M2) |
 | [ADR-022](ADR-022-decision-file-approval.md) | Decision files take effect only from Billy-approved copies held in app data | Proposed | M1 (review UI M2, live detection M3) |
 | [ADR-023](ADR-023-schema-versioning-and-migrations.md) | Every file Foreman owns has an integer schemaVersion with pure, golden-tested forward migrations | Proposed | M1 |

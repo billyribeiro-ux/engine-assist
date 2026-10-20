@@ -9,7 +9,8 @@ Read the latest `docs/handoff/stage-NN.md` and `docs/lessons.md`. A stage starts
 - Tauri 2.12.4 (CLI 2.12.3), Rust 1.99.1 via `rust-toolchain.toml` (floor 1.90)
 - SvelteKit 3.1.0 in SPA mode (adapter-static 4.0.0, `fallback: 'index.html'`, `ssr = false`) on Svelte 5.57.2 and Vite 8.3.4. Config lives in `vite.config.ts` (`svelte.config.js` isn't supported). Use `#lib` imports.
 - TypeScript **6.0.3** (pinned: TS 7 breaks svelte-check and typescript-eslint; ADR-019); pnpm 12.14.0; Node ≥ 22.17
-- portable-pty 0.9.0, @xterm/xterm 6.0.0, notify 8.2.0, comrak =0.56.0, bits-ui 2.19.5, ts-rs 12.0.1
+- portable-pty 0.9.0, @xterm/xterm 6.0.0, notify 8.2.0, comrak =0.56.0, ts-rs 12.0.1
+- UI primitives are hand-built and keyboard-complete in `#lib/components` (no UI library; bits-ui was not adopted, ADR-020 amendment 2026-10-20)
 - Claude Code ≥ 2.1.293 on the machine; subscription login only (`authMethod` `claude.ai` or `oauth_token`)
 - Full pinned list: `docs/design-doc.md` §3.2, `spec/council/r7-stack.md`
 - Dev tools may lag the newest patch by up to 7 days (pnpm minimumReleaseAge); see docs/dev-notes.md.
