@@ -228,7 +228,15 @@ mod privacy {
         };
         assert!(snapshots() > 0, "a launch leaves a config snapshot");
         let repo_before = tree(&p.project);
-        let runs_before = std::fs::read_dir(app.join("runs")).unwrap().count();
+        // Run records only: the month index may still gain the exit line of the run above.
+        let run_dirs = || {
+            std::fs::read_dir(app.join("runs"))
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|e| e.path().is_dir())
+                .count()
+        };
+        let runs_before = run_dirs();
 
         // Cancel changes nothing.
         p.t.os.answer_next(false);
@@ -245,7 +253,7 @@ mod privacy {
         assert_eq!(snapshots(), 0, "the redacted config snapshots went too");
         assert_eq!(tree(&p.project), repo_before, "the repo is untouched");
         assert_eq!(
-            std::fs::read_dir(app.join("runs")).unwrap().count(),
+            run_dirs(),
             runs_before,
             "run history is kept for the metrics"
         );
