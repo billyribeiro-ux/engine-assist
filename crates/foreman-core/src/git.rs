@@ -49,6 +49,9 @@ pub enum RevParse {
     GitCommonDir,
     /// `--verify -q HEAD`
     VerifyHead,
+    /// `--verify -q refs/heads/<branch>` (another branch's tip for signing there, SR-43;
+    /// CR-007, Proposed)
+    VerifyBranch(String),
     /// `<rev>:<path>` (the blob OID at a revision)
     BlobAt {
         /// `HEAD` or an OID.
@@ -206,6 +209,33 @@ fn refname(r: &str) -> Result<&str, GitArgError> {
     if ok { Ok(r) } else { Err(bad("ref", r)) }
 }
 
+/// A branch name as `git check-ref-format --branch` accepts it, narrowed to Foreman's ref
+/// characters (ASCII letters, digits, `/ . _ -`): no empty or `.`-leading component, no `..`,
+/// no `.lock` component end, no trailing `/` or `.`, not starting with `-`, at most 200 bytes.
+/// Returns the full ref (`refs/heads/<name>`).
+///
+/// # Errors
+/// When the name breaks a rule.
+pub fn branch_ref(name: &str) -> Result<String, GitArgError> {
+    let n = name.strip_prefix("refs/heads/").unwrap_or(name);
+    let ok = !n.is_empty()
+        && n.len() <= 200
+        && !n.starts_with('-')
+        && !n.ends_with('/')
+        && !n.ends_with('.')
+        && !n.contains("..")
+        && n.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"/._-".contains(&c))
+        && n.split('/').all(|c| {
+            !c.is_empty() && !c.starts_with('.') && !c.to_ascii_lowercase().ends_with(".lock")
+        });
+    if ok {
+        Ok(format!("refs/heads/{n}"))
+    } else {
+        Err(bad("branch", name))
+    }
+}
+
 fn config_key(k: &str) -> Result<&str, GitArgError> {
     let ok = k.contains('.')
         && k.starts_with(|c: char| c.is_ascii_alphabetic())
@@ -243,6 +273,18 @@ pub fn args(op: &GitOp) -> Result<GitArgs, GitArgError> {
             RevParse::GitPath(p) => vec!["rev-parse".into(), "--git-path".into(), path(p)?.into()],
             RevParse::GitCommonDir => s(&["rev-parse", "--git-common-dir"]),
             RevParse::VerifyHead => s(&["rev-parse", "--verify", "-q", "HEAD"]),
+            RevParse::VerifyBranch(b) => {
+                let r = refname(b)?;
+                if r == "HEAD" {
+                    return Err(bad("ref", r));
+                }
+                vec![
+                    "rev-parse".into(),
+                    "--verify".into(),
+                    "-q".into(),
+                    format!("{r}^{{commit}}"),
+                ]
+            }
             RevParse::BlobAt { rev: r, path: p } => {
                 vec!["rev-parse".into(), format!("{}:{}", rev(r)?, path(p)?)]
             }

@@ -105,8 +105,18 @@ pub fn resolve(p: &Opened, s: &Step) -> Result<Resolution, IpcError> {
         attested_na: &attested_na,
         overlay_items: &p.overlay.added_items,
     };
+    let mut result = resolver::resolve(&ctx);
+    // AC-F016-01 (M4-18): an F.2 prompt ends with the entry format from docs/lessons.md's header.
+    if s.template_id.as_deref() == Some("F.2")
+        && let Ok(ok) = &mut result
+        && let Some(suffix) = crate::closeout::lessons_text(p)
+            .as_deref()
+            .and_then(foreman_core::lessons::f2_suffix)
+    {
+        ok.text.push_str(&sanitize::for_paste(&suffix).0);
+    }
     Ok(Resolution {
-        result: resolver::resolve(&ctx),
+        result,
         required: resolver::required_inputs(&ctx),
     })
 }

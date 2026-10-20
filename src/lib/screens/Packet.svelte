@@ -233,6 +233,10 @@
 											nodes={fd.value}
 										/>{/if}
 									{#if fd.note}<span class="muted"><Text spans={fd.note} /></span>{/if}
+									{#if fd.key === 'OPEN ITEMS' && fd.problems.length}<p class="reason">
+											These items are open. Close each one of two ways: resolve it, or move it to
+											KNOWN LIMITS with a ticket ID.
+										</p>{/if}
 									{#if pk.normalization.some((n) => n.field === fd.key)}<button
 											class="btn ghost xs norm"
 											type="button"

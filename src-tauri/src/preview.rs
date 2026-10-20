@@ -10,4 +10,6 @@ pub enum Preview {
     Action(Box<crate::ipc::commands::steps::HeldAction>),
     /// `paste_back_preview` → `paste_back_apply`.
     Paste(Box<crate::ipc::commands::chat::HeldPaste>),
+    /// `sign_preview` → `sign_apply`.
+    Sign(Box<crate::signing::HeldSign>),
 }

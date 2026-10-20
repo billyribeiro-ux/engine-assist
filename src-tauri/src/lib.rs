@@ -2,6 +2,7 @@
 //! built in Rust in [`window`]; native dialogs, the clipboard and events go through [`os`].
 #![forbid(unsafe_code)]
 
+pub mod closeout;
 pub mod convert;
 pub mod diff;
 pub mod ipc;
@@ -12,6 +13,7 @@ pub mod preview;
 pub mod project;
 pub mod render;
 pub mod runs;
+pub mod signing;
 pub mod state;
 pub mod text;
 pub mod watch;

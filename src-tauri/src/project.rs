@@ -81,6 +81,10 @@ pub struct Opened {
     pub packets: BTreeMap<u8, PacketFile>,
     /// Pending outside changes found by this open (already merged into `progress`).
     pub new_pending: usize,
+    /// Signed packets whose working file differs from the committed blob (DR-146): the working
+    /// file as read. `packets` holds the committed version for those stages (the resolver uses
+    /// it).
+    pub tampered: BTreeMap<u8, PacketFile>,
 }
 
 /// How much `open` does beyond reading.
@@ -179,6 +183,7 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         read_only: None,
         packets: BTreeMap::new(),
         new_pending: 0,
+        tampered: BTreeMap::new(),
     };
     let folder = Path::new(&entry.path);
     if !folder.is_dir() {
@@ -197,10 +202,39 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         app: &app_root,
         project_id: id,
     };
-    // DR-151: classify every decision file against its approved copy.
+    // DR-151: classify every decision file against its approved copy. While HEAD names a branch a
+    // signing on another branch committed to, that branch's version is no change (ADR-022 §5).
     let now = app.now();
+    let head_ref = if opened
+        .approvals
+        .files
+        .project
+        .committed_on_other_branches
+        .is_empty()
+        && opened
+            .approvals
+            .files
+            .overlay
+            .committed_on_other_branches
+            .is_empty()
+        && opened
+            .approvals
+            .files
+            .blueprint_lock
+            .committed_on_other_branches
+            .is_empty()
+    {
+        None
+    } else {
+        crate::signing::head_ref(app, folder)
+    };
     for kind in CoreKind::ALL {
-        let outcome = match d.process(kind, &uuid::Uuid::new_v4().to_string(), &now) {
+        let outcome = match d.process_on(
+            kind,
+            &uuid::Uuid::new_v4().to_string(),
+            &now,
+            head_ref.as_deref(),
+        ) {
             Ok(o) => o,
             Err(DecisionError::NoApprovedCopy(_)) => {
                 opened.read_only.get_or_insert_with(|| {
@@ -314,11 +348,24 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
             );
         }
     }
+    // Signed packets: another branch's from its commit; a tampered one's committed blob (DR-146).
+    crate::signing::load_signed_packets(app, &root, &progress, &mut opened);
     if mode == OpenMode::Full
         && let Ok(ctx) = app.spawn_ctx_now()
     {
         // SR-32: idempotent; a folder that isn't its own repo or a missing git just skips it.
         let _ = foreman_sys::git::ensure_exclude(&root, &ctx);
+        // ADR-012 4.7: a pending real-index refresh is retried on open.
+        crate::signing::retry_index_refresh(app, &root, &mut progress);
+        for n in opened.tampered.keys() {
+            app.emit(Event::TamperDetected(
+                crate::ipc::dto::events::TamperDetected {
+                    project_id: ProjectId::from_trusted(id),
+                    stage: Stage(*n),
+                    rev: Rev(progress.rev),
+                },
+            ));
+        }
     }
     opened.root = Some(root);
     opened.progress = progress;

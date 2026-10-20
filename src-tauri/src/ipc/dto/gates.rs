@@ -82,6 +82,8 @@ response!(
         failures: u32,
         needs_reconfirm: bool,
         session: Option<String>,
+        text_sha256: Sha256,
+        previous_text: Option<String>,
     }
 );
 

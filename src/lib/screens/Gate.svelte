@@ -110,9 +110,7 @@
 	async function reconfirm(it: GateItemView): Promise<void> {
 		const c = await ipc();
 		try {
-			gate.set(
-				await c.itemKindConfirm({ projectId: pid, item: it.id, textSha256: '0'.repeat(64) })
-			);
+			gate.set(await c.itemKindConfirm({ projectId: pid, item: it.id, textSha256: it.textSha256 }));
 		} catch (e: unknown) {
 			ui.say(failureText(toIpcFailure(e)));
 		}
@@ -227,6 +225,23 @@
 						: failureText(f);
 		}
 	}
+	// AC-F014-11, -13: APPROVED BY is written but the commit didn't finish.
+	const commitPending = $derived(
+		g?.closeout.some((s) => s.key === 'sign' && s.state === 'failed') ?? false
+	);
+	async function retryCommit(): Promise<void> {
+		const c = await ipc();
+		try {
+			const r = await c.signRetryCommit({ projectId: pid, stage: stageNo });
+			if (r.kind === 'signed') {
+				ui.toast(`Committed ${r.commit}. Stage ${stageNo} is signed.`, 'pass', 'stamp');
+				refresh(`project:${pid}`, 'today', 'projects');
+			} else if (r.kind === 'commitPending') ui.say(`The commit didn't finish: ${r.stderrTail}`);
+			else ui.say('Read-back found a difference. The stage stays commit pending.');
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
+		}
+	}
 	const signWhy = $derived(
 		g?.signable
 			? ''
@@ -288,6 +303,12 @@
 					<button class="btn" type="button" onclick={() => reconfirm(it)}>Re-confirm kind</button
 					><span class="reason">The item text changed since the blueprint pin.</span>
 				</div>
+				<dl class="drift">
+					<dt>Pinned</dt>
+					<dd>{it.previousText ?? 'The pinned text is no longer in the blueprint.'}</dd>
+					<dt>Now</dt>
+					<dd>{it.text}</dd>
+				</dl>
 			{:else if it.status === 'fail'}
 				<div class="actions">
 					<button class="btn primary" type="button" onclick={() => fix(it)}
@@ -420,6 +441,11 @@
 							onclick={openSign}
 							><Icon name="pen" />{g.state === 'signed' ? 'Packet signed' : 'Sign packet'}</button
 						>
+						{#if commitPending}
+							<button class="btn" type="button" onclick={retryCommit}
+								><Icon name="pen" />Retry commit</button
+							>
+						{/if}
 						{#if !g.signable}<span class="reason" id="sign-why">{signWhy}</span>{/if}
 					</div>
 				{/if}
@@ -727,6 +753,21 @@
 	.item-title:focus-visible {
 		outline: var(--focus-width) solid var(--focus);
 		outline-offset: var(--focus-offset);
+	}
+	.drift {
+		display: grid;
+		grid-template-columns: max-content minmax(0, 1fr);
+		gap: var(--space-1) var(--space-3);
+		margin: var(--space-2) 0 0;
+		font-size: var(--text-12);
+		color: var(--ink-muted);
+	}
+	.drift dt {
+		font-weight: var(--weight-semibold);
+	}
+	.drift dd {
+		margin: 0;
+		color: var(--ink);
 	}
 	.item-how {
 		font-size: var(--text-12);

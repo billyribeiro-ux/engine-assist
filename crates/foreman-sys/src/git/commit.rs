@@ -1,12 +1,14 @@
-//! The plumbing commit with read-back (SR-42, ADR-012 decisions 3–5, DR-142–DR-145). Only the given
-//! paths, only if they changed since HEAD, from bytes Foreman re-read through the store; a
-//! temporary index; `commit-tree --no-gpg-sign`; `update-ref <ref> <new> <old>`; read-back by
-//! hash; then the real index for exactly those paths (retried on `index.lock`).
+//! The plumbing commit with read-back (SR-42, SR-43, ADR-012 decisions 3–5, DR-142–DR-145). Only
+//! the given paths, only if they changed since the tip, from bytes Foreman holds (re-read through
+//! the store on the current branch); a temporary index; `commit-tree --no-gpg-sign`;
+//! `update-ref <ref> <new> <old>`; read-back by hash; then, on the current branch only, the real
+//! index for exactly those paths (retried on `index.lock`). Another branch never touches HEAD,
+//! the index or the working tree.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use foreman_core::git::{GitOp, ReadTreeFrom, RevParse, ZERO_OID};
+use foreman_core::git::{self as core_git, GitOp, ReadTreeFrom, RevParse, ZERO_OID};
 use foreman_core::pathpolicy::{ReadClass, RepoPath};
 use foreman_core::store::{Root, StoreError, sha256_hex};
 
@@ -22,9 +24,39 @@ pub struct Reviewed {
     pub sha256: String,
 }
 
-/// Test seams and app-data facts.
+/// One plumbing step, reported as it happens (`Channel<SignProgress>`, ADR-012).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommitStep<'a> {
+    /// `hash-object -w --no-filters` of a path.
+    HashObject(&'a str),
+    /// `write-tree` (after `read-tree` and `update-index` on the temporary index).
+    WriteTree,
+    /// `commit-tree --no-gpg-sign`.
+    CommitTree,
+    /// `update-ref`.
+    UpdateRef,
+    /// The real-index refresh (current branch only).
+    RefreshIndex,
+    /// A path read back from the commit, and whether it matched.
+    ReadBack(&'a str, bool),
+}
+
+/// A read-back test seam: the path and the committed bytes in, the bytes compared out.
+pub type ReadbackSeam = dyn Fn(&str, Vec<u8>) -> Vec<u8>;
+
+/// Where the commit lands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Target {
+    /// The branch HEAD names (SR-42).
+    Current,
+    /// Another branch, `refs/heads/<name>` (SR-43). A branch that doesn't exist yet starts at
+    /// HEAD's commit.
+    Other(String),
+}
+
+/// Test seams, progress and app-data facts.
 #[derive(Default)]
-#[allow(missing_debug_implementations, reason = "holds a test callback")]
+#[allow(missing_debug_implementations, reason = "holds callbacks")]
 pub struct CommitOpts<'a> {
     /// Foreman's app data (the temporary index goes to `<app_data>/tmp/`).
     pub app_data: PathBuf,
@@ -32,6 +64,19 @@ pub struct CommitOpts<'a> {
     pub before_update_ref: Option<&'a dyn Fn()>,
     /// Retries and their spacing for the real-index refresh (5 × 200 ms).
     pub index_retries: Option<(u32, Duration)>,
+    /// Told of each plumbing step.
+    pub on_step: Option<&'a dyn Fn(CommitStep<'_>)>,
+    /// A test seam: changes the bytes of a path between `hash-object` and read-back's
+    /// comparison, as a repo hook rewriting the packet would (AC-F014-10).
+    pub tamper_readback: Option<&'a ReadbackSeam>,
+}
+
+impl CommitOpts<'_> {
+    fn step(&self, s: CommitStep<'_>) {
+        if let Some(f) = self.on_step {
+            f(s);
+        }
+    }
 }
 
 /// What the commit did.
@@ -66,6 +111,9 @@ pub enum CommitError {
         /// Path.
         path: String,
     },
+    /// The branch name isn't valid, or is the branch HEAD names (sign on the current branch).
+    #[error("{0}")]
+    BadBranch(String),
     /// The ref moved between `commit-tree` and `update-ref`; nothing was overwritten.
     #[error("the branch moved while Foreman was committing; nothing was overwritten")]
     ConcurrentRefMove,
@@ -107,9 +155,24 @@ pub fn verify_readback(
     expected: &[(String, String)],
     ctx: &SpawnCtx,
 ) -> Result<(), CommitError> {
+    verify_readback_with(repo, commit, expected, &CommitOpts::default(), ctx)
+}
+
+fn verify_readback_with(
+    repo: &Path,
+    commit: &str,
+    expected: &[(String, String)],
+    opts: &CommitOpts<'_>,
+    ctx: &SpawnCtx,
+) -> Result<(), CommitError> {
     for (path, sha) in expected {
-        let blob = show::blob_at(repo, commit, path, ctx)?;
-        if blob.as_deref().map(sha256_hex).as_deref() != Some(sha.as_str()) {
+        let mut blob = show::blob_at(repo, commit, path, ctx)?;
+        if let Some(f) = opts.tamper_readback {
+            blob = blob.map(|b| f(path, b));
+        }
+        let ok = blob.as_deref().map(sha256_hex).as_deref() == Some(sha.as_str());
+        opts.step(CommitStep::ReadBack(path, ok));
+        if !ok {
             return Err(CommitError::ReadbackMismatch {
                 commit: commit.to_owned(),
                 path: path.clone(),
@@ -119,7 +182,8 @@ pub fn verify_readback(
     Ok(())
 }
 
-/// Commits exactly `paths` on the current branch (SR-42), if they changed since HEAD.
+/// Commits exactly `paths` on the current branch (SR-42), if they changed since HEAD. Each path
+/// is re-read through the store and must still hash to what was reviewed.
 ///
 /// # Errors
 /// See [`CommitError`].
@@ -130,18 +194,7 @@ pub fn commit_paths(
     opts: &CommitOpts<'_>,
     ctx: &SpawnCtx,
 ) -> Result<CommitOutcome, CommitError> {
-    let repo = project.path().to_path_buf();
-    let g = GitOpts::default();
-    // HEAD state first (current branch only).
-    let sym = run(&repo, &GitOp::SymbolicRefHead, &g, ctx)?;
-    if !sym.ok() {
-        return Err(CommitError::DetachedHead);
-    }
-    let branch = sym.text();
-    let tip = show::head(&repo, ctx)?;
-
-    // Re-read through the store and compare with what was reviewed; keep only changed paths.
-    let mut changed: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut files: Vec<(String, Vec<u8>)> = Vec::new();
     for r in paths {
         let (bytes, _) = project.read(&r.path, ReadClass::Decision)?;
         if sha256_hex(&bytes) != r.sha256 {
@@ -149,9 +202,85 @@ pub fn commit_paths(
                 path: r.path.to_string(),
             });
         }
-        let (dirty, _, _) = show::changed_since_head(&repo, r.path.as_str(), &bytes, ctx)?;
-        if dirty {
-            changed.push((r.path.to_string(), bytes));
+        files.push((r.path.to_string(), bytes));
+    }
+    commit_bytes(project.path(), &files, message, &Target::Current, opts, ctx)
+}
+
+/// The tip a target commits onto: `(ref to update, its current OID, the parent to use)`.
+fn tip_of(
+    repo: &Path,
+    target: &Target,
+    ctx: &SpawnCtx,
+) -> Result<(String, Option<String>, Option<String>), CommitError> {
+    let g = GitOpts::default();
+    let sym = run(repo, &GitOp::SymbolicRefHead, &g, ctx)?;
+    let head_branch = sym.ok().then(|| sym.text());
+    match target {
+        Target::Current => {
+            // HEAD state first (current branch only).
+            let Some(branch) = head_branch else {
+                return Err(CommitError::DetachedHead);
+            };
+            let tip = show::head(repo, ctx)?;
+            Ok((branch, tip.clone(), tip))
+        }
+        Target::Other(b) => {
+            let full =
+                core_git::branch_ref(b).map_err(|e| CommitError::BadBranch(e.to_string()))?;
+            if head_branch.as_deref() == Some(full.as_str()) {
+                return Err(CommitError::BadBranch(
+                    "That's the branch you're on. Sign on the current branch instead.".into(),
+                ));
+            }
+            let out = run(
+                repo,
+                &GitOp::RevParse(RevParse::VerifyBranch(full.clone())),
+                &g,
+                ctx,
+            )?;
+            if out.ok() {
+                let tip = out.text();
+                Ok((full, Some(tip.clone()), Some(tip)))
+            } else {
+                // A new branch starts at HEAD's commit (or empty in an unborn repo).
+                Ok((full, None, show::head(repo, ctx)?))
+            }
+        }
+    }
+}
+
+/// Commits `files` (path, bytes Foreman holds) onto `target` if they differ from its tip.
+///
+/// # Errors
+/// See [`CommitError`].
+#[allow(
+    clippy::too_many_lines,
+    reason = "ADR-012 decision 4's steps in order, kept together for review"
+)]
+pub fn commit_bytes(
+    repo: &Path,
+    files: &[(String, Vec<u8>)],
+    message: &str,
+    target: &Target,
+    opts: &CommitOpts<'_>,
+    ctx: &SpawnCtx,
+) -> Result<CommitOutcome, CommitError> {
+    let repo = repo.to_path_buf();
+    let g = GitOpts::default();
+    let (refname, old, parent) = tip_of(&repo, target, ctx)?;
+    let current = *target == Target::Current;
+
+    // DR-142 against the commit we build on: keep only paths that changed.
+    let mut changed: Vec<(String, &[u8])> = Vec::new();
+    for (p, bytes) in files {
+        let working = show::hash_object(&repo, bytes, false, ctx)?;
+        let at = match &parent {
+            Some(tip) => show::blob_oid(&repo, tip, p, ctx)?,
+            None => None,
+        };
+        if at.as_deref() != Some(working.as_str()) {
+            changed.push((p.clone(), bytes.as_slice()));
         }
     }
     if changed.is_empty() {
@@ -160,6 +289,7 @@ pub fn commit_paths(
     let mut entries = Vec::new();
     for (p, bytes) in &changed {
         let oid = show::hash_object(&repo, bytes, true, ctx)?;
+        opts.step(CommitStep::HashObject(p));
         entries.push((oid, p.clone()));
     }
     let index = temp_index(&opts.app_data)?;
@@ -168,7 +298,9 @@ pub fn commit_paths(
         ..GitOpts::default()
     };
     let result = (|| -> Result<String, CommitError> {
-        let from = tip.clone().map_or(ReadTreeFrom::Empty, ReadTreeFrom::Tip);
+        let from = parent
+            .clone()
+            .map_or(ReadTreeFrom::Empty, ReadTreeFrom::Tip);
         run_ok(&repo, &GitOp::ReadTree(from), &with_index, ctx)?;
         run_ok(
             &repo,
@@ -179,25 +311,31 @@ pub fn commit_paths(
             ctx,
         )?;
         let tree = run_ok(&repo, &GitOp::WriteTree, &with_index, ctx)?;
+        opts.step(CommitStep::WriteTree);
         let commit = run_ok(
             &repo,
             &GitOp::CommitTree {
                 tree,
-                parent: tip.clone(),
+                parent: parent.clone(),
                 msg: message.to_owned(),
             },
             &g,
             ctx,
         )?;
+        opts.step(CommitStep::CommitTree);
         if let Some(f) = opts.before_update_ref {
             f();
         }
         let upd = run(
             &repo,
             &GitOp::UpdateRef {
-                refname: "HEAD".into(),
+                refname: if current {
+                    "HEAD".into()
+                } else {
+                    refname.clone()
+                },
                 new: commit.clone(),
-                old: tip.clone().unwrap_or_else(|| ZERO_OID.to_owned()),
+                old: old.clone().unwrap_or_else(|| ZERO_OID.to_owned()),
             },
             &g,
             ctx,
@@ -205,6 +343,7 @@ pub fn commit_paths(
         if !upd.ok() {
             return Err(CommitError::ConcurrentRefMove);
         }
+        opts.step(CommitStep::UpdateRef);
         Ok(commit)
     })();
     let _ = rustix::fs::unlink(&index);
@@ -214,17 +353,45 @@ pub fn commit_paths(
         .iter()
         .map(|(p, b)| (p.clone(), sha256_hex(b)))
         .collect();
-    verify_readback(&repo, &commit, &expected, ctx)?;
+    let paths: Vec<String> = changed.into_iter().map(|(p, _)| p).collect();
+    if !current {
+        verify_readback_with(&repo, &commit, &expected, opts, ctx)?;
+        return Ok(CommitOutcome::Committed {
+            commit,
+            branch: refname,
+            paths,
+            first: parent.is_none(),
+            index_refresh_pending: false,
+        });
+    }
+    // Read-back before the real index is touched: a mismatch leaves Billy's index alone.
+    verify_readback_with(&repo, &commit, &expected, opts, ctx)?;
+    let refreshed = refresh_index(&repo, &entries, opts, ctx)?;
+    Ok(CommitOutcome::Committed {
+        commit,
+        branch: refname,
+        paths,
+        first: parent.is_none(),
+        index_refresh_pending: !refreshed,
+    })
+}
 
-    // The real index, exactly those paths, retried on index.lock. Attributes are neutralized
-    // (T-040). `$GIT_DIR/info/attributes` can't be neutralized that way, so a repo that has one
-    // keeps the refresh pending (the banner tells Billy) rather than risk running a filter.
+/// The real index, exactly those paths, retried on `index.lock`. Attributes are neutralized
+/// (T-040). `$GIT_DIR/info/attributes` can't be neutralized that way, so a repo that has one
+/// keeps the refresh pending (the banner tells Billy) rather than risk running a filter.
+fn refresh_index(
+    repo: &Path,
+    entries: &[(String, String)],
+    opts: &CommitOpts<'_>,
+    ctx: &SpawnCtx,
+) -> Result<bool, CommitError> {
+    let g = GitOpts::default();
     let (tries, gap) = opts
         .index_retries
         .unwrap_or((5, Duration::from_millis(200)));
     let mut refreshed = false;
     let info_attr = run_ok(
-        &repo,
+        repo,
         &GitOp::RevParse(RevParse::GitPath("info/attributes".into())),
         &g,
         ctx,
@@ -241,9 +408,9 @@ pub fn commit_paths(
     };
     for i in 0..if has_info_attributes { 0 } else { tries.max(1) } {
         let out = run(
-            &repo,
+            repo,
             &GitOp::UpdateIndexCacheInfo {
-                entries: entries.clone(),
+                entries: entries.to_vec(),
             },
             &refresh,
             ctx,
@@ -256,11 +423,35 @@ pub fn commit_paths(
             std::thread::sleep(gap);
         }
     }
-    Ok(CommitOutcome::Committed {
-        commit,
-        branch,
-        paths: changed.into_iter().map(|(p, _)| p).collect(),
-        first: tip.is_none(),
-        index_refresh_pending: !refreshed,
-    })
+    if refreshed {
+        opts.step(CommitStep::RefreshIndex);
+    }
+    Ok(refreshed)
+}
+
+/// Retries a pending real-index refresh (`indexRefreshPending`: on project open and window
+/// focus). Returns true once it succeeded. Only paths whose working bytes still hash to the
+/// committed blob are refreshed; a path Billy changed since is left alone.
+///
+/// # Errors
+/// git failed to run.
+pub fn retry_index_refresh(
+    project: &Root,
+    commit: &str,
+    paths: &[String],
+    opts: &CommitOpts<'_>,
+    ctx: &SpawnCtx,
+) -> Result<bool, CommitError> {
+    let repo = project.path().to_path_buf();
+    let mut entries = Vec::new();
+    for p in paths {
+        let Some(oid) = show::blob_oid(&repo, commit, p, ctx)? else {
+            continue;
+        };
+        entries.push((oid, p.clone()));
+    }
+    if entries.is_empty() {
+        return Ok(true);
+    }
+    refresh_index(&repo, &entries, opts, ctx)
 }

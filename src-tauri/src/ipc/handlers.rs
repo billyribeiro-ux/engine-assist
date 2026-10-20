@@ -687,7 +687,7 @@ pub async fn packet_repair_prepare(
     progress: tauri::ipc::Channel<LaunchProgress>,
 ) -> Result<PrepareOutcome, IpcError> {
     call(&state, req, move |a, r| {
-        commands::packets::packet_repair_prepare(a, r, progress)
+        commands::signing::packet_repair_prepare(a, r, progress)
     })
     .await
 }

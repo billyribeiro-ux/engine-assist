@@ -252,7 +252,7 @@ export type GateArtifact = { kind: ArtifactKind, text: string, };
 export type ItemKind = "attest" | "time";
 export type ItemStatus = "pass" | "fail" | "waiting" | "notApplicable";
 export type Proposed = "pass" | "fail";
-export type GateItemView = { id: ItemId, text: string, kind: ItemKind, how: string | null, status: ItemStatus, evidence: Array<TextSpan> | null, proposed: Proposed | null, note: string | null, waitsFor: string | null, artifacts: Array<GateArtifact>, failures: number, needsReconfirm: boolean, session: string | null, };
+export type GateItemView = { id: ItemId, text: string, kind: ItemKind, how: string | null, status: ItemStatus, evidence: Array<TextSpan> | null, proposed: Proposed | null, note: string | null, waitsFor: string | null, artifacts: Array<GateArtifact>, failures: number, needsReconfirm: boolean, session: string | null, textSha256: Sha256, previousText: string | null, };
 export type CloseoutKey = "gateA" | "results" | "gateB" | "gateC" | "sign";
 export type CloseoutState = "done" | "now" | "failed" | "pending" | "locked";
 export type CloseoutStep = { key: CloseoutKey, label: string, state: CloseoutState, note: string | null, };
@@ -979,7 +979,7 @@ TS    { projectId: string; item: string; textSha256: string }
 Res   GateView
 Err   Cancelled · Stale (bullet changed again) · NotFound
 ```
-F-001, F-015 · AC-F001-16, -17 · SR-24a, SR-40.
+F-001, F-015 · AC-F001-16, -17 · SR-24a, SR-40. `textSha256` is the item's `GateItemView.textSha256`; the gate view also gives `previousText` (the pinned bullet's text when another item now has it, e.g. swapped bullets) so the webview can show both texts as context. The approval itself is the native dialog only.
 
 **`progress_rebuild_preview`** · P1 · M3 · **mem**
 ```text
@@ -1150,7 +1150,7 @@ Res   SignResult = Signed { commit: String, stage: Stage } | CommitPending { std
                  | ReadBackMismatch { diffs: Vec<Diff> }
 Err   Expired · Cancelled · Stale ("packet changed since you reviewed it") · Conflict · ToolFailed
 ```
-`progress: Channel<SignProgress>` · F-014, F-016 · AC-F014-04…-14, AC-F013-15 · SR-42…SR-47, SR-53 (sensor events of the stage deleted).
+`progress: Channel<SignProgress>` · F-014, F-016 · AC-F014-04…-14, AC-F013-15 · SR-42…SR-47, SR-53 (sensor events of the stage deleted). Built (M4-20, M4-21): the native dialog names the DRI, the date, "Signing stage-NN.md @ <6 hex>", the branch, Stage 2's conditions and a running session. Read-back runs before the real-index refresh, so `ReadBack` messages come before `RefreshIndex` (a mismatch leaves Billy's index alone). On another branch nothing is written to the working tree, so a failed commit there answers `ToolFailed` and records nothing (sign again); `CommitPending` is the current branch's state after phase 1.
 
 **`sign_retry_commit`** · M4 · **git**
 ```text

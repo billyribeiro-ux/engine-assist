@@ -110,9 +110,11 @@ pub fn next_step<'a>(app: &App, p: &'a Opened) -> Result<&'a foreman_core::templ
 pub fn today_get(app: &App, req: TodayGetReq) -> Result<TodayView, IpcError> {
     let TodayGetReq {} = req;
     let mut rows = Vec::new();
+    let mut inbox = Vec::new();
     for summary in summaries(app)? {
         let row = match project::open(app, summary.id.as_str()) {
             Ok(p) => {
+                inbox.extend(crate::signing::tamper_inbox(app, &p));
                 let strip = p.stage_views(app).iter().map(|v| v.status).collect();
                 let stage_title = p.current_stage().and_then(|n| {
                     p.template
@@ -147,10 +149,7 @@ pub fn today_get(app: &App, req: TodayGetReq) -> Result<TodayView, IpcError> {
         };
         rows.push(row);
     }
-    Ok(TodayView {
-        rows,
-        inbox: Vec::new(),
-    })
+    Ok(TodayView { rows, inbox })
 }
 
 /// `do_next` (P1): the first Today row with a next step. A chat step returns its readiness; a

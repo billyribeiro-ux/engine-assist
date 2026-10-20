@@ -18,6 +18,7 @@ import {
 	buildWorld,
 	IDS,
 	launchTranscript,
+	mockSha,
 	NOW,
 	SCENARIOS,
 	stepOf,
@@ -2269,6 +2270,7 @@ export class MockIpcClient implements IpcClient {
 			if (!item) throw notFound();
 			this.ask();
 			item.needsReconfirm = false;
+			item.previousText = null;
 			this.touch(p);
 			return this.gate(p, stage);
 		});
@@ -2596,7 +2598,9 @@ export class MockIpcClient implements IpcClient {
 				artifacts: [],
 				failures: 0,
 				needsReconfirm: false,
-				session: null
+				session: null,
+				textSha256: mockSha(`Stage ${stage} inspection items ${id}`),
+				previousText: null
 			}));
 			p.gates[stage] = items;
 		}
@@ -3129,7 +3133,9 @@ export class MockIpcClient implements IpcClient {
 				artifacts: [],
 				failures: 0,
 				needsReconfirm: false,
-				session: null
+				session: null,
+				textSha256: mockSha(req.text),
+				previousText: null
 			});
 			this.touch(p);
 			return this.gate(p, req.stage);

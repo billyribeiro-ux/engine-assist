@@ -11,6 +11,7 @@ pub mod files;
 pub mod first_run;
 pub mod gates;
 pub mod launch;
+pub mod lessons;
 pub mod packets;
 pub mod projects;
 pub mod settings;

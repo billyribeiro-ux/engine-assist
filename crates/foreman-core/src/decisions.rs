@@ -359,6 +359,24 @@ impl Decisions<'_> {
         self.save_approvals(&a, &s)
     }
 
+    /// Records what a signing on another branch committed for a decision file (SR-43, ADR-022 §5):
+    /// `committedOnOtherBranches[<ref>] = sha256`.
+    ///
+    /// # Errors
+    /// Store failure.
+    pub fn mark_committed_on_branch(
+        &self,
+        kind: DecisionFileKind,
+        branch_ref: &str,
+        sha256: &str,
+    ) -> Result<(), DecisionError> {
+        let (mut a, s) = self.approvals()?;
+        entry(&mut a, kind)
+            .committed_on_other_branches
+            .insert(branch_ref.to_owned(), sha256.to_owned());
+        self.save_approvals(&a, &s)
+    }
+
     /// Re-reads the repo file and classifies it (ADR-022 §2). Variables-only changes are accepted
     /// here; nothing is ever written to the repo file.
     ///
@@ -369,6 +387,22 @@ impl Decisions<'_> {
         kind: DecisionFileKind,
         id: &str,
         now: &str,
+    ) -> Result<Processed, DecisionError> {
+        self.process_on(kind, id, now, None)
+    }
+
+    /// [`Self::process`] knowing the branch HEAD names (`symbolic-ref -q HEAD`): while it is a
+    /// branch a signing on another branch committed to, a repo file equal to what that signing
+    /// committed is no change (ADR-022 §5, `committedOnOtherBranches`).
+    ///
+    /// # Errors
+    /// Store failure, or no approved copy.
+    pub fn process_on(
+        &self,
+        kind: DecisionFileKind,
+        id: &str,
+        now: &str,
+        head_ref: Option<&str>,
     ) -> Result<Processed, DecisionError> {
         let rel = Self::repo_rel(kind)?;
         let disk = match self.project.read(&rel, ReadClass::Decision) {
@@ -391,6 +425,11 @@ impl Decisions<'_> {
         // Foreman's own pending change: the repo file still holds the last committed version.
         let own_pending = e.committed_sha256.is_some() && e.committed_sha256 != e.approved_sha256;
         if own_pending && e.committed_sha256.as_deref() == Some(sha.as_str()) {
+            return Ok(Processed::Unchanged);
+        }
+        if let Some(h) = head_ref
+            && e.committed_on_other_branches.get(h).map(String::as_str) == Some(sha.as_str())
+        {
             return Ok(Processed::Unchanged);
         }
         Ok(match classify_outside_change(kind, &approved, &disk) {
