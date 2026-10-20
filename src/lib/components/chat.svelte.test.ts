@@ -83,6 +83,23 @@ describe('PasteBack', () => {
 			.element(s.getByText(/add the entries to docs\/lessons\.md yourself/))
 			.toBeVisible();
 	});
+
+	it('AC-F016-02: an F.2 step pastes its lessons back as an append to docs/lessons.md', async () => {
+		const m = fresh('stage1');
+		m.setClipboard('## L-001 · Stage 1 · 2026-10-20 · Packets ran long\nSTATUS: open');
+		const preview = vi.spyOn(m, 'pasteBackPreview');
+		const s = await render(PasteBack, {
+			projectId: IDS.tradelog,
+			step: '1:F.2',
+			stage: 1,
+			packet: false,
+			kind: 'lessons'
+		});
+		await s.getByRole('button', { name: /Paste back/ }).click();
+		expect(preview).toHaveBeenCalledWith(expect.objectContaining({ kind: 'lessons' }));
+		await expect.element(s.getByText('docs/lessons.md')).toBeVisible();
+		await expect.element(s.getByRole('button', { name: /^Write 1 file/ })).toBeVisible();
+	});
 });
 
 describe('CloseOutChecklist', () => {

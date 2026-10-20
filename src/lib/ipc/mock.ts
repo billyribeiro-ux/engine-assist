@@ -1589,24 +1589,14 @@ export class MockIpcClient implements IpcClient {
 			const p = this.project(req.projectId);
 			if (p.readOnly) throw fail('readOnly', { kind: 'readOnly', ...p.readOnly });
 			const st = this.step(p, req.step);
+			// Capture from session needs the session sensor's reply, which the mock never records.
 			if (req.source === 'sensor')
-				throw fail('unsupported', {
-					kind: 'unsupported',
-					feature: 'sensor',
-					why: 'No session sensor in this build'
-				});
+				throw fail('unsupported', { kind: 'unsupported', feature: 'sensor', why: 'noSensor' });
 			const text = this.world.clipboard;
 			if (!text.trim()) throw fail('clipboard', { kind: 'clipboard', why: 'empty' });
 			if (enc.encode(text).length > 1024 * 1024)
 				throw fail('clipboard', { kind: 'clipboard', why: 'tooLarge' });
 			const stage = this.stageOf(p, st.tpl.key).stage;
-			if (st.tpl.key.endsWith('F.2'))
-				throw notAllowed(
-					'appends-in-p1',
-					'This step appends to docs/lessons.md. In this version, add the entries to docs/lessons.md yourself.'
-				);
-			const packets = [...text.matchAll(/=== HANDOFF PACKET · Stage (\d+)/g)];
-			const writesPacket = st.tpl.note?.includes('packet') ?? false;
 			const add = (path: string, lines: string[], exists = false): T.Diff => ({
 				path,
 				exists,
@@ -1618,6 +1608,61 @@ export class MockIpcClient implements IpcClient {
 					}
 				]
 			});
+			if (req.kind === 'lessons') {
+				if (!st.tpl.key.endsWith('F.2'))
+					throw notAllowed('not-a-lessons-step', "This step doesn't append to docs/lessons.md.");
+				const at = text.search(/^## L-\d{3,} · Stage \d{1,2} · /m);
+				if (at < 0)
+					throw notAllowed(
+						'no-lessons-entries',
+						'The paste has no lessons entry headed "## L-NNN · Stage N · …".'
+					);
+				return {
+					previewId: this.preview('paste', p.id, {
+						step: st.tpl.key,
+						targets: ['docs/lessons.md'],
+						packet: false
+					}),
+					kind: 'lessons',
+					targets: [add('docs/lessons.md', text.slice(at).split('\n'), true)],
+					problems: [],
+					notes: [],
+					packetFields: null
+				};
+			}
+			if (req.kind === 'adrSet') {
+				const parts = [...text.matchAll(/^# ADR-(\d{3}):.*$/gm)];
+				if (parts.length === 0)
+					throw notAllowed('no-adrs', 'The paste has no ADR heading ("# ADR-001: …").');
+				const targets = parts.map((m, i) =>
+					add(
+						`docs/adr/ADR-${m[1] ?? ''}.md`,
+						text
+							.slice(m.index, parts[i + 1]?.index ?? text.length)
+							.trimEnd()
+							.split('\n')
+					)
+				);
+				return {
+					previewId: this.preview('paste', p.id, {
+						step: st.tpl.key,
+						targets: targets.map((t) => t.path),
+						packet: false
+					}),
+					kind: 'adrSet',
+					targets,
+					problems: [],
+					notes: [`split into ${targets.length} ADR ${targets.length === 1 ? 'file' : 'files'}`],
+					packetFields: null
+				};
+			}
+			if (st.tpl.key.endsWith('F.2'))
+				throw notAllowed(
+					'appends-in-p1',
+					'This step appends to docs/lessons.md. In this version, add the entries to docs/lessons.md yourself.'
+				);
+			const packets = [...text.matchAll(/=== HANDOFF PACKET · Stage (\d+)/g)];
+			const writesPacket = st.tpl.note?.includes('packet') ?? false;
 			if (writesPacket || req.kind === 'packet') {
 				if (packets.length === 0) throw notAllowed('no-packet');
 				if (packets.length > 1)

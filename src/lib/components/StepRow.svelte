@@ -569,6 +569,7 @@
 						step={step.key}
 						stage={stage.stage}
 						packet={writesPacket}
+						kind={step.kind === 'lessons' ? 'lessons' : 'auto'}
 					/>
 				{/if}
 

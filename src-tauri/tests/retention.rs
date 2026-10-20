@@ -35,6 +35,7 @@ fn copy(p: &ProjectApp, step: &str) -> String {
             entry: foreman_core::schema::run::EntryPoint::Palette,
             kind: foreman_core::schema::run::RunKind::ChatCopy,
             intended: None,
+            over: false,
             prompt_sha256: None,
             time_to_start_ms: 1000,
         },

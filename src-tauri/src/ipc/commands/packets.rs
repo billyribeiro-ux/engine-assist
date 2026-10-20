@@ -1,8 +1,9 @@
-//! `packets` commands (`docs/contracts/ipc.md` §4).
+//! `packets` commands (`docs/contracts/ipc.md` §4.5, F-013): the packet view, normalization and
+//! hand-signature confirmation. `packet_repair_prepare` lives in `signing.rs`; the run-log commands
+//! (`metrics_*`, `runs_*`) in `runs.rs`.
 
 #![allow(
     clippy::needless_pass_by_value,
-    clippy::unnecessary_wraps,
     reason = "handlers take requests by value and return the IPC Result"
 )]
 
@@ -15,14 +16,11 @@ use foreman_core::schema;
 use foreman_core::schema::approvals::OutsideSignature;
 
 use crate::ipc::IpcError;
-use crate::ipc::dto::launch::{LaunchProgress, PrepareOutcome};
 use crate::ipc::dto::records::{
-    ExportResult, MetricsView, NormalizationNote, PacketFieldView, PacketHeader, PacketView,
-    RawLine, RunsPage, Signature,
+    NormalizationNote, PacketFieldView, PacketHeader, PacketView, RawLine, Signature,
 };
 use crate::ipc::dto::requests::{
-    MetricsExportReq, MetricsViewReq, PacketNormalizeApplyReq, PacketRepairPrepareReq,
-    PacketSignatureConfirmReq, PacketViewReq, RunsClearReq, RunsSearchReq,
+    PacketNormalizeApplyReq, PacketSignatureConfirmReq, PacketViewReq,
 };
 use crate::ipc::error::StaleWhat;
 use crate::ipc::types::{FixAction, IsoDate, Problem, RepoPath, Sha256, Stage, TextSpan};
@@ -252,8 +250,8 @@ pub fn view_of(p: &Opened, n: u8) -> Result<PacketView, IpcError> {
         problems,
         normalization,
         signed,
-        // The tamper diff is P2 (M4-22).
-        tamper: None,
+        // M4-22: a signed packet whose working copy differs from its commit (committed → working).
+        tamper: crate::signing::tamper_diff(p, n),
         raw,
         written_by: None,
         summary,
@@ -392,51 +390,4 @@ pub fn packet_signature_confirm(
     p.approvals = a;
     p.save_progress(app)?;
     view_of(&p, n)
-}
-
-/// `packet_repair_prepare`: not built yet (M4-23; IPC-R12).
-///
-/// # Errors
-/// `Unsupported` (`notYetAvailable:M4-23`).
-pub fn packet_repair_prepare(
-    _app: &App,
-    _req: PacketRepairPrepareReq,
-    _progress: tauri::ipc::Channel<LaunchProgress>,
-) -> Result<PrepareOutcome, IpcError> {
-    Err(IpcError::not_yet_available(
-        "packet_repair_prepare",
-        "M4-23",
-    ))
-}
-
-/// `metrics_export`: not built yet (M3-26; IPC-R12).
-///
-/// # Errors
-/// `Unsupported` (`notYetAvailable:M3-26`).
-pub fn metrics_export(_app: &App, _req: MetricsExportReq) -> Result<ExportResult, IpcError> {
-    Err(IpcError::not_yet_available("metrics_export", "M3-26"))
-}
-
-/// `metrics_view`: not built yet (M4-03; IPC-R12).
-///
-/// # Errors
-/// `Unsupported` (`notYetAvailable:M4-03`).
-pub fn metrics_view(_app: &App, _req: MetricsViewReq) -> Result<MetricsView, IpcError> {
-    Err(IpcError::not_yet_available("metrics_view", "M4-03"))
-}
-
-/// `runs_clear`: not built yet (M4-02; IPC-R12).
-///
-/// # Errors
-/// `Unsupported` (`notYetAvailable:M4-02`).
-pub fn runs_clear(_app: &App, _req: RunsClearReq) -> Result<(), IpcError> {
-    Err(IpcError::not_yet_available("runs_clear", "M4-02"))
-}
-
-/// `runs_search`: not built yet (M4-03; IPC-R12).
-///
-/// # Errors
-/// `Unsupported` (`notYetAvailable:M4-03`).
-pub fn runs_search(_app: &App, _req: RunsSearchReq) -> Result<RunsPage, IpcError> {
-    Err(IpcError::not_yet_available("runs_search", "M4-03"))
 }

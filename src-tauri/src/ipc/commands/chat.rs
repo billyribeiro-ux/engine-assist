@@ -10,20 +10,25 @@
 //!   policy, and shows every target with its diff before anything is written (SR-35). Apply
 //!   writes by compare-and-swap against the stamps read at preview time (SR-33, IPC-R10).
 //!   Pasted text never reaches the webview as HTML (SR-26): diffs are escaped spans.
+//! - P2 kinds (M4-18, M4-24) and Capture from session (M4-23): `lessons` appends to
+//!   `docs/lessons.md` through `foreman_core::lessons` (`read` for the diff, `append` by CAS);
+//!   `adrSet` splits on `^# ADR-\d{3}:` through `foreman_core::packet::adr_split` and lists every
+//!   ADR file before any write; `source: "sensor"` takes the text from the step's last run's
+//!   `last_assistant_message` (the session sensor's events) and then follows the clipboard path.
 
 use std::time::Instant;
 
 use foreman_core::ids::{StepKey as CoreKey, Surface as CoreSurface};
+use foreman_core::lessons::{self, AppendError};
+use foreman_core::packet::adr_split::{self, SplitError};
 use foreman_core::pasteback::{self, PasteError, PasteInput, PasteKind as CorePaste, Role};
 use foreman_core::pathpolicy::{self, ReadClass, WritePurpose};
 use foreman_core::policy;
 use foreman_core::rules::Applicability as CoreApp;
 use foreman_core::sanitize;
 use foreman_core::schema::progress::{DecisionFileKind, StoredState};
-use foreman_core::schema::run::{
-    EntryPoint as RunEntry, IndexStatus, RunFile, RunKind, RunStatus as FileStatus, RunSurface,
-    Timings,
-};
+use foreman_core::schema::run::{EntryPoint as RunEntry, RunKind};
+use foreman_core::session_state::SessionState;
 use foreman_core::steps::StepEvent;
 use foreman_core::store::{ReadStamp, StoreError, sha256_hex};
 use foreman_core::template::Step;
@@ -40,7 +45,7 @@ use crate::ipc::dto::requests::{
 use crate::ipc::dto::steps::{
     ChatCopyResult, MissingLink, PacketFields, PasteApplyResult, PastePreview,
 };
-use crate::ipc::error::ClipboardProblem;
+use crate::ipc::error::{ClipboardProblem, IpcErrorDetail};
 use crate::ipc::types::{
     EntryPoint, FixAction, PasteKind, PreviewId, Problem, ProjectId, RepoPath, Rev, RunId, Stage,
 };
@@ -142,7 +147,6 @@ fn run_entry(e: EntryPoint) -> RunEntry {
 /// "prompt-control-char")`, `Io`.
 pub fn chat_copy_and_open(app: &App, req: ChatCopyAndOpenReq) -> Result<ChatCopyResult, IpcError> {
     let started = Instant::now();
-    let wall_start = app.now();
     let _w = app.writing();
     let mut p = project::open(app, req.project_id.as_str())?;
     p.writable()?;
@@ -186,8 +190,9 @@ pub fn chat_copy_and_open(app: &App, req: ChatCopyAndOpenReq) -> Result<ChatCopy
         ChatTarget::Missing(m) => (false, Some(*m)),
     };
     let time_to_start = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
-    let run_id = uuid::Uuid::new_v4().hyphenated().to_string();
-    // The run record (SR-52: the prompt's hash, never its text).
+    // The run record (SR-52: the sanitized prompt's hash, never its text) and its index line,
+    // through the run log's one path (M3-26): the chat clock stops here (AC-F026-02), and the
+    // step's Mark done or paste-back adds the active time (`runs::note_step_done`).
     let (_, _, pf) = p.parts()?;
     let over = p.progress.overrides.get(&key).copied();
     let intended = policy::effective_start(
@@ -202,44 +207,21 @@ pub fn chat_copy_and_open(app: &App, req: ChatCopyAndOpenReq) -> Result<ChatCopy
     )
     .ok()
     .map(|e| e.value);
-    let file = RunFile {
-        schema_version: 1,
-        run_id: run_id.clone(),
-        project_id: p.id().to_owned(),
-        stage: s.stage,
-        step_id: key.clone(),
-        surface: RunSurface::Chat,
-        kind: RunKind::ChatCopy,
-        chain_id: None,
-        name: None,
-        argv: Vec::new(),
-        env_names: Vec::new(),
-        cwd: None,
-        prompt_sha256: Some(sha256_hex(clean.as_bytes())),
-        run_settings_sha256: None,
-        intended,
-        r#override: over.is_some(),
-        observed: None,
-        entry_point: run_entry(req.entry),
-        t: Timings {
-            wall_start,
-            look_start: Some(0),
-            prepared: Some(0),
-            confirmed: None,
-            spawned: Some(time_to_start),
-            exited: None,
+    let run_id = runs::record_chat_copy(
+        app,
+        &runs::ChatCopy {
+            project_id: p.id(),
+            stage: s.stage,
+            step: key.clone(),
+            chain: None,
+            entry: run_entry(req.entry),
+            kind: RunKind::ChatCopy,
+            intended,
+            over: over.is_some(),
+            prompt_sha256: Some(sha256_hex(clean.as_bytes())),
+            time_to_start_ms: time_to_start,
         },
-        time_to_start_ms: Some(time_to_start),
-        run_input_interventions: 0,
-        copy_prompt_on_cli: false,
-        status: FileStatus::Copied,
-        exit_code: None,
-        claude_version: None,
-        pid: None,
-        sensor_token: None,
-    };
-    runs::write_run(&p.app_root, &file, &ReadStamp::Absent)?;
-    runs::append_index(&p.app_root, &file, IndexStatus::Copied);
+    )?;
     next.last_run_id = Some(run_id.clone());
     // DR-103: an override is for the next run only.
     p.progress.overrides.remove(&key);
@@ -298,6 +280,23 @@ pub struct HeldTarget {
     pub stamp: ReadStamp,
 }
 
+/// What a held paste-back writes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeldKind {
+    /// A packet (plus attachments and extra outs).
+    Packet,
+    /// The step's declared outputs.
+    Output,
+    /// `docs/adr/ADR-NNN.md` files cut from an ADR-set paste (M4-24).
+    AdrSet,
+    /// Entries appended to `docs/lessons.md` (M4-18); `lessons::append` re-derives the text
+    /// from these entries against the stamp read at preview time.
+    Lessons {
+        /// The paste (normalized), from its first entry heading on.
+        entries: String,
+    },
+}
+
 /// A paste-back held between preview and apply (IPC-R7).
 #[derive(Debug)]
 pub struct HeldPaste {
@@ -305,13 +304,14 @@ pub struct HeldPaste {
     pub project: String,
     /// Step.
     pub step: String,
-    /// Packet or output.
-    pub kind: CorePaste,
+    /// What it writes.
+    pub kind: HeldKind,
     /// The packet's stage.
     pub stage: Option<u8>,
     /// Every write, in order.
     pub targets: Vec<HeldTarget>,
-    /// The paste is a valid packet or an output (the step becomes done, AC-F012-12).
+    /// The paste is a valid packet, output, lessons append or ADR set (the step becomes done,
+    /// AC-F012-12).
     pub valid: bool,
 }
 
@@ -328,42 +328,233 @@ fn paste_error(e: &PasteError) -> IpcError {
     IpcError::not_allowed(rule, e.to_string())
 }
 
-/// `paste_back_preview` (P1: packets and outputs): every target with its diff, the packet's
-/// problems and the normalization notes, under a one-time preview ID (AC-F012-06…-10, -13, -14).
+fn lessons_error(e: AppendError) -> IpcError {
+    match e {
+        AppendError::Missing => IpcError::not_allowed("lessons-missing", e.to_string()),
+        AppendError::NoEntries => IpcError::not_allowed("no-lessons-entries", e.to_string()),
+        AppendError::Changed => IpcError::conflict(lessons::PATH, Vec::new()),
+        AppendError::Store(s) => s.into(),
+    }
+}
+
+fn adr_error(e: &SplitError) -> IpcError {
+    let rule = match e {
+        SplitError::NoAdrs => "no-adrs",
+        SplitError::Duplicate(_) => "duplicate-adr",
+    };
+    IpcError::not_allowed(rule, e.to_string())
+}
+
+/// `source: "sensor"` (AC-F013-14, M4-23): the `last_assistant_message` the session sensor
+/// recorded for the step's last run (its events in app data, read through
+/// `foreman_sys::sensor::ingest` against the run's own token). Without it (no run, a run started
+/// without the sensor, no `Stop` event yet) the answer is `Unsupported { feature: "sensor", why:
+/// "noSensor" }` and paste-back is offered instead.
+fn captured(p: &Opened, s: &Step) -> Result<String, IpcError> {
+    let none = |why: &str| {
+        IpcError::unsupported(
+            "sensor",
+            "noSensor",
+            format!("{why} Copy the reply and paste it back."),
+        )
+    };
+    let Some(run_id) = p.step_progress(s.key.as_str()).last_run_id else {
+        return Err(none(
+            "This step hasn't run in Claude Code, so there's no session to capture from.",
+        ));
+    };
+    let no_events = "Foreman has no session events for this step's last run.";
+    let Ok((file, _)) = runs::read_run(&p.app_root, &run_id) else {
+        return Err(none(no_events));
+    };
+    let Some(token) = file.sensor_token else {
+        return Err(none(no_events));
+    };
+    let state = foreman_sys::sensor::ingest(&p.app_root, &run_id, &token, SessionState::default())
+        .map_err(|_| none(no_events))?;
+    state
+        .last_assistant_message
+        .filter(|m| !m.trim().is_empty())
+        .ok_or_else(|| none("Claude Code hasn't finished a reply in this step's last run."))
+}
+
+fn hold(app: &App, held: HeldPaste) -> PreviewId {
+    PreviewId::from_trusted(
+        app.inner()
+            .previews
+            .hold(Preview::Paste(Box::new(held)), PREVIEW_TTL),
+    )
+}
+
+/// `kind: "lessons"` (F-016, M4-18; AC-F016-02…-04): the step must append to `docs/lessons.md`;
+/// the file is read through `lessons::read` (missing: nothing is written, AC-F016-04) and the
+/// diff is the append with each entry renumbered to the next free `L-NNN`, header kept.
+fn lessons_preview(
+    app: &App,
+    p: &Opened,
+    s: &Step,
+    project_id: &str,
+    text: &str,
+) -> Result<PastePreview, IpcError> {
+    if s.appends.as_deref() != Some(lessons::PATH) {
+        return Err(IpcError::not_allowed(
+            "not-a-lessons-step",
+            "This step doesn't append to docs/lessons.md.",
+        ));
+    }
+    let rel = pathpolicy::check_write(lessons::PATH, WritePurpose::Repo)?;
+    let root = p.root()?;
+    let Some((existing, stamp)) = lessons::read(root)? else {
+        return Err(lessons_error(AppendError::Missing));
+    };
+    let (clean, mut notes) = pasteback::prepare(text);
+    let lead = lessons::header(&clean);
+    let mut entries = clean[lead.len()..].to_owned();
+    // A code block opened right before the first entry (Claude's "one block") and closed at the
+    // end: its closing fence isn't part of the entries.
+    if lead
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())
+        .is_some_and(|l| l.starts_with("```"))
+        && let Some(cut) = entries.trim_end().strip_suffix("```")
+        && (cut.is_empty() || cut.ends_with('\n'))
+    {
+        entries = cut.to_owned();
+        if !notes.iter().any(|n| n == "removed code fence") {
+            notes.push("removed code fence".to_owned());
+        }
+    }
+    let new = lessons::appended(&existing, &entries).map_err(lessons_error)?;
+    let before = lessons::entries(&existing).len();
+    for (pasted, written) in lessons::entries(&entries)
+        .iter()
+        .zip(lessons::entries(&new).iter().skip(before))
+    {
+        if pasted.id != written.id {
+            notes.push(format!(
+                "{} becomes {} (the next free ID)",
+                pasted.id, written.id
+            ));
+        }
+        if pasted.stage != s.stage {
+            notes.push(format!(
+                "{} is for Stage {}, so it doesn't count for Stage {}",
+                written.id, pasted.stage, s.stage
+            ));
+        }
+    }
+    let target = diff(rel.as_str(), Some(&existing), &new);
+    let id = hold(
+        app,
+        HeldPaste {
+            project: project_id.to_owned(),
+            step: s.key.as_str().to_owned(),
+            kind: HeldKind::Lessons { entries },
+            stage: None,
+            targets: vec![HeldTarget {
+                path: RepoPath::from_trusted(rel.as_str()),
+                role: Role::Output,
+                text: new,
+                stamp,
+            }],
+            valid: true,
+        },
+    );
+    Ok(PastePreview {
+        preview_id: id,
+        kind: PasteKind::Lessons,
+        targets: vec![target],
+        problems: Vec::new(),
+        notes: notes.iter().map(|n| escape_visible(n)).collect(),
+        packet_fields: None,
+    })
+}
+
+/// `kind: "adrSet"` (AC-F012-15, SR-35; M4-24): split on `^# ADR-\d{3}:` into
+/// `docs/adr/ADR-NNN.md`; every target is checked by the write policy and listed with its diff
+/// against the current file before anything is written. A target the policy refuses refuses the
+/// whole paste (AC-F012-08).
+fn adr_preview(
+    app: &App,
+    p: &Opened,
+    s: &Step,
+    project_id: &str,
+    text: &str,
+) -> Result<PastePreview, IpcError> {
+    let (clean, mut notes) = pasteback::prepare(text);
+    let parts = adr_split::split_adrs(&clean).map_err(|e| adr_error(&e))?;
+    let targets = adr_split::plan(p.root()?, parts)?;
+    let mut held = Vec::new();
+    let mut diffs = Vec::new();
+    for t in &targets {
+        let Some(rel) = t.rel.as_ref() else {
+            pathpolicy::check_write(&t.part.path, WritePurpose::Repo)?;
+            return Err(IpcError::not_allowed(
+                "policy",
+                escape_visible(t.refused.as_deref().unwrap_or_default()),
+            ));
+        };
+        diffs.push(diff(rel.as_str(), t.current.as_deref(), &t.part.text));
+        held.push(HeldTarget {
+            path: RepoPath::from_trusted(rel.as_str()),
+            role: Role::Output,
+            text: t.part.text.clone(),
+            stamp: t.stamp.clone(),
+        });
+    }
+    notes.push(format!(
+        "split into {} ADR {}",
+        held.len(),
+        if held.len() == 1 { "file" } else { "files" }
+    ));
+    let id = hold(
+        app,
+        HeldPaste {
+            project: project_id.to_owned(),
+            step: s.key.as_str().to_owned(),
+            kind: HeldKind::AdrSet,
+            stage: None,
+            targets: held,
+            // The ADR set is the step's whole output only when it declares nothing else to write.
+            valid: s.out.is_empty() && s.appends.is_none(),
+        },
+    );
+    Ok(PastePreview {
+        preview_id: id,
+        kind: PasteKind::AdrSet,
+        targets: diffs,
+        problems: Vec::new(),
+        notes: notes.iter().map(|n| escape_visible(n)).collect(),
+        packet_fields: None,
+    })
+}
+
+/// `paste_back_preview`: every target with its diff, the packet's problems and the
+/// normalization notes, under a one-time preview ID (AC-F012-06…-10, -13…-15, AC-F013-14,
+/// AC-F016-02…-04). Packets and outputs (P1), lessons (M4-18) and ADR sets (M4-24); the text
+/// comes from the clipboard or, for `source: "sensor"`, from the step's last run (M4-23).
 ///
 /// # Errors
-/// `Clipboard` (empty, not text, over 1 MB), `Unsupported` (`sensor`, ADR set, lessons: P2),
+/// `Clipboard` (empty, not text, over 1 MB), `Unsupported` (`sensor` without a recorded reply),
 /// `NotAllowed("wrong-stage-packet" | "two-packets" | "appends-in-p1" | "no-packet" |
-/// "not-a-packet-step" | "no-output")`, `PolicyViolation`, `ReadOnly`, `NotFound`.
+/// "not-a-packet-step" | "no-output" | "not-a-lessons-step" | "lessons-missing" |
+/// "no-lessons-entries" | "no-adrs" | "duplicate-adr")`, `PolicyViolation`, `ReadOnly`, `NotFound`.
 pub fn paste_back_preview(app: &App, req: PasteBackPreviewReq) -> Result<PastePreview, IpcError> {
     let p = project::open(app, req.project_id.as_str())?;
     p.writable()?;
     let s = p.step(req.step.as_str())?.clone();
+    let text = match req.source {
+        PasteSource::Clipboard => app.os().clipboard_read().map_err(IpcError::clipboard)?,
+        PasteSource::Sensor => captured(&p, &s)?,
+    };
     let kind = match req.kind {
         PasteKind::Auto => CorePaste::Auto,
         PasteKind::Packet => CorePaste::Packet,
         PasteKind::Output => CorePaste::Output,
-        PasteKind::AdrSet => {
-            return Err(IpcError::not_yet_available(
-                "paste_back_preview.adrSet",
-                "M4-24",
-            ));
-        }
-        PasteKind::Lessons => {
-            return Err(IpcError::not_yet_available(
-                "paste_back_preview.lessons",
-                "M4-18",
-            ));
-        }
+        PasteKind::AdrSet => return adr_preview(app, &p, &s, req.project_id.as_str(), &text),
+        PasteKind::Lessons => return lessons_preview(app, &p, &s, req.project_id.as_str(), &text),
     };
-    if req.source == PasteSource::Sensor {
-        return Err(IpcError::unsupported(
-            "sensor",
-            "noSensor",
-            "Capture from the session needs the session sensor, which this build doesn't have. Copy the reply and paste it back.",
-        ));
-    }
-    let text = app.os().clipboard_read().map_err(IpcError::clipboard)?;
     let (t, _, _) = p.parts()?;
     let stage = pasteback::packet_stage_of(&s.out);
     let format = stage.and_then(|n| t.packet_format(n));
@@ -408,24 +599,24 @@ pub fn paste_back_preview(app: &App, req: PasteBackPreviewReq) -> Result<PastePr
             .collect(),
         _ => Vec::new(),
     };
-    let preview_kind = if planned.kind == CorePaste::Packet {
-        PasteKind::Packet
+    let (preview_kind, held_kind) = if planned.kind == CorePaste::Packet {
+        (PasteKind::Packet, HeldKind::Packet)
     } else {
-        PasteKind::Output
+        (PasteKind::Output, HeldKind::Output)
     };
-    let id = app.inner().previews.hold(
-        Preview::Paste(Box::new(HeldPaste {
+    let id = hold(
+        app,
+        HeldPaste {
             project: req.project_id.as_str().to_owned(),
             step: req.step.as_str().to_owned(),
-            kind: planned.kind,
+            kind: held_kind,
             stage,
             targets: held,
             valid: problems.is_empty(),
-        })),
-        PREVIEW_TTL,
+        },
     );
     Ok(PastePreview {
-        preview_id: PreviewId::from_trusted(id),
+        preview_id: id,
         kind: preview_kind,
         targets: diffs,
         problems,
@@ -437,13 +628,37 @@ pub fn paste_back_preview(app: &App, req: PasteBackPreviewReq) -> Result<PastePr
     })
 }
 
-/// `paste_back_apply` (P1): writes the previewed targets by compare-and-swap, in order. Every
+/// Writes one held target by compare-and-swap: a lessons append through `lessons::append`
+/// (which re-reads the file and refuses a change since the preview, AC-F016-03), every other
+/// target as the exact previewed bytes.
+fn write_target(
+    root: &foreman_core::store::Root,
+    kind: &HeldKind,
+    t: &HeldTarget,
+) -> Result<(), IpcError> {
+    let rel = pathpolicy::check_write(t.path.as_str(), WritePurpose::Repo)?;
+    if let HeldKind::Lessons { entries } = kind {
+        return lessons::append(root, &t.stamp, entries)
+            .map(|_| ())
+            .map_err(lessons_error);
+    }
+    root.write(&rel, t.text.as_bytes(), &t.stamp)
+        .map(|_| ())
+        .map_err(|e| match e {
+            StoreError::Conflict { .. } => IpcError::conflict(t.path.as_str(), Vec::new()),
+            other => other.into(),
+        })
+}
+
+/// `paste_back_apply`: writes the previewed targets by compare-and-swap, in order. Every
 /// stamp is checked before the first write, so a target changed since the preview writes nothing
-/// (AC-F012-08); a change racing the writes reports exactly what was written (IPC-R10). A valid
-/// paste-back makes the step `done` (AC-F012-12).
+/// (AC-F012-08, AC-F016-03); a change racing the writes reports exactly what was written
+/// (IPC-R10). A valid paste-back makes the step `done` (AC-F012-12), which ends its chat run's
+/// clock (`runs::note_step_done`, M3-26).
 ///
 /// # Errors
-/// `Expired`, `Conflict` (with `written`), `PolicyViolation`, `ReadOnly`.
+/// `Expired`, `Conflict` (with `written`), `PolicyViolation`, `ReadOnly`,
+/// `NotAllowed("lessons-missing")`.
 pub fn paste_back_apply(app: &App, req: PasteBackApplyReq) -> Result<PasteApplyResult, IpcError> {
     let _w = app.writing();
     let held = match app.inner().previews.take(req.preview_id.as_str())? {
@@ -463,17 +678,16 @@ pub fn paste_back_apply(app: &App, req: PasteBackApplyReq) -> Result<PasteApplyR
             }
         }
         for t in &held.targets {
-            let rel = pathpolicy::check_write(t.path.as_str(), WritePurpose::Repo)?;
-            match root.write(&rel, t.text.as_bytes(), &t.stamp) {
-                Ok(_) => written.push(t.path.clone()),
-                Err(StoreError::Conflict { .. }) => {
-                    return Err(IpcError::conflict(t.path.as_str(), written));
-                }
-                Err(e) => {
-                    if written.is_empty() {
-                        return Err(e.into());
+            match write_target(root, &held.kind, t) {
+                Ok(()) => written.push(t.path.clone()),
+                Err(mut err) => {
+                    if let Some(IpcErrorDetail::Conflict { written: w, .. }) = &mut err.detail {
+                        w.clone_from(&written);
+                        return Err(err);
                     }
-                    let mut err: IpcError = e.into();
+                    if written.is_empty() {
+                        return Err(err);
+                    }
                     err.message = format!(
                         "{} Already written: {}.",
                         err.message,
@@ -504,7 +718,10 @@ pub fn paste_back_apply(app: &App, req: PasteBackApplyReq) -> Result<PasteApplyR
         step_done = step_done || p.step_progress(key).state == StoredState::Done;
     }
     let rev = p.save_progress(app)?;
-    if let (CorePaste::Packet, Some(n)) = (held.kind, held.stage) {
+    if step_done {
+        runs::note_step_done(app, &held.project, &held.step);
+    }
+    if let (HeldKind::Packet, Some(n)) = (&held.kind, held.stage) {
         app.emit(Event::PacketChanged(PacketChanged {
             project_id: ProjectId::from_trusted(&held.project),
             stage: Stage(n),

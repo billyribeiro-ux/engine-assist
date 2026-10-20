@@ -5,7 +5,7 @@
 	import { failureText } from '#lib/actions/words.ts';
 	import { toIpcFailure } from '#lib/ipc/errors.ts';
 	import { ipc } from '#lib/ipc/index.ts';
-	import type { PastePreview } from '#lib/ipc/types.ts';
+	import type { PasteKind, PastePreview } from '#lib/ipc/types.ts';
 	import Diff from '#lib/render/Diff.svelte';
 	import Text from '#lib/render/Text.svelte';
 	import { refresh } from '#lib/stores/bus.ts';
@@ -19,12 +19,15 @@
 		step,
 		stage,
 		packet,
+		kind = 'auto',
 		api
 	}: {
 		projectId: string;
 		step: string;
 		stage: number;
 		packet: boolean;
+		/** `lessons` for an F.2 step (appends to docs/lessons.md, F-016); `auto` otherwise. */
+		kind?: PasteKind;
 		/** Hands the parent the ⌘⇧V action. */
 		api?: (trigger: (() => Promise<true | string>) | null) => void;
 	} = $props();
@@ -37,14 +40,19 @@
 	let writeBtn = $state<HTMLButtonElement>();
 	const headId = $derived(`pb-${step.replace(/[^a-z0-9]/gi, '-')}`);
 
-	// Refusals whose Rust message is the exact sentence to show (AC-F012-10, -14).
+	// Refusals whose Rust message is the exact sentence to show (AC-F012-10, -14, AC-F016-04).
 	const OWN_WORDS = new Set([
 		'wrong-stage-packet',
 		'two-packets',
 		'appends-in-p1',
 		'no-packet',
 		'not-a-packet-step',
-		'no-output'
+		'no-output',
+		'not-a-lessons-step',
+		'lessons-missing',
+		'no-lessons-entries',
+		'no-adrs',
+		'duplicate-adr'
 	]);
 
 	$effect(() => {
@@ -57,7 +65,7 @@
 		error = null;
 		fixable = false;
 		try {
-			preview = await c.pasteBackPreview({ projectId, step, kind: 'auto', source: 'clipboard' });
+			preview = await c.pasteBackPreview({ projectId, step, kind, source: 'clipboard' });
 			// The exact writes are the next decision: move focus to Write so the keyboard can act.
 			await tick();
 			writeBtn?.focus();
@@ -136,6 +144,10 @@
 						.toStage !== null
 						? ` → Stage ${preview.packetFields.toStage}`
 						: ''}
+				{:else if preview.kind === 'lessons'}
+					Lessons found on the clipboard
+				{:else if preview.kind === 'adrSet'}
+					ADRs found on the clipboard
 				{:else}
 					Output found on the clipboard
 				{/if}
@@ -145,7 +157,9 @@
 		<ul class="writes">
 			{#each preview.targets as t, i (t.path)}
 				<li>
-					<span class="what">{t.exists ? 'Overwrite' : 'Create'}</span>
+					<span class="what"
+						>{preview.kind === 'lessons' ? 'Append' : t.exists ? 'Overwrite' : 'Create'}</span
+					>
 					<span
 						><code><Text text={t.path} layout={false} /></code>
 						{#if i === 1 && preview.packetFields}<span class="muted"
@@ -175,7 +189,7 @@
 				>Write {total} {total === 1 ? 'file' : 'files'}</button
 			>
 			<button class="btn ghost" type="button" onclick={() => (preview = null)}>Cancel</button>
-			{#if creates < total}<span class="reason"
+			{#if creates < total && preview.kind !== 'lessons'}<span class="reason"
 					>{total - creates} existing {total - creates === 1 ? 'file is' : 'files are'} replaced; check
 					what changes first.</span
 				>{/if}

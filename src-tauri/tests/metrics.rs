@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use common::project::{ProjectApp, collect, req};
-use foreman_app::ipc::commands::{launch, runs as cmd, steps};
+use foreman_app::ipc::commands::{chat, launch, projects, runs as cmd, steps};
 use foreman_app::ipc::dto::launch::{PrepareOutcome, RunStarted};
 use foreman_app::ipc::dto::records::{ExportResult, MetricsView, RunsPage};
 use foreman_app::ipc::error::IpcErrorCode;
@@ -92,6 +92,7 @@ fn chat_copy(p: &ProjectApp, step: &str, stage: u8, tts: u64) -> String {
             entry: foreman_core::schema::run::EntryPoint::Palette,
             kind: foreman_core::schema::run::RunKind::ChatCopy,
             intended: None,
+            over: false,
             prompt_sha256: Some("a".repeat(64)),
             time_to_start_ms: tts,
         },
@@ -311,6 +312,151 @@ mod metrics_view {
         assert!(text.contains("| Steps logged | CLI | 1 | 1 |"), "{text}");
         assert!(text.contains("TradeLog"), "project names, not IDs");
         assert!(text.contains("4 runs counted"), "{text}");
+    }
+}
+
+/// M3-26 end to end: the kill-check numbers for chat steps through the real commands — Copy and
+/// open records the run through `runs::record_chat_copy` (one index line, the sanitized prompt's
+/// hash, the step's interventions), Mark done and paste-back apply call `runs::note_step_done`
+/// (a second line per run with its duration), and `metrics_view` counts each run once.
+mod kill_check {
+    use super::*;
+
+    const PACKET: &str = "=== HANDOFF PACKET · Stage 1 → Stage 2 ===
+PROJECT: TradeLog
+APPROVED BY: <blank>
+APP: TradeLog — a journal that imports every fill
+FOR: active options traders | also: coaches
+PROBLEM: \"I lose track of why I took a trade\" (41 of 60 polled)
+DOES:
+  - imports fills from the broker
+  - tags each trade with its setup
+CORE LOOP: log after the close, review on Sunday
+WOW MOMENT: the first import shows last month's P&L by setup
+WITH (must integrate): broker CSV exports
+WITH (constraints): evenings only, three months
+STACK PREFERENCE: Svelte and Rust, decided in Stage 2
+NOT DOING (v1): social features
+MONETIZATION HYPOTHESIS: free tool for the trading room
+SUCCESS METRICS: 30 weekly active members by week 6
+KILL CRITERION: fewer than 10 weekly users after a month
+RISKIEST ASSUMPTION: members log every week; v1 tests it with reminders
+PRESS RELEASE + FAQ: attached below the packet
+OPEN ITEMS: none
+NEXT: Stage 2 · Architect's Design Studio · chat + Claude Code council";
+
+    fn later(p: &ProjectApp, secs: i64) {
+        p.t.os.set_now(
+            foreman_app::os::Os::now(&*p.t.os)
+                .checked_add(jiff::SignedDuration::from_secs(secs))
+                .unwrap(),
+        );
+    }
+
+    fn copy_and_open(p: &ProjectApp, step: &str) -> String {
+        let r = chat::chat_copy_and_open(
+            &p.t.app,
+            req(json!({ "projectId": p.id, "step": step, "entry": "stageView" })),
+        )
+        .unwrap();
+        r.run_id.as_str().to_owned()
+    }
+
+    #[test]
+    fn chat_step_end_to_end() {
+        let p = ProjectApp::new(json!({}));
+        common::project::git_identity(&p);
+        for (name, value) in [
+            ("MY_ADVANTAGES", "Ten years of trading"),
+            ("BUDGET_TIME", "Evenings, 3 months"),
+            ("APP_NAME", "TradeLog"),
+            ("PREFERRED_STACK", "Svelte and Rust"),
+        ] {
+            projects::variable_set(
+                &p.t.app,
+                req(json!({ "projectId": p.id, "name": name, "value": value })),
+            )
+            .unwrap();
+        }
+
+        // 1.1: Copy and open, then Mark done 90 s later.
+        let one = copy_and_open(&p, "1.1");
+        let lines = index_lines(&p);
+        assert_eq!(lines.len(), 1, "one line per Copy and open: {lines:?}");
+        assert_eq!(lines[0]["runId"], one.as_str());
+        assert_eq!(lines[0]["surface"], "chat");
+        assert_eq!(lines[0]["durationMs"], Value::Null);
+        let rec: Value = serde_json::from_str(
+            &std::fs::read_to_string(p.t.app_data().join("runs").join(&one).join("run.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        // SR-52: the hash of exactly what went onto the clipboard (the sanitized prompt).
+        let clip = p.t.os.clipboard().unwrap();
+        assert_eq!(
+            rec["promptSha256"],
+            foreman_core::store::sha256_hex(clip.as_bytes())
+        );
+        assert_eq!(rec["kind"], "chatCopy");
+        let t1 = lines[0]["timeToStartMs"].as_u64().unwrap();
+        later(&p, 90);
+        steps::step_mark_done(&p.t.app, req(json!({ "projectId": p.id, "step": "1.1" }))).unwrap();
+
+        // 1.4: one run input retyped (an edit), Copy and open, then the packet pasted back 60 s
+        // later.
+        for v in ["41 of 60", "41 of 60 polled"] {
+            steps::run_input_set(
+                &p.t.app,
+                req(json!({ "projectId": p.id, "step": "1.4", "name": "paste_numbers", "value": v })),
+            )
+            .unwrap();
+        }
+        let four = copy_and_open(&p, "1.4");
+        later(&p, 60);
+        p.t.os.set_clipboard(Some(PACKET));
+        let pv = chat::paste_back_preview(
+            &p.t.app,
+            req(json!({ "projectId": p.id, "step": "1.4", "kind": "auto", "source": "clipboard" })),
+        )
+        .unwrap();
+        let r =
+            chat::paste_back_apply(&p.t.app, req(json!({ "previewId": pv.preview_id }))).unwrap();
+        assert!(r.step_done);
+
+        let lines = index_lines(&p);
+        assert_eq!(
+            lines.len(),
+            4,
+            "a copy line and a done line per run: {lines:?}"
+        );
+        let ids: Vec<&str> = lines.iter().map(|l| l["runId"].as_str().unwrap()).collect();
+        assert_eq!(
+            ids,
+            [one.as_str(), one.as_str(), four.as_str(), four.as_str()]
+        );
+        assert_eq!(lines[1]["durationMs"], 90_000);
+        assert_eq!(lines[3]["durationMs"], 60_000);
+        assert_eq!(lines[2]["runInputInterventions"], 1);
+        let t4 = lines[2]["timeToStartMs"].as_u64().unwrap();
+
+        let v = view(&p, Some(&p.id));
+        assert_eq!(v.runs_counted, 2, "two runs, four lines");
+        assert_eq!(v.stages_through_foreman, 1);
+        let chat = v
+            .per_surface
+            .iter()
+            .find(|s| format!("{:?}", s.surface) == "Chat")
+            .unwrap();
+        // Median of two is the integer mean of the pair; active time is time to start + duration.
+        assert_eq!(u64::from(chat.median_time_to_start_ms), (t1 + t4) / 2);
+        assert_eq!(
+            u64::from(chat.median_active_ms_per_step),
+            (t1 + 90_000 + t4 + 60_000) / 2
+        );
+        assert_eq!(v.manual_edits_by_stage[0].edits, 1);
+        // Done twice adds nothing.
+        runs::note_step_done(&p.t.app, &p.id, "1.4");
+        assert_eq!(index_lines(&p).len(), 4);
     }
 }
 

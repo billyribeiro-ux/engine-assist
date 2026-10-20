@@ -740,6 +740,44 @@ mod sign {
         .unwrap_err();
         assert_eq!(e.code, IpcErrorCode::NotAllowed);
     }
+
+    /// M4-22 (AC-F014-15): `packet_view` of a tampered signed packet carries the tamper diff
+    /// (committed → working); the fields are the committed text's, and the diff is gone once the
+    /// committed text is back.
+    #[test]
+    fn packet_view_shows_the_tamper_diff() {
+        let p = ProjectApp::new(json!({}));
+        ready(&p);
+        let pv = preview(&p, current()).unwrap();
+        apply(&p, &pv).unwrap();
+        let view = || {
+            packets::packet_view(&p.t.app, req(json!({ "projectId": p.id, "stage": 1 }))).unwrap()
+        };
+        assert!(view().tamper.is_none(), "signed and untouched");
+        let path = p.project.join("docs/handoff/stage-01.md");
+        let signed = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(
+            &path,
+            signed.replace("APPROVED BY: Billy Ribeiro", "APPROVED BY: Mallory"),
+        )
+        .unwrap();
+        let v = view();
+        let tamper = v.tamper.expect("tamper diff");
+        assert_eq!(tamper.path.as_str(), "docs/handoff/stage-01.md");
+        let hunks = serde_json::to_string(&tamper.hunks).unwrap();
+        assert!(
+            hunks.contains("Mallory") && hunks.contains("\"op\":\"del\""),
+            "{hunks}"
+        );
+        assert!(
+            !serde_json::to_string(&v.fields)
+                .unwrap()
+                .contains("Mallory"),
+            "the view shows the committed packet"
+        );
+        std::fs::write(&path, &signed).unwrap();
+        assert!(view().tamper.is_none());
+    }
 }
 
 fn projects_open(p: &ProjectApp) {

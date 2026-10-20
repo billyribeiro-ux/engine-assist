@@ -8,7 +8,8 @@
 //!   file → re-classified, so a pending review appears without a restart (`decision:pending`,
 //!   AC-F022-04); a refused root → the watcher stops and Doctor warns (AC-F013-10). `docs/lessons.md`
 //!   and `out` paths have no P1 reader (F-016 and the round tracker are P2), so they emit nothing.
-//!   Missed events are tolerated: the interest set is re-stat'ed on window focus ([`on_focus`]).
+//!   Missed events are tolerated: the interest set is re-stat'ed on window focus ([`on_focus`])
+//!   and before every launch or sign ([`restat_before_acting`]).
 //! - **Config of live runs.** A `HintWatcher` per live run over its fingerprint sources (the cwd,
 //!   repo root and config folder for the named files, the source folders recursively, and
 //!   `~/.claude.json` and ancestor `CLAUDE.md` files directly). A hint on a source re-fingerprints
@@ -245,9 +246,22 @@ pub fn restat_project(app: &App, p: &Opened) -> usize {
     changes.iter().filter(|c| handle(app, p.id(), c)).count()
 }
 
-/// Window focus (ADR-013): re-stat every watched project and re-check live runs' config.
+/// The re-stat before a launch or a sign (ADR-013): a change that a coalesced or missed event
+/// hid is handled (state refreshed, events emitted) before Foreman acts on the project. Works with
+/// or without a running watcher. Returns the number of changes handled.
+pub fn restat_before_acting(app: &App, project_id: &str) -> usize {
+    crate::project::open(app, project_id).map_or(0, |p| restat_project(app, &p))
+}
+
+/// Window focus (ADR-013): re-stat every opened project, including one whose watcher couldn't
+/// start or stopped (the re-stat path carries on without it), and re-check live runs' config.
 pub fn on_focus(app: &App) {
-    let ids: Vec<String> = guard(&app.watchers().projects).keys().cloned().collect();
+    let mut ids: Vec<String> = guard(&app.watchers().projects).keys().cloned().collect();
+    for id in guard(&app.watchers().known).keys() {
+        if !ids.contains(id) {
+            ids.push(id.clone());
+        }
+    }
     for id in ids {
         if let Ok(p) = crate::project::open(app, &id) {
             restat_project(app, &p);
