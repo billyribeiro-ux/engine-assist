@@ -46,7 +46,14 @@ pub const PACKET_MARKERS: [(&str, &[u8]); 5] = [
 pub const PATH_ALIASES: [&str; 3] = ["app", "N-1", "N+1"];
 
 /// Run inputs known to the table (DR-082 #16–21); `N` is the stage-number context input.
-pub const RUN_INPUTS: [&str; 6] = ["N", "X", "changes", "paste numbers", "jurisdictions", "list screens"];
+pub const RUN_INPUTS: [&str; 6] = [
+    "N",
+    "X",
+    "changes",
+    "paste numbers",
+    "jurisdictions",
+    "list screens",
+];
 
 /// Literal tokens (DR-082 #22).
 pub const LITERALS: [&str; 1] = ["M#-NN"];
@@ -80,7 +87,12 @@ pub enum ScanError {
 
 /// Classifies one inner text (DR-080, DR-081). `declared` are the step's run-input names.
 #[must_use]
-pub fn classify(inner: &str, prev: Option<char>, next: Option<char>, declared: &[String]) -> Option<TokenClass> {
+pub fn classify(
+    inner: &str,
+    prev: Option<char>,
+    next: Option<char>,
+    declared: &[String],
+) -> Option<TokenClass> {
     if next == Some('(') || prev.is_some_and(char::is_alphanumeric) {
         return Some(TokenClass::Literal);
     }

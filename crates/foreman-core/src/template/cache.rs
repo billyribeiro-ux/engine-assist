@@ -29,12 +29,13 @@ pub fn load_or_parse(app: &Root, source: &str) -> Result<(Template, Origin), Sto
     let sha = source_sha256(source);
     let rel = pathpolicy::check_app_data(&cache_path(&sha))?;
     let (bytes, stamp) = app.read_opt(&rel, ReadClass::Template)?;
-    if let Some(b) = bytes {
-        if let Ok(t) = crate::json::parse::<Template>(&b) {
-            if t.source_sha256 == sha && t.parser_version == PARSER_VERSION && t.schema_version == 1 {
-                return Ok((t, Origin::Cache));
-            }
-        }
+    if let Some(b) = bytes
+        && let Ok(t) = crate::json::parse::<Template>(&b)
+        && t.source_sha256 == sha
+        && t.parser_version == PARSER_VERSION
+        && t.schema_version == 1
+    {
+        return Ok((t, Origin::Cache));
     }
     let t = parse_template(source);
     let text = crate::json::to_canonical(&t).map_err(|e| StoreError::Io {

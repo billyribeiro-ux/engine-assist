@@ -262,8 +262,17 @@ pub struct VerifyEntry {
 /// A diagnostic for an unterminated comment or an empty name.
 pub fn lex(literal: &str, at: SourcePos, file: &str) -> Result<Directive, Diagnostic> {
     let trimmed = literal.trim_end();
-    let Some(body) = trimmed.strip_prefix("<!--").and_then(|b| b.strip_suffix("-->")) else {
-        return Err(Diagnostic::error(file, at.line as usize, at.column as usize, "grammar.bad-directive", "an fm: annotation must be one HTML comment ending with -->"));
+    let Some(body) = trimmed
+        .strip_prefix("<!--")
+        .and_then(|b| b.strip_suffix("-->"))
+    else {
+        return Err(Diagnostic::error(
+            file,
+            at.line as usize,
+            at.column as usize,
+            "grammar.bad-directive",
+            "an fm: annotation must be one HTML comment ending with -->",
+        ));
     };
     // Token positions: walk the literal tracking line and column (body starts 4 bytes in).
     let mut toks: Vec<(String, SourcePos)> = Vec::new();
@@ -295,16 +304,34 @@ pub fn lex(literal: &str, at: SourcePos, file: &str) -> Result<Directive, Diagno
     }
     let mut it = toks.into_iter();
     let Some((head, _)) = it.next() else {
-        return Err(Diagnostic::error(file, at.line as usize, at.column as usize, "grammar.bad-directive", "empty annotation"));
+        return Err(Diagnostic::error(
+            file,
+            at.line as usize,
+            at.column as usize,
+            "grammar.bad-directive",
+            "empty annotation",
+        ));
     };
     let name = head.strip_prefix("fm:").unwrap_or(&head).to_owned();
     let tokens = it
         .map(|(t, pos)| match t.split_once('=') {
-            Some((k, v)) => Token { key: k.to_owned(), value: v.to_owned(), pos },
-            None => Token { key: t.clone(), value: String::new(), pos },
+            Some((k, v)) => Token {
+                key: k.to_owned(),
+                value: v.to_owned(),
+                pos,
+            },
+            None => Token {
+                key: t.clone(),
+                value: String::new(),
+                pos,
+            },
         })
         .collect();
-    Ok(Directive { name, tokens, pos: at })
+    Ok(Directive {
+        name,
+        tokens,
+        pos: at,
+    })
 }
 
 /// Parses `<model>@<effort>[/<mode>]` (DR-023). `bypassPermissions` is never a mode.
@@ -317,34 +344,59 @@ pub fn parse_start(v: &str) -> Result<Start, (&'static str, String)> {
         None => (v, None),
     };
     let Some((m, e)) = me.split_once('@') else {
-        return Err(("grammar.unknown-value", format!("`{v}` is not <model>@<effort>[/<mode>]")));
+        return Err((
+            "grammar.unknown-value",
+            format!("`{v}` is not <model>@<effort>[/<mode>]"),
+        ));
     };
     let model = Model::parse(m).ok_or(("grammar.unknown-value", format!("unknown model `{m}`")))?;
-    let effort = Effort::parse(e).ok_or(("grammar.unknown-value", format!("unknown effort `{e}`")))?;
+    let effort =
+        Effort::parse(e).ok_or(("grammar.unknown-value", format!("unknown effort `{e}`")))?;
     let mode = match mode {
         None => None,
         Some(x) if x.eq_ignore_ascii_case("bypassPermissions") => {
-            return Err(("grammar.bypass-permissions", "bypassPermissions is never allowed (SR-03)".into()));
+            return Err((
+                "grammar.bypass-permissions",
+                "bypassPermissions is never allowed (SR-03)".into(),
+            ));
         }
-        Some(x) => Some(Mode::parse(x).ok_or(("grammar.unknown-value", format!("unknown mode `{x}`")))?),
+        Some(x) => {
+            Some(Mode::parse(x).ok_or(("grammar.unknown-value", format!("unknown mode `{x}`")))?)
+        }
     };
-    Ok(Start { model, effort, mode })
+    Ok(Start {
+        model,
+        effort,
+        mode,
+    })
 }
 
 fn parse_alt(v: &str) -> Result<Alt, (&'static str, String)> {
     let Some((rule, me)) = v.split_once(':') else {
-        return Err(("grammar.unknown-value", format!("`{v}` is not <rule>:<model>@<effort>")));
+        return Err((
+            "grammar.unknown-value",
+            format!("`{v}` is not <rule>:<model>@<effort>"),
+        ));
     };
     let rule = match rule {
         "pro-plan" => AltRule::ProPlan,
         "max-plan" => AltRule::MaxPlan,
-        other => return Err(("grammar.unknown-alt-rule", format!("unknown alternative rule `{other}`"))),
+        other => {
+            return Err((
+                "grammar.unknown-alt-rule",
+                format!("unknown alternative rule `{other}`"),
+            ));
+        }
     };
     let s = parse_start(me)?;
     if s.mode.is_some() {
         return Err(("grammar.unknown-value", "an alternative has no mode".into()));
     }
-    Ok(Alt { rule, model: s.model, effort: s.effort })
+    Ok(Alt {
+        rule,
+        model: s.model,
+        effort: s.effort,
+    })
 }
 
 fn parse_input(v: &str) -> Result<InputDecl, (&'static str, String)> {
@@ -359,17 +411,31 @@ fn parse_input(v: &str) -> Result<InputDecl, (&'static str, String)> {
     let kind = match parts.get(1) {
         Some(&"text") => InputType::Text,
         Some(&"multiline") => InputType::Multiline,
-        _ => return Err(("grammar.unknown-value", format!("`{v}` is not <name>:<text|multiline>[:remember]"))),
+        _ => {
+            return Err((
+                "grammar.unknown-value",
+                format!("`{v}` is not <name>:<text|multiline>[:remember]"),
+            ));
+        }
     };
     let remember = match parts.get(2) {
         None => false,
         Some(&"remember") if parts.len() == 3 => true,
-        _ => return Err(("grammar.unknown-value", format!("`{v}` has an unknown input option"))),
+        _ => {
+            return Err((
+                "grammar.unknown-value",
+                format!("`{v}` has an unknown input option"),
+            ));
+        }
     };
-    Ok(InputDecl { name: name.to_owned(), kind, remember })
+    Ok(InputDecl {
+        name: name.to_owned(),
+        kind,
+        remember,
+    })
 }
 
-/// Checks an annotation path (DR-026): repo-relative, through the write policy (TemplateOut) for
+/// Checks an annotation path (DR-026): repo-relative, through the write policy (`TemplateOut`) for
 /// `out`/`appends`, the read policy for `requires`. `NN` in `stage-NN` is allowed in templates.
 fn check_path(v: &str, write: bool) -> Result<(), (&'static str, String)> {
     let r = if write {
@@ -402,17 +468,34 @@ const KEYS: [(&str, bool); 15] = [
 fn allowed_on(key: &str, kind: StepKind) -> bool {
     match key {
         "id" | "kind" | "tag" | "when" | "requires" => true,
-        "surface" | "cwd" | "session" | "chain" | "start" | "switch" | "alt" | "in" | "appends" => kind.is_prompt_kind(),
+        "surface" | "cwd" | "session" | "chain" | "start" | "switch" | "alt" | "in" | "appends" => {
+            kind.is_prompt_kind()
+        }
         "out" => kind.is_prompt_kind() || kind == StepKind::Manual,
         _ => false,
     }
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "one arm per DR-022 key, kept together for review"
+)]
 /// Parses the tokens of an `fm:step` (DR-022). `grammar` is the declared version. Diagnostics are
 /// appended; `None` when the annotation is unusable (no valid `id`).
-pub fn parse_step(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagnostic>) -> Option<StepAnnotation> {
+pub fn parse_step(
+    d: &Directive,
+    grammar: u32,
+    file: &str,
+    diags: &mut Vec<Diagnostic>,
+) -> Option<StepAnnotation> {
     let err = |diags: &mut Vec<Diagnostic>, pos: SourcePos, rule: &str, msg: String| {
-        diags.push(Diagnostic::error(file, pos.line as usize, pos.column as usize, rule, msg));
+        diags.push(Diagnostic::error(
+            file,
+            pos.line as usize,
+            pos.column as usize,
+            rule,
+            msg,
+        ));
     };
     let mut a = StepAnnotation {
         id: String::new(),
@@ -438,7 +521,12 @@ pub fn parse_step(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagn
     if let Some(t) = d.tokens.iter().find(|t| t.key == "kind") {
         match StepKind::parse(&t.value) {
             Some(k) => a.kind = k,
-            None => err(diags, t.pos, "grammar.unknown-value", format!("unknown kind `{}`", t.value)),
+            None => err(
+                diags,
+                t.pos,
+                "grammar.unknown-value",
+                format!("unknown kind `{}`", t.value),
+            ),
         }
     }
     for t in &d.tokens {
@@ -446,58 +534,107 @@ pub fn parse_step(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagn
             if grammar > GRAMMAR_VERSION {
                 a.unknown_keys.push(t.key.clone());
             } else {
-                err(diags, t.pos, "grammar.unknown-key", format!("unknown key `{}` (grammar v{GRAMMAR_VERSION})", t.key));
+                err(
+                    diags,
+                    t.pos,
+                    "grammar.unknown-key",
+                    format!("unknown key `{}` (grammar v{GRAMMAR_VERSION})", t.key),
+                );
             }
             continue;
         };
         if !repeatable && a.keys.contains(&t.key) {
-            err(diags, t.pos, "grammar.duplicate-key", format!("`{}` appears twice", t.key));
+            err(
+                diags,
+                t.pos,
+                "grammar.duplicate-key",
+                format!("`{}` appears twice", t.key),
+            );
             continue;
         }
         a.keys.push(t.key.clone());
         if !allowed_on(&t.key, a.kind) {
-            err(diags, t.pos, "grammar.key-not-allowed", format!("`{}` isn't allowed on kind={}", t.key, a.kind.as_str()));
+            err(
+                diags,
+                t.pos,
+                "grammar.key-not-allowed",
+                format!("`{}` isn't allowed on kind={}", t.key, a.kind.as_str()),
+            );
             continue;
         }
         if t.value.is_empty() {
-            err(diags, t.pos, "grammar.unknown-value", format!("`{}` needs a value", t.key));
+            err(
+                diags,
+                t.pos,
+                "grammar.unknown-value",
+                format!("`{}` needs a value", t.key),
+            );
             continue;
         }
         let v = t.value.as_str();
         let r: Result<(), (&'static str, String)> = match t.key.as_str() {
             "id" => {
                 if is_step_id(v) {
-                    a.id = v.to_owned();
+                    v.clone_into(&mut a.id);
                     Ok(())
                 } else {
                     Err(("grammar.bad-id", format!("`{v}` isn't a step ID")))
                 }
             }
-            "kind" => Ok(()),
             "tag" => match v {
-                "core" => Ok(a.tag = Tag::Core),
-                "conditional" => Ok(a.tag = Tag::Conditional),
-                "optional" => Ok(a.tag = Tag::Optional),
+                "core" => {
+                    a.tag = Tag::Core;
+                    Ok(())
+                }
+                "conditional" => {
+                    a.tag = Tag::Conditional;
+                    Ok(())
+                }
+                "optional" => {
+                    a.tag = Tag::Optional;
+                    Ok(())
+                }
                 _ => Err(("grammar.unknown-value", format!("unknown tag `{v}`"))),
             },
             "when" => parse_expr(v)
                 .map(|e| a.when = Some((v.to_owned(), e)))
                 .map_err(|e| (e.rule(), e.to_string())),
             "surface" => match v {
-                "chat" => Ok(a.surface = Some(Surface::Chat)),
-                "cli" => Ok(a.surface = Some(Surface::Cli)),
-                "desktop" => Ok(a.surface = Some(Surface::Desktop)),
+                "chat" => {
+                    a.surface = Some(Surface::Chat);
+                    Ok(())
+                }
+                "cli" => {
+                    a.surface = Some(Surface::Cli);
+                    Ok(())
+                }
+                "desktop" => {
+                    a.surface = Some(Surface::Desktop);
+                    Ok(())
+                }
                 _ => Err(("grammar.unknown-value", format!("unknown surface `{v}`"))),
             },
             "cwd" => match v {
-                "project" => Ok(a.cwd = Some(CwdKind::Project)),
-                "spec" => Ok(a.cwd = Some(CwdKind::Spec)),
+                "project" => {
+                    a.cwd = Some(CwdKind::Project);
+                    Ok(())
+                }
+                "spec" => {
+                    a.cwd = Some(CwdKind::Spec);
+                    Ok(())
+                }
                 "blueprint" | "worktree" => Err(("grammar.v1-1-cwd", format!("cwd={v} is v1.1"))),
                 _ => Err(("grammar.unknown-value", format!("unknown cwd `{v}`"))),
             },
             "session" => match v {
-                "new" => Ok(a.session = Session::New),
-                "continue" => Ok(a.session = Session::Continue),
+                "new" => {
+                    a.session = Session::New;
+                    Ok(())
+                }
+                "continue" => {
+                    a.session = Session::Continue;
+                    Ok(())
+                }
                 _ => Err(("grammar.unknown-value", format!("unknown session `{v}`"))),
             },
             "chain" => {
@@ -508,18 +645,28 @@ pub fn parse_step(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagn
                     a.chain = Some(ChainRef::Step(v.to_owned()));
                     Ok(())
                 } else {
-                    Err(("grammar.bad-chain", format!("`{v}` isn't a step ID or @stage")))
+                    Err((
+                        "grammar.bad-chain",
+                        format!("`{v}` isn't a step ID or @stage"),
+                    ))
                 }
             }
             "start" => parse_start(v).map(|s| a.start = Some(s)),
             "switch" => v
                 .split_once(':')
-                .ok_or(("grammar.unknown-value", format!("`{v}` is not <trigger>:<start>")))
+                .ok_or((
+                    "grammar.unknown-value",
+                    format!("`{v}` is not <trigger>:<start>"),
+                ))
                 .and_then(|(trig, s)| {
                     let to = parse_start(s)?;
-                    let ok = !trig.is_empty() && trig.bytes().all(|c| c.is_ascii_lowercase() || c == b'-');
+                    let ok = !trig.is_empty()
+                        && trig.bytes().all(|c| c.is_ascii_lowercase() || c == b'-');
                     if ok {
-                        a.switches.push(Switch { trigger: trig.to_owned(), to });
+                        a.switches.push(Switch {
+                            trigger: trig.to_owned(),
+                            to,
+                        });
                         Ok(())
                     } else {
                         Err(("grammar.unknown-value", format!("bad trigger `{trig}`")))
@@ -527,9 +674,13 @@ pub fn parse_step(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagn
                 }),
             "alt" => parse_alt(v).map(|x| a.alts.push(x)),
             "in" => parse_input(v).map(|x| a.inputs.push(x)),
-            "out" => v.split(',').try_for_each(|p| check_path(p, true).map(|()| a.out.push(p.to_owned()))),
+            "out" => v
+                .split(',')
+                .try_for_each(|p| check_path(p, true).map(|()| a.out.push(p.to_owned()))),
             "appends" => check_path(v, true).map(|()| a.appends = Some(v.to_owned())),
-            "requires" => v.split(',').try_for_each(|p| check_path(p, false).map(|()| a.requires.push(p.to_owned()))),
+            "requires" => v
+                .split(',')
+                .try_for_each(|p| check_path(p, false).map(|()| a.requires.push(p.to_owned()))),
             _ => Ok(()),
         };
         if let Err((rule, msg)) = r {
@@ -538,7 +689,12 @@ pub fn parse_step(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagn
     }
     if a.id.is_empty() {
         if !d.tokens.iter().any(|t| t.key == "id") {
-            err(diags, d.pos, "grammar.missing-id", "fm:step needs an id".into());
+            err(
+                diags,
+                d.pos,
+                "grammar.missing-id",
+                "fm:step needs an id".into(),
+            );
         }
         return None;
     }
@@ -546,32 +702,71 @@ pub fn parse_step(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagn
 }
 
 /// Parses an `fm:verify` (DR-030, DR-031, DR-034).
-pub fn parse_verify(d: &Directive, grammar: u32, file: &str, diags: &mut Vec<Diagnostic>) -> Vec<VerifyEntry> {
+pub fn parse_verify(
+    d: &Directive,
+    grammar: u32,
+    file: &str,
+    diags: &mut Vec<Diagnostic>,
+) -> Vec<VerifyEntry> {
     let mut out = Vec::new();
     for t in &d.tokens {
         if !is_item_id(&t.key) {
-            diags.push(Diagnostic::error(file, t.pos.line as usize, t.pos.column as usize, "grammar.bad-id", format!("`{}` isn't an item ID", t.key)));
+            diags.push(Diagnostic::error(
+                file,
+                t.pos.line as usize,
+                t.pos.column as usize,
+                "grammar.bad-id",
+                format!("`{}` isn't an item ID", t.key),
+            ));
             continue;
         }
         let kind_ok = t.value == "attest"
             || t.value.strip_prefix("time:").is_some_and(|r| {
                 let (n, rest) = r.split_once('d').unwrap_or((r, "x"));
-                n.parse::<u32>().is_ok_and(|n| (1..=365).contains(&n)) && !n.starts_with('0') && (rest.is_empty() || rest == ">attest")
+                n.parse::<u32>().is_ok_and(|n| (1..=365).contains(&n))
+                    && !n.starts_with('0')
+                    && (rest.is_empty() || rest == ">attest")
             })
             || t.value.strip_prefix("auto:cmd=").is_some_and(is_item_id);
         if !kind_ok {
-            let sev = if grammar > GRAMMAR_VERSION { "warning" } else { "error" };
+            let sev = if grammar > GRAMMAR_VERSION {
+                "warning"
+            } else {
+                "error"
+            };
             let msg = format!("unknown item kind `{}`", t.value);
             diags.push(if sev == "warning" {
-                Diagnostic::warning(file, t.pos.line as usize, t.pos.column as usize, "grammar.newer-grammar", msg)
+                Diagnostic::warning(
+                    file,
+                    t.pos.line as usize,
+                    t.pos.column as usize,
+                    "grammar.newer-grammar",
+                    msg,
+                )
             } else {
-                Diagnostic::error(file, t.pos.line as usize, t.pos.column as usize, "grammar.unknown-value", msg)
+                Diagnostic::error(
+                    file,
+                    t.pos.line as usize,
+                    t.pos.column as usize,
+                    "grammar.unknown-value",
+                    msg,
+                )
             });
         }
         if t.value.starts_with("auto:") {
-            diags.push(Diagnostic::warning(file, t.pos.line as usize, t.pos.column as usize, "grammar.auto-needs-v1-1", "auto items need Foreman v1.1; treated as attest"));
+            diags.push(Diagnostic::warning(
+                file,
+                t.pos.line as usize,
+                t.pos.column as usize,
+                "grammar.auto-needs-v1-1",
+                "auto items need Foreman v1.1; treated as attest",
+            ));
         }
-        out.push(VerifyEntry { id: t.key.clone(), kind: t.value.clone(), pos: t.pos });
+        out.push(VerifyEntry {
+            id: t.key.clone(),
+            kind: t.value.clone(),
+            pos: t.pos,
+        });
     }
     out
 }

@@ -1,0 +1,55 @@
+---
+source: crates/foreman-core/tests/golden_v2_2.rs
+expression: gate
+---
+## 5:gate.A · Inspection · Runnable
+kind=prompt tag=core when=-
+surface=cli cwd=project session=New chain=5:gate.A
+start=opus@high/plan switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Run the Stage [N] inspection for [APP_NAME]. Read docs/handoff/stage-[N-1].md
+for context. For each inspection item below, verify it with real evidence
+(command output, test names, file paths, URLs) and mark PASS or FAIL.
+Use the test-runner agent for every automated check. Do not fix anything;
+just report.
+INSPECTION ITEMS:
+[paste the stage's inspection list]
+
+## 5:gate.B · Handoff Packet · Runnable
+kind=prompt tag=core when=-
+surface=cli cwd=project session=Continue chain=5:gate.A
+start=opus@medium/acceptEdits switches=[] alts=[]
+in=[] out=[docs/handoff/stage-05.md] appends=- requires=[]
+--- prompt part ---
+All items PASS. Write docs/handoff/stage-[N].md in exactly this format:
+
+=== HANDOFF PACKET · Stage [N] → Stage [N+1] ===
+PROJECT: [APP_NAME]
+APPROVED BY: <blank>
+COMPLETED: what this stage delivered (bullets, with file paths)
+EVIDENCE: each inspection item → PASS + its evidence
+DECISIONS: any new or amended ADRs (IDs + one line each)
+STATE: what now exists and works (URLs, commands, environments)
+KNOWN LIMITS: deliberate deferrals, each with its ticket ID
+OPEN ITEMS: none
+NEXT: Stage [N+1] · <name> · <surface> · <model> · <effort> · <mode>
+INPUTS FOR NEXT STAGE: the files, tickets, and facts it must read first
+
+Do not commit it. I review it, sign it, and commit it myself.
+
+## 5:gate.C · Lessons capture · Runnable
+kind=followup tag=core when=-
+surface=cli cwd=project session=Continue chain=5:gate.A
+start=opus@medium/acceptEdits switches=[] alts=[]
+in=[] out=[] appends=docs/lessons.md requires=[]
+--- prompt part ---
+Before we close Stage [N], capture what this stage taught us. Review
+this session, the PR history for the stage, and every finding the
+reviewers raised. Append an entry to docs/lessons.md in the format at
+the top of that file, covering: anything I had to fix or redo, anything
+a reviewer or gate caught that the builder should have caught, any
+prompt that produced weak output, any agent that missed something, and
+anything that wasted usage. For each, propose the exact edit (to a
+prompt, an agent file, CLAUDE.md, or a gate) that would prevent it next
+time. If nothing went wrong, write "clean stage" with one line on why.

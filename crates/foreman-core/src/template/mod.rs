@@ -4,7 +4,6 @@
 //! never panics; every problem is a [`Diagnostic`].
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as _, Sha256};
 
 use crate::diagnostic::Diagnostic;
 use crate::ids::{CwdKind, Start, StepKey, Surface};
@@ -19,7 +18,8 @@ mod validate;
 
 pub use expr::{Expr, ExprError, parse_expr};
 pub use grammar::{
-    Alt, AltRule, ChainRef, InputDecl, InputType, Session, SourcePos, StepAnnotation, StepKind, Switch, Tag,
+    Alt, AltRule, ChainRef, InputDecl, InputType, Session, SourcePos, StepAnnotation, StepKind,
+    Switch, Tag,
 };
 
 /// The parser version (part of the template cache key, ADR-023 §5).
@@ -135,13 +135,18 @@ impl Step {
     /// The `when` expression.
     #[must_use]
     pub fn when(&self) -> Option<&Expr> {
-        self.annotation.as_ref().and_then(|a| a.when.as_ref()).map(|(_, e)| e)
+        self.annotation
+            .as_ref()
+            .and_then(|a| a.when.as_ref())
+            .map(|(_, e)| e)
     }
 
     /// Switches.
     #[must_use]
     pub fn switches(&self) -> &[Switch] {
-        self.annotation.as_ref().map_or(&[], |a| a.switches.as_slice())
+        self.annotation
+            .as_ref()
+            .map_or(&[], |a| a.switches.as_slice())
     }
 
     /// Alternatives.
@@ -153,7 +158,9 @@ impl Step {
     /// Declared run inputs.
     #[must_use]
     pub fn inputs(&self) -> &[InputDecl] {
-        self.annotation.as_ref().map_or(&[], |a| a.inputs.as_slice())
+        self.annotation
+            .as_ref()
+            .map_or(&[], |a| a.inputs.as_slice())
     }
 }
 
@@ -189,6 +196,18 @@ pub struct InspectionItem {
     pub kind: String,
     /// Line.
     pub line: u32,
+}
+
+impl InspectionItem {
+    /// The kind Foreman v1 acts on: `auto:` items are attested (DR-031).
+    #[must_use]
+    pub fn effective_kind(&self) -> &str {
+        if self.kind.starts_with("auto:") {
+            "attest"
+        } else {
+            &self.kind
+        }
+    }
 }
 
 /// One required packet key (DR-017).
@@ -300,13 +319,21 @@ impl Template {
         self.packet_formats
             .iter()
             .find(|f| f.stage == Some(stage))
-            .or_else(|| (5..=17).contains(&stage).then(|| self.packet_formats.iter().find(|f| f.stage.is_none())).flatten())
+            .or_else(|| {
+                (5..=17)
+                    .contains(&stage)
+                    .then(|| self.packet_formats.iter().find(|f| f.stage.is_none()))
+                    .flatten()
+            })
     }
 
     /// Steps whose grammar is newer than this Foreman ("Update Foreman: N steps", DR-035).
     #[must_use]
     pub fn needs_newer_count(&self) -> usize {
-        self.steps.iter().filter(|s| s.status == StepStatus::NeedsNewerForeman).count()
+        self.steps
+            .iter()
+            .filter(|s| s.status == StepStatus::NeedsNewerForeman)
+            .count()
     }
 }
 
@@ -317,7 +344,7 @@ pub fn normalize_source(src: &str) -> String {
     s.replace("\r\n", "\n").replace('\r', "\n")
 }
 
-/// Tabs expanded to the next multiple of 4 columns (CommonMark tab stops).
+/// Tabs expanded to the next multiple of 4 columns (`CommonMark` tab stops).
 fn expand_tabs(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for line in s.split_inclusive('\n') {
@@ -348,7 +375,11 @@ pub fn source_sha256(src: &str) -> String {
 #[must_use]
 pub fn normalize_item_text(bullet: &str) -> String {
     let arena = comrak::Arena::new();
-    let root = comrak::parse_document(&arena, &expand_tabs(&normalize_source(bullet)), &comrak::Options::default());
+    let root = comrak::parse_document(
+        &arena,
+        &expand_tabs(&normalize_source(bullet)),
+        &comrak::Options::default(),
+    );
     let mut raw = String::new();
     structure::inline_text(root, &mut raw);
     collapse(&raw.to_lowercase())
@@ -361,8 +392,7 @@ pub(crate) fn collapse(s: &str) -> String {
 /// SHA-256 hex of a normalized item text.
 #[must_use]
 pub fn item_hash(normalized: &str) -> String {
-    let d = Sha256::digest(normalized.as_bytes());
-    d.iter().map(|b| format!("{b:02x}")).collect()
+    crate::store::sha256_hex(normalized.as_bytes())
 }
 
 /// Parses a blueprint (never panics; problems become diagnostics).

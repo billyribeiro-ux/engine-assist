@@ -50,3 +50,34 @@ pub fn assert_valid(kind: &str, v: &serde_json::Value) {
         .collect();
     assert!(errs.is_empty(), "{kind}: {errs:#?}");
 }
+
+/// The annotated v2.2 blueprint fixture (M1-01).
+pub fn blueprint() -> String {
+    read_fixture("fixtures/blueprint/claude-build-blueprint-v2.2.md")
+}
+
+/// The v2.1 baseline from docs/spec-input (never edited).
+pub fn blueprint_v21() -> String {
+    std::fs::read_to_string(repo_root().join("docs/spec-input/claude-build-blueprint.md")).unwrap()
+}
+
+/// Parses text as a template.
+pub fn parse(s: &str) -> foreman_core::template::Template {
+    foreman_core::template::parse_template(s)
+}
+
+/// The rule codes of a template's diagnostics.
+pub fn rules(t: &foreman_core::template::Template) -> Vec<String> {
+    t.diagnostics.iter().map(|d| d.rule.clone()).collect()
+}
+
+/// A minimal annotated blueprint: title, grammar line, then `body`.
+pub fn mini(body: &str) -> String {
+    format!("# Mini\n<!-- fm:grammar v=1 -->\n\nVersion 2.2 · test\n\n{body}")
+}
+
+/// Replaces exactly one occurrence (panics otherwise) — for fixture edits of the real blueprint.
+pub fn replace_once(s: &str, old: &str, new: &str) -> String {
+    assert_eq!(s.matches(old).count(), 1, "anchor {old:?}");
+    s.replacen(old, new, 1)
+}

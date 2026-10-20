@@ -11,8 +11,9 @@ pub mod git;
 pub mod ids;
 pub mod json;
 pub mod pathpolicy;
-pub mod schema;
 pub mod resolver;
+pub mod rules;
+pub mod schema;
 pub mod store;
 pub mod template;
 

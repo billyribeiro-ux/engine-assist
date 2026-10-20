@@ -36,19 +36,32 @@ pub fn render_step(a: &StepAnnotation) -> String {
     for w in &a.switches {
         parts.push(format!("switch={}:{}", w.trigger, w.to));
     }
-    for alt in &a.alts {
+    // Alternatives and inputs are sets (order carries no meaning); switches keep their order.
+    let mut alts = a.alts.clone();
+    alts.sort_by_key(|x| x.rule.as_str());
+    for alt in &alts {
         let rule = match alt.rule {
             AltRule::ProPlan => "pro-plan",
             AltRule::MaxPlan => "max-plan",
         };
-        parts.push(format!("alt={rule}:{}@{}", alt.model.as_str(), alt.effort.as_str()));
+        parts.push(format!(
+            "alt={rule}:{}@{}",
+            alt.model.as_str(),
+            alt.effort.as_str()
+        ));
     }
-    for i in &a.inputs {
+    let mut inputs = a.inputs.clone();
+    inputs.sort_by(|x, y| x.name.cmp(&y.name));
+    for i in &inputs {
         let ty = match i.kind {
             InputType::Text => "text",
             InputType::Multiline => "multiline",
         };
-        parts.push(format!("in={}:{ty}{}", i.name, if i.remember { ":remember" } else { "" }));
+        parts.push(format!(
+            "in={}:{ty}{}",
+            i.name,
+            if i.remember { ":remember" } else { "" }
+        ));
     }
     if !a.out.is_empty() {
         parts.push(format!("out={}", a.out.join(",")));
