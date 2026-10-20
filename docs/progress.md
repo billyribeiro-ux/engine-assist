@@ -49,6 +49,12 @@ fails only for a milestone marked `done` below. Statuses: `todo`, `in-progress`,
 | M1-32 | done | M1 benchmarks |
 | M1-33 | review-pending | M1 exit review |
 
+## M4 tickets (stage/05-annotate)
+
+| Ticket | Status | Notes |
+| ------ | ------ | ----- |
+| M4-04 | done | Annotate blueprint v2.2: Stages 0 and 3–5; golden through Stage 5. The M1-01 generator (`scripts/blueprint/annotate-v2.2.py`) already wrote DR-038's annotations for Stages 0 and 3–5, so the fixture is unchanged; what M4-04 adds is the proof: snapshots `golden_v2_2_stage_0`, `_3`, `_4`, `_5` and `golden_v2_2_stages_0_5_lint` beside the Stages 1–2 and Gate ones, `template::golden_v2_2_stages_0_to_5` (zero errors, 40 runnable steps, 6–18 still needs-annotation) and `template::pin_clean_through_stage_5` (pin check clean; an error in Stage 0, 3, 4 or 5 is scoped and doesn't block the pin). Two lint warnings remain (4.7, 5.5): [CR-004](change-requests/CR-004-stage-4-5-lint-warnings.md), proposed. Template-health data for M4-06: the core already carries every field (steps' annotations, outs, lint diagnostics, per-stage status). The `TemplateHealth` DTO (`src-tauri`) has the per-stage rows and diagnostics but not the per-runnable-step annotations and outputs (AC-F003-05); adding them is M4-06's work, outside this core-only change. |
+
 ## Known deviations (M1, reviewed 2026-10-20)
 
 Where the M1 build differs from the docs, the doc that should change (or the decision Billy owes), and what was done. "Doc changed" means this branch edited it; the rest wait for Billy.
