@@ -1,276 +1,233 @@
 {
-  "$id": "urn:foreman:stage-record.v1",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "branch": {
-      "additionalProperties": false,
-      "properties": {
-        "mode": {
-          "enum": [
-            "current",
-            "other"
-          ]
-        },
-        "ref": {
-          "pattern": "^refs/heads/[^\\s~^:?*\\[\\\\]+$",
-          "type": "string"
-        }
-      },
-      "required": [
-        "mode",
-        "ref"
-      ],
-      "type": "object"
-    },
-    "gate": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "item": {
-            "$ref": "urn:foreman:common#/$defs/itemId"
-          },
-          "kind": {
-            "$ref": "urn:foreman:common#/$defs/itemKind"
-          },
-          "link": {
-            "maxLength": 2048,
-            "type": "string"
-          },
-          "outcome": {
-            "enum": [
-              "done",
-              "notApplicable",
-              "pass"
-            ]
-          },
-          "text": {
-            "$ref": "urn:foreman:common#/$defs/note"
-          }
-        },
-        "required": [
-          "item",
-          "kind",
-          "outcome",
-          "text"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    },
-    "git": {
-      "additionalProperties": false,
-      "properties": {
-        "env": {
-          "items": {
-            "pattern": "^[A-Z_]+$",
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "overrides": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "signMode": {
-          "const": "noGpgSign"
-        }
-      },
-      "required": [
-        "overrides",
-        "signMode",
-        "env"
-      ],
-      "type": "object"
-    },
-    "packet": {
-      "additionalProperties": false,
-      "properties": {
-        "attachments": {
-          "oneOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "path": {
-                  "$ref": "urn:foreman:common#/$defs/repoPath"
-                },
-                "sha256": {
-                  "$ref": "urn:foreman:common#/$defs/sha256"
-                }
-              },
-              "required": [
-                "path",
-                "sha256"
-              ],
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "path": {
-          "$ref": "urn:foreman:common#/$defs/repoPath"
-        },
-        "sha256": {
-          "$ref": "urn:foreman:common#/$defs/sha256"
-        }
-      },
-      "required": [
-        "path",
-        "sha256",
-        "attachments"
-      ],
-      "type": "object"
-    },
-    "schemaVersion": {
-      "const": 1
-    },
-    "signedBy": {
-      "$ref": "urn:foreman:common#/$defs/shortText"
-    },
-    "signedOn": {
-      "$ref": "urn:foreman:common#/$defs/isoDate"
-    },
-    "skipped": {
-      "items": {
-        "maxLength": 400,
-        "type": "string"
-      },
-      "type": "array"
-    },
-    "stage": {
-      "$ref": "urn:foreman:common#/$defs/stage"
-    },
-    "steps": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "activeMs": {
-            "minimum": 0,
-            "type": "integer"
-          },
-          "chainId": {
-            "oneOf": [
-              {
-                "$ref": "urn:foreman:common#/$defs/uuid"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "intended": {
-            "oneOf": [
-              {
-                "$ref": "urn:foreman:common#/$defs/start"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "observed": {
-            "oneOf": [
-              {
-                "additionalProperties": false,
-                "properties": {
-                  "effort": {
-                    "maxLength": 20,
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "mode": {
-                    "maxLength": 20,
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "model": {
-                    "maxLength": 100,
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  }
-                },
-                "required": [
-                  "model",
-                  "effort",
-                  "mode"
-                ],
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "promptSha256s": {
-            "items": {
-              "$ref": "urn:foreman:common#/$defs/sha256"
-            },
-            "type": "array"
-          },
-          "reason": {
-            "$ref": "urn:foreman:common#/$defs/shortText"
-          },
-          "runIds": {
-            "items": {
-              "$ref": "urn:foreman:common#/$defs/uuid"
-            },
-            "type": "array"
-          },
-          "state": {
-            "enum": [
-              "done",
-              "skipped",
-              "notApplicable"
-            ]
-          },
-          "step": {
-            "$ref": "urn:foreman:common#/$defs/stepKey"
-          }
-        },
-        "required": [
-          "step",
-          "state",
-          "runIds",
-          "chainId",
-          "intended",
-          "observed",
-          "promptSha256s",
-          "activeMs"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    },
-    "substitutions": {
-      "items": {
-        "maxLength": 400,
-        "type": "string"
-      },
-      "type": "array"
-    }
-  },
-  "required": [
-    "schemaVersion",
-    "stage",
-    "signedBy",
-    "signedOn",
-    "branch",
-    "packet",
-    "steps",
-    "gate",
-    "skipped",
-    "substitutions",
-    "git"
-  ],
-  "type": "object"
+	"$id": "urn:foreman:stage-record.v1",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"properties": {
+		"branch": {
+			"additionalProperties": false,
+			"properties": {
+				"mode": {
+					"enum": ["current", "other"]
+				},
+				"ref": {
+					"pattern": "^refs/heads/[^\\s~^:?*\\[\\\\]+$",
+					"type": "string"
+				}
+			},
+			"required": ["mode", "ref"],
+			"type": "object"
+		},
+		"gate": {
+			"items": {
+				"additionalProperties": false,
+				"properties": {
+					"item": {
+						"$ref": "urn:foreman:common#/$defs/itemId"
+					},
+					"kind": {
+						"$ref": "urn:foreman:common#/$defs/itemKind"
+					},
+					"link": {
+						"maxLength": 2048,
+						"type": "string"
+					},
+					"outcome": {
+						"enum": ["done", "notApplicable", "pass"]
+					},
+					"text": {
+						"$ref": "urn:foreman:common#/$defs/note"
+					}
+				},
+				"required": ["item", "kind", "outcome", "text"],
+				"type": "object"
+			},
+			"type": "array"
+		},
+		"git": {
+			"additionalProperties": false,
+			"properties": {
+				"env": {
+					"items": {
+						"pattern": "^[A-Z_]+$",
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"overrides": {
+					"items": {
+						"type": "string"
+					},
+					"type": "array"
+				},
+				"signMode": {
+					"const": "noGpgSign"
+				}
+			},
+			"required": ["overrides", "signMode", "env"],
+			"type": "object"
+		},
+		"packet": {
+			"additionalProperties": false,
+			"properties": {
+				"attachments": {
+					"oneOf": [
+						{
+							"additionalProperties": false,
+							"properties": {
+								"path": {
+									"$ref": "urn:foreman:common#/$defs/repoPath"
+								},
+								"sha256": {
+									"$ref": "urn:foreman:common#/$defs/sha256"
+								}
+							},
+							"required": ["path", "sha256"],
+							"type": "object"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"path": {
+					"$ref": "urn:foreman:common#/$defs/repoPath"
+				},
+				"sha256": {
+					"$ref": "urn:foreman:common#/$defs/sha256"
+				}
+			},
+			"required": ["path", "sha256", "attachments"],
+			"type": "object"
+		},
+		"schemaVersion": {
+			"const": 1
+		},
+		"signedBy": {
+			"$ref": "urn:foreman:common#/$defs/shortText"
+		},
+		"signedOn": {
+			"$ref": "urn:foreman:common#/$defs/isoDate"
+		},
+		"skipped": {
+			"items": {
+				"maxLength": 400,
+				"type": "string"
+			},
+			"type": "array"
+		},
+		"stage": {
+			"$ref": "urn:foreman:common#/$defs/stage"
+		},
+		"steps": {
+			"items": {
+				"additionalProperties": false,
+				"properties": {
+					"activeMs": {
+						"minimum": 0,
+						"type": "integer"
+					},
+					"chainId": {
+						"oneOf": [
+							{
+								"$ref": "urn:foreman:common#/$defs/uuid"
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"intended": {
+						"oneOf": [
+							{
+								"$ref": "urn:foreman:common#/$defs/start"
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"observed": {
+						"oneOf": [
+							{
+								"additionalProperties": false,
+								"properties": {
+									"effort": {
+										"maxLength": 20,
+										"type": ["string", "null"]
+									},
+									"mode": {
+										"maxLength": 20,
+										"type": ["string", "null"]
+									},
+									"model": {
+										"maxLength": 100,
+										"type": ["string", "null"]
+									}
+								},
+								"required": ["model", "effort", "mode"],
+								"type": "object"
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"promptSha256s": {
+						"items": {
+							"$ref": "urn:foreman:common#/$defs/sha256"
+						},
+						"type": "array"
+					},
+					"reason": {
+						"$ref": "urn:foreman:common#/$defs/shortText"
+					},
+					"runIds": {
+						"items": {
+							"$ref": "urn:foreman:common#/$defs/uuid"
+						},
+						"type": "array"
+					},
+					"state": {
+						"enum": ["done", "skipped", "notApplicable"]
+					},
+					"step": {
+						"$ref": "urn:foreman:common#/$defs/stepKey"
+					}
+				},
+				"required": [
+					"step",
+					"state",
+					"runIds",
+					"chainId",
+					"intended",
+					"observed",
+					"promptSha256s",
+					"activeMs"
+				],
+				"type": "object"
+			},
+			"type": "array"
+		},
+		"substitutions": {
+			"items": {
+				"maxLength": 400,
+				"type": "string"
+			},
+			"type": "array"
+		}
+	},
+	"required": [
+		"schemaVersion",
+		"stage",
+		"signedBy",
+		"signedOn",
+		"branch",
+		"packet",
+		"steps",
+		"gate",
+		"skipped",
+		"substitutions",
+		"git"
+	],
+	"type": "object"
 }

@@ -88,7 +88,9 @@ export async function waitForServer(
 		}
 		await new Promise((resolve) => setTimeout(resolve, 250));
 	}
-	throw new Error(`WebDriver server at ${baseUrl} not ready after ${String(timeoutMs)} ms (${last})`);
+	throw new Error(
+		`WebDriver server at ${baseUrl} not ready after ${String(timeoutMs)} ms (${last})`
+	);
 }
 
 export class Element {

@@ -1,167 +1,151 @@
 {
-  "$id": "urn:foreman:project.v1",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "chatProjectUrl": {
-      "oneOf": [
-        {
-          "$ref": "urn:foreman:common#/$defs/claudeUrl"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "chatUrls": {
-      "additionalProperties": {
-        "$ref": "urn:foreman:common#/$defs/claudeUrl"
-      },
-      "propertyNames": {
-        "$ref": "urn:foreman:common#/$defs/stepKey"
-      },
-      "type": "object"
-    },
-    "conditionAudit": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "at": {
-            "$ref": "urn:foreman:common#/$defs/timestamp"
-          },
-          "condition": {
-            "$ref": "urn:foreman:common#/$defs/conditionId"
-          },
-          "from": {
-            "$ref": "urn:foreman:common#/$defs/triState"
-          },
-          "note": {
-            "$ref": "urn:foreman:common#/$defs/note"
-          },
-          "to": {
-            "$ref": "urn:foreman:common#/$defs/triState"
-          }
-        },
-        "required": [
-          "condition",
-          "from",
-          "to",
-          "at",
-          "note"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    },
-    "conditions": {
-      "additionalProperties": {
-        "$ref": "urn:foreman:common#/$defs/triState"
-      },
-      "propertyNames": {
-        "$ref": "urn:foreman:common#/$defs/conditionId"
-      },
-      "required": [
-        "idea_known",
-        "commercial",
-        "payments",
-        "multi_user",
-        "public",
-        "has_ui",
-        "others_data",
-        "server",
-        "has_database",
-        "has_uploads",
-        "has_email",
-        "has_integrations"
-      ],
-      "type": "object"
-    },
-    "modelPolicy": {
-      "additionalProperties": false,
-      "properties": {
-        "plan": {
-          "enum": [
-            "max",
-            "pro"
-          ]
-        },
-        "substitutions": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "effort": {
-                "oneOf": [
-                  {
-                    "$ref": "urn:foreman:common#/$defs/effort"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "from": {
-                "$ref": "urn:foreman:common#/$defs/model"
-              },
-              "to": {
-                "$ref": "urn:foreman:common#/$defs/model"
-              }
-            },
-            "required": [
-              "from",
-              "to",
-              "effort"
-            ],
-            "type": "object"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "plan",
-        "substitutions"
-      ],
-      "type": "object"
-    },
-    "name": {
-      "$ref": "urn:foreman:common#/$defs/shortText",
-      "minLength": 1
-    },
-    "projectId": {
-      "$ref": "urn:foreman:common#/$defs/uuid"
-    },
-    "schemaVersion": {
-      "const": 1
-    },
-    "slug": {
-      "pattern": "^[a-z0-9-]{1,40}$",
-      "type": "string"
-    },
-    "specFolder": {
-      "const": "spec"
-    },
-    "variables": {
-      "additionalProperties": {
-        "maxLength": 4000,
-        "type": "string"
-      },
-      "propertyNames": {
-        "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
-      },
-      "type": "object"
-    }
-  },
-  "required": [
-    "schemaVersion",
-    "projectId",
-    "name",
-    "slug",
-    "specFolder",
-    "variables",
-    "conditions",
-    "conditionAudit",
-    "modelPolicy",
-    "chatProjectUrl",
-    "chatUrls"
-  ],
-  "type": "object"
+	"$id": "urn:foreman:project.v1",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"properties": {
+		"chatProjectUrl": {
+			"oneOf": [
+				{
+					"$ref": "urn:foreman:common#/$defs/claudeUrl"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"chatUrls": {
+			"additionalProperties": {
+				"$ref": "urn:foreman:common#/$defs/claudeUrl"
+			},
+			"propertyNames": {
+				"$ref": "urn:foreman:common#/$defs/stepKey"
+			},
+			"type": "object"
+		},
+		"conditionAudit": {
+			"items": {
+				"additionalProperties": false,
+				"properties": {
+					"at": {
+						"$ref": "urn:foreman:common#/$defs/timestamp"
+					},
+					"condition": {
+						"$ref": "urn:foreman:common#/$defs/conditionId"
+					},
+					"from": {
+						"$ref": "urn:foreman:common#/$defs/triState"
+					},
+					"note": {
+						"$ref": "urn:foreman:common#/$defs/note"
+					},
+					"to": {
+						"$ref": "urn:foreman:common#/$defs/triState"
+					}
+				},
+				"required": ["condition", "from", "to", "at", "note"],
+				"type": "object"
+			},
+			"type": "array"
+		},
+		"conditions": {
+			"additionalProperties": {
+				"$ref": "urn:foreman:common#/$defs/triState"
+			},
+			"propertyNames": {
+				"$ref": "urn:foreman:common#/$defs/conditionId"
+			},
+			"required": [
+				"idea_known",
+				"commercial",
+				"payments",
+				"multi_user",
+				"public",
+				"has_ui",
+				"others_data",
+				"server",
+				"has_database",
+				"has_uploads",
+				"has_email",
+				"has_integrations"
+			],
+			"type": "object"
+		},
+		"modelPolicy": {
+			"additionalProperties": false,
+			"properties": {
+				"plan": {
+					"enum": ["max", "pro"]
+				},
+				"substitutions": {
+					"items": {
+						"additionalProperties": false,
+						"properties": {
+							"effort": {
+								"oneOf": [
+									{
+										"$ref": "urn:foreman:common#/$defs/effort"
+									},
+									{
+										"type": "null"
+									}
+								]
+							},
+							"from": {
+								"$ref": "urn:foreman:common#/$defs/model"
+							},
+							"to": {
+								"$ref": "urn:foreman:common#/$defs/model"
+							}
+						},
+						"required": ["from", "to", "effort"],
+						"type": "object"
+					},
+					"type": "array"
+				}
+			},
+			"required": ["plan", "substitutions"],
+			"type": "object"
+		},
+		"name": {
+			"$ref": "urn:foreman:common#/$defs/shortText",
+			"minLength": 1
+		},
+		"projectId": {
+			"$ref": "urn:foreman:common#/$defs/uuid"
+		},
+		"schemaVersion": {
+			"const": 1
+		},
+		"slug": {
+			"pattern": "^[a-z0-9-]{1,40}$",
+			"type": "string"
+		},
+		"specFolder": {
+			"const": "spec"
+		},
+		"variables": {
+			"additionalProperties": {
+				"maxLength": 4000,
+				"type": "string"
+			},
+			"propertyNames": {
+				"pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+			},
+			"type": "object"
+		}
+	},
+	"required": [
+		"schemaVersion",
+		"projectId",
+		"name",
+		"slug",
+		"specFolder",
+		"variables",
+		"conditions",
+		"conditionAudit",
+		"modelPolicy",
+		"chatProjectUrl",
+		"chatUrls"
+	],
+	"type": "object"
 }

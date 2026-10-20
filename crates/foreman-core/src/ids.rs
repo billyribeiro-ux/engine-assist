@@ -521,7 +521,9 @@ mod tests {
         ] {
             assert!(StepKey::parse(ok).is_ok(), "{ok}");
         }
-        for bad in ["", "2", "2.", "123.1", "gate.A", "F.2", "5:gate.D", "x-2", "2.3B", "../x"] {
+        for bad in [
+            "", "2", "2.", "123.1", "gate.A", "F.2", "5:gate.D", "x-2", "2.3B", "../x",
+        ] {
             assert!(StepKey::parse(bad).is_err(), "{bad}");
         }
         assert!(is_step_id("gate.A") && is_step_id("F.2") && !is_step_id("5:gate.A"));

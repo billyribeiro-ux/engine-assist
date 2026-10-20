@@ -28,24 +28,54 @@ beforeAll(async () => {
 			const body: unknown = raw === '' ? undefined : JSON.parse(raw);
 			const url = req.url ?? '';
 			seen.push({ method: req.method ?? '', url, body });
-			if (url === '/status') { reply(res, 200, { ready, message: 'x' }); return; }
-			if (url === '/session' && req.method === 'POST')
-				{ reply(res, 200, { sessionId: 'S1', capabilities: {} }); return; }
-			if (url === '/session/S1' && req.method === 'DELETE') { reply(res, 200, null); return; }
-			if (url === '/session/S1/url')
-				{ reply(res, 200, req.method === 'GET' ? 'tauri://localhost/' : null); return; }
-			if (url === '/session/S1/window/handles') { reply(res, 200, ['main']); return; }
-			if (url === '/session/S1/execute/sync') { reply(res, 200, { echoed: body }); return; }
-			if (url === '/session/S1/execute/async') { reply(res, 200, 'async-result'); return; }
-			if (url === '/session/S1/element') {
-				if (findsBeforeFound-- > 0)
-					{ reply(res, 404, { error: 'no such element', message: 'Unable to locate element' }); return; }
-				reply(res, 200, { [ELEMENT_KEY]: 'E1' }); return;
+			if (url === '/status') {
+				reply(res, 200, { ready, message: 'x' });
+				return;
 			}
-			if (url === '/session/S1/element/E1/text') { reply(res, 200, 'Today'); return; }
-			if (url === '/session/S1/element/E1/displayed') { reply(res, 200, true); return; }
-			if (url === '/session/S1/boom')
-				{ reply(res, 500, { error: 'javascript error', message: 'kaput', stacktrace: '' }); return; }
+			if (url === '/session' && req.method === 'POST') {
+				reply(res, 200, { sessionId: 'S1', capabilities: {} });
+				return;
+			}
+			if (url === '/session/S1' && req.method === 'DELETE') {
+				reply(res, 200, null);
+				return;
+			}
+			if (url === '/session/S1/url') {
+				reply(res, 200, req.method === 'GET' ? 'tauri://localhost/' : null);
+				return;
+			}
+			if (url === '/session/S1/window/handles') {
+				reply(res, 200, ['main']);
+				return;
+			}
+			if (url === '/session/S1/execute/sync') {
+				reply(res, 200, { echoed: body });
+				return;
+			}
+			if (url === '/session/S1/execute/async') {
+				reply(res, 200, 'async-result');
+				return;
+			}
+			if (url === '/session/S1/element') {
+				if (findsBeforeFound-- > 0) {
+					reply(res, 404, { error: 'no such element', message: 'Unable to locate element' });
+					return;
+				}
+				reply(res, 200, { [ELEMENT_KEY]: 'E1' });
+				return;
+			}
+			if (url === '/session/S1/element/E1/text') {
+				reply(res, 200, 'Today');
+				return;
+			}
+			if (url === '/session/S1/element/E1/displayed') {
+				reply(res, 200, true);
+				return;
+			}
+			if (url === '/session/S1/boom') {
+				reply(res, 500, { error: 'javascript error', message: 'kaput', stacktrace: '' });
+				return;
+			}
 			reply(res, 404, { error: 'unknown command', message: url });
 		});
 	});

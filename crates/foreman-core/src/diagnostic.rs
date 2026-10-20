@@ -36,7 +36,13 @@ pub struct Diagnostic {
 impl Diagnostic {
     /// An error.
     #[must_use]
-    pub fn error(file: &str, line: usize, column: usize, rule: &str, message: impl Into<String>) -> Self {
+    pub fn error(
+        file: &str,
+        line: usize,
+        column: usize,
+        rule: &str,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             file: file.to_owned(),
             line: clamp(line),
@@ -50,7 +56,13 @@ impl Diagnostic {
 
     /// A warning.
     #[must_use]
-    pub fn warning(file: &str, line: usize, column: usize, rule: &str, message: impl Into<String>) -> Self {
+    pub fn warning(
+        file: &str,
+        line: usize,
+        column: usize,
+        rule: &str,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             severity: Severity::Warning,
             ..Self::error(file, line, column, rule, message)
