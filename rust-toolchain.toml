@@ -1,0 +1,6 @@
+# ADR-003: newest rust-lang release tag on 2026-10-19 (floors: 1.90 tauri-build 2.7.3, 1.89 comrak 0.56.0).
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+targets = ["aarch64-apple-darwin"]
+profile = "minimal"

@@ -1,0 +1,21 @@
+[package]
+name = "fake-claude"
+description = "Test double for the claude CLI (ADR-015); never bundled"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "fake-claude"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "=1.0.154"
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+[lints]
+workspace = true

@@ -1,0 +1,28 @@
+[package]
+name = "foreman-core"
+description = "Foreman pure domain and store (no Tauri, no tokio, no process spawning; ADR-003)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+# Direct dependencies are exact-pinned (SR-61, AC-M0-06). None are needed yet: each one arrives
+# with the M1 ticket that uses it, with a line in the ADR log (SR-61).
+[dependencies]
+
+[dev-dependencies]
+# ADR-015 layer 1 tooling (M0-05: wired now; goldens, property tests and benches grow from M1).
+proptest = "=1.12.0"
+insta = { version = "=1.49.0", features = ["json"] }
+criterion = { version = "=0.8.2", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "core"
+harness = false
+
+[lints]
+workspace = true

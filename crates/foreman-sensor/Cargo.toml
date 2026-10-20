@@ -1,0 +1,17 @@
+[package]
+name = "foreman-sensor"
+description = "Foreman per-launch hook helper (P2, ADR-009); a stub until M4-07"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "foreman-sensor"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints]
+workspace = true
