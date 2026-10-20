@@ -266,7 +266,7 @@
 											These items are open. Close each one of two ways: resolve it, or move it to
 											KNOWN LIMITS with a ticket ID.
 										</p>{/if}
-																		{#each pk.normalization.filter((n) => n.field === fd.key) as n (n.message)}<span
+									{#each pk.normalization.filter((n) => n.field === fd.key) as n (n.message)}<span
 											class="note-tag">{n.message}</span
 										>{/each}
 									{#each fd.problems as pr, i (i)}
