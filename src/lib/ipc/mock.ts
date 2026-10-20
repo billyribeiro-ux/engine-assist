@@ -572,7 +572,7 @@ export class MockIpcClient implements IpcClient {
 				kind: 'versionBelowFloor',
 				found: this.world.claudeVersion,
 				required: this.world.floorAll,
-				requirements: [{ what: 'Opus 5.5', version: '2.1.280' }]
+				requirements: [{ feature: 'Opus 5.5', min: '2.1.280', source: 'step 2.3' }]
 			});
 		const inSpec = st.tpl.where.includes('spec/') || st.tpl.where.includes('continues 2.');
 		if (launching && st.tpl.surface === 'cli' && inSpec) {
@@ -582,7 +582,7 @@ export class MockIpcClient implements IpcClient {
 					kind: 'authKeyBlocked',
 					file: 'spec/.claude/settings.json',
 					key: 'apiKeyHelper',
-					hit: 'd0000000-0000-4000-8000-000000000001',
+					hit: 'd1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
 					allowlistable: false
 				});
 			else if (n)

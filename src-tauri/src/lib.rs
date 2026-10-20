@@ -2,13 +2,16 @@
 //! built in Rust in [`window`]; native dialogs, the clipboard and events go through [`os`].
 #![forbid(unsafe_code)]
 
+pub mod convert;
 pub mod diff;
 pub mod ipc;
+pub mod launch;
 pub mod logging;
 pub mod os;
 pub mod preview;
 pub mod project;
 pub mod render;
+pub mod runs;
 pub mod state;
 pub mod text;
 pub mod window;
@@ -137,7 +140,7 @@ pub fn run() -> tauri::Result<()> {
                 home: app.path().home_dir()?,
             };
             let os = Arc::new(os::TauriOs::new(app.handle().clone()));
-            app.manage::<ipc::Shared>(Arc::new(state::App::new(os, paths)));
+            app.manage::<ipc::Shared>(state::App::new(os, paths));
             window::build_main(app)?;
             Ok(())
         })

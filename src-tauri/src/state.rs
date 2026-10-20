@@ -125,6 +125,9 @@ pub struct Inner {
 pub struct App {
     os: Arc<dyn Os>,
     paths: Paths,
+    me: std::sync::Weak<App>,
+    runs: crate::runs::Runs,
+    launch: Mutex<crate::launch::LaunchState>,
     inner: Mutex<Inner>,
     /// Serializes mutating commands (one writer at a time; CAS still guards every file).
     write_lock: Mutex<()>,
@@ -187,17 +190,37 @@ pub fn display_path(home: &Path, p: &Path) -> String {
 impl App {
     /// The state for an app-data folder and home.
     #[must_use]
-    pub fn new(os: Arc<dyn Os>, paths: Paths) -> Self {
-        Self {
+    pub fn new(os: Arc<dyn Os>, paths: Paths) -> Arc<Self> {
+        Arc::new_cyclic(|me| Self {
             os,
             paths,
+            me: me.clone(),
+            runs: crate::runs::Runs::default(),
+            launch: Mutex::new(crate::launch::LaunchState::default()),
             inner: Mutex::new(Inner {
                 settings_rev: 1,
                 projects_rev: 1,
                 ..Inner::default()
             }),
             write_lock: Mutex::new(()),
-        }
+        })
+    }
+
+    /// A weak handle to this app (exit handlers on reader threads).
+    #[must_use]
+    pub fn weak(&self) -> std::sync::Weak<App> {
+        self.me.clone()
+    }
+
+    /// The run table.
+    #[must_use]
+    pub fn runs(&self) -> &crate::runs::Runs {
+        &self.runs
+    }
+
+    /// Plans, pending acknowledgements and re-arms (IPC-R7).
+    pub fn launch(&self) -> MutexGuard<'_, crate::launch::LaunchState> {
+        guard(&self.launch)
     }
 
     /// The OS seam.

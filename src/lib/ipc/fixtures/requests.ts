@@ -42,7 +42,7 @@ export const requests = {
 	projects_list: {},
 	setup_pick_folder: {},
 	setup_preview: {
-		pickId: 'd0000000-0000-4000-8000-000000000001',
+		pickId: 'd1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
 		name: 'TradeLog',
 		slug: 'tradelog',
 		variables: {
@@ -111,7 +111,7 @@ export const requests = {
 		cwd: 'spec',
 		fingerprint: 'abababababababababababababababababababababababababababababababab'
 	},
-	auth_key_allowlist_add: { hit: 'd0000000-0000-4000-8000-000000000001' },
+	auth_key_allowlist_add: { hit: 'd1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
 	project_env_approve: { projectId: TL, cwd: 'spec', sha256: SHA },
 	pty_attach: { runId: RUN },
 	pty_write: { runId: RUN, data: 'hello' },

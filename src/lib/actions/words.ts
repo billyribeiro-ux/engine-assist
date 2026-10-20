@@ -33,11 +33,12 @@ export function blockerText(b: Blocker): string {
 					missing: 'missing',
 					notExecutable: 'not executable',
 					inProject: 'inside a project',
-					symlinkIntoProject: 'a symlink into a project'
+					symlinkIntoProject: 'a symlink into a project',
+					worldWritable: 'in a folder anyone can write to'
 				}[b.why]
 			}). Fix it in Settings or Doctor.`;
 		case 'versionBelowFloor':
-			return `Claude Code ${b.found} found. ${b.requirements[0]?.what ?? 'This step'} needs ${b.required} or later. Run claude update, then check again.`;
+			return `Claude Code ${b.found} found. ${b.requirements[0]?.feature ?? 'This step'} needs ${b.required} or later. Run claude update, then check again.`;
 		case 'contractFailed':
 			return `Claude Code ${b.version} no longer accepts ${b.feature}. Doctor has the details.`;
 		case 'configChanged':

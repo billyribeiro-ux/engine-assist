@@ -166,7 +166,7 @@ pub fn do_next(app: &App, req: DoNextReq) -> Result<DoNextOutcome, IpcError> {
             continue;
         };
         let s = match next_step(app, &p) {
-            Ok(s) => s,
+            Ok(s) => s.clone(),
             Err(w) => {
                 why = w;
                 continue;
@@ -176,11 +176,11 @@ pub fn do_next(app: &App, req: DoNextReq) -> Result<DoNextOutcome, IpcError> {
         let step = StepKey::from_trusted(s.key.as_str());
         if s.surface == Some(CoreSurface::Chat) || s.kind != CoreKind::Prompt {
             let r = if s.prompt.is_some() {
-                Some(steps::resolve(&p, s)?)
+                Some(steps::resolve(&p, &s)?)
             } else {
                 None
             };
-            let blockers = steps::blockers(&p, app, s, r.as_ref());
+            let blockers = steps::blockers(&p, app, &s, r.as_ref());
             return Ok(DoNextOutcome::Chat {
                 project,
                 step,
@@ -188,11 +188,14 @@ pub fn do_next(app: &App, req: DoNextReq) -> Result<DoNextOutcome, IpcError> {
                 blockers,
             });
         }
+        let key = s.key.to_string();
+        let mut p = p;
         let prepare = crate::ipc::commands::launch::prepare(
             app,
-            &p,
-            s,
+            &mut p,
+            &key,
             crate::ipc::types::EntryPoint::DoNext,
+            crate::ipc::dto::requests::PrepareMode::Normal,
             &|_| {},
         )?;
         return Ok(DoNextOutcome::Cli {

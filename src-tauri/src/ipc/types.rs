@@ -128,8 +128,9 @@ validated_string!(
     PickId, "uuid", uuid
 );
 validated_string!(
-    /// `HitId(Uuid)`: an auth-key hit Rust holds (§4.6).
-    HitId, "uuid", uuid
+    /// `HitId`: an SR-07 auth-key hit Rust holds (§2.4: the hit's stable SHA-256 over file, key
+    /// and value hash, `foreman_core::fingerprint::AuthKeyHit::id`).
+    HitId, "sha256", foreman_core::ids::is_sha256_hex
 );
 validated_string!(
     /// `StepKey` (DR-005).
@@ -804,6 +805,7 @@ pub enum ToolPathProblem {
     NotExecutable,
     InProject,
     SymlinkIntoProject,
+    WorldWritable,
 }
 
 /// Why `claude auth status` blocked (SR-08).
@@ -818,17 +820,18 @@ pub enum AuthProblem {
     WrongMethod { method: String },
     UnknownMethod,
     Unparsable,
-    Exit { code: i32 },
+    Exit { code: Option<i32> },
     Timeout,
 }
 
-/// A feature's version requirement (ADR-017).
+/// A feature's version requirement (ADR-017; `foreman_core::compat::Requirement`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Requirement {
-    pub what: String,
-    pub version: String,
+    pub feature: String,
+    pub min: String,
+    pub source: String,
 }
 
 /// Why a launch can't go ahead (returned inside `PrepareOutcome`, never thrown; DR-120).

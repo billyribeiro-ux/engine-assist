@@ -103,6 +103,17 @@ pub enum LinkOutcome {
     Cancelled,
 }
 
+/// The contract probes' outcome in a launch (ADR-017; `skipped` when they weren't due).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
+pub enum ContractOutcome {
+    Pass,
+    FlagFailure,
+    Inconclusive,
+    Skipped,
+}
+
 /// The step a re-arm's ending is at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -122,14 +133,14 @@ pub enum EndingStep {
 )]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum LaunchProgress {
-    Version { found: String },
-    Contract { outcome: String },
+    Version { found: Option<String> },
+    Contract { outcome: ContractOutcome },
     Fingerprint { first_scan: bool },
     Auth { cached: bool },
     Transcript,
     Inputs,
     Ending { step: EndingStep },
-    Exited { code: i32 },
+    Exited { code: Option<i32> },
     Spawning,
     Done,
 }

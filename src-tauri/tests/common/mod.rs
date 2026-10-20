@@ -50,13 +50,13 @@ impl TestApp {
         let home = dir.path().join("home");
         std::fs::create_dir_all(&home).unwrap();
         let os = Arc::new(ScriptedOs::default());
-        let app = Arc::new(App::new(
+        let app = App::new(
             os.clone(),
             Paths {
                 app_data: dir.path().join("app-data"),
                 home,
             },
-        ));
+        );
         Self { app, os, dir }
     }
 
