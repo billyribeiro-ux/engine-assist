@@ -73,6 +73,7 @@ const steps = [
 		]
 	},
 	{ name: 'cargo-test', run: ['cargo', 'test', '--workspace', '--locked'] },
+	{ name: 'required-tests', run: ['node', 'scripts/check-required-tests.mjs'] },
 	{
 		name: 'bindings-drift',
 		run: () => {
