@@ -10,15 +10,15 @@ use std::collections::BTreeSet;
 
 use foreman_core::decisions;
 use foreman_core::packet::{self, Signature as PacketSignature};
-use foreman_core::pathpolicy::{self, ReadClass};
+use foreman_core::pathpolicy::{self, ReadClass, WritePurpose};
 use foreman_core::schema;
 use foreman_core::schema::approvals::OutsideSignature;
 
 use crate::ipc::IpcError;
 use crate::ipc::dto::launch::{LaunchProgress, PrepareOutcome};
 use crate::ipc::dto::records::{
-    ExportResult, MetricsView, PacketFieldView, PacketHeader, PacketView, RawLine, RunsPage,
-    Signature,
+    ExportResult, MetricsView, NormalizationNote, PacketFieldView, PacketHeader, PacketView,
+    RawLine, RunsPage, Signature,
 };
 use crate::ipc::dto::requests::{
     MetricsExportReq, MetricsViewReq, PacketNormalizeApplyReq, PacketRepairPrepareReq,
@@ -37,6 +37,70 @@ fn title_case(key: &str) -> String {
     c.next()
         .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
         .unwrap_or_default()
+}
+
+/// The format key (or `header`, or `""` for the whole file) that holds a 1-based line of `text`.
+fn field_at(text: &str, keys: &[String], line: u32) -> String {
+    let parsed = packet::parse_packet(text, keys);
+    if parsed.header.is_some_and(|(_, _, l)| l == line) {
+        return "header".to_owned();
+    }
+    parsed
+        .fields
+        .iter()
+        .rev()
+        .find(|f| f.line <= line)
+        .map(|f| escape_visible(&f.key))
+        .unwrap_or_default()
+}
+
+/// DR-131 notes for a file Claude wrote, one per change kind and field (AC-F013-08: shown before
+/// anything is written). Empty when normalizing would record nothing.
+fn normalization_notes(text: &str, keys: &[String]) -> Vec<NormalizationNote> {
+    let n = packet::normalize_packet(text);
+    let mut out: Vec<NormalizationNote> = Vec::new();
+    for note in &n.notes {
+        let mut fields: Vec<String> = note
+            .lines
+            .iter()
+            .map(|l| field_at(&n.text, keys, *l))
+            .collect();
+        if fields.is_empty() {
+            fields.push(String::new());
+        }
+        fields.dedup();
+        for field in fields {
+            let x = NormalizationNote {
+                field,
+                message: note.message.clone(),
+            };
+            if !out.contains(&x) {
+                out.push(x);
+            }
+        }
+    }
+    out
+}
+
+/// AC-F004-12: a Stage 2 packet signed by hand while an early condition is undecided doesn't
+/// count; this is the problem the packet view shows.
+fn undecided_problem(p: &Opened, n: u8, line: u32) -> Option<Problem> {
+    if n != 2 {
+        return None;
+    }
+    let (_, _, project) = p.parts().ok()?;
+    let undecided: Vec<String> = project
+        .conditions
+        .iter()
+        .filter(|(c, v)| !c.is_late() && **v == foreman_core::ids::TriState::Undecided)
+        .map(|(c, _)| c.to_string())
+        .collect();
+    (!undecided.is_empty()).then(|| Problem {
+        rule: "packet.undecided-early-condition".to_owned(),
+        line: Some(line),
+        message: format!("Decide {} before signing Stage 2", undecided.join(", ")),
+        fix: None,
+    })
 }
 
 /// The `PacketView` of a stage's packet (SR-26: every value as typed nodes).
@@ -144,14 +208,30 @@ pub fn view_of(p: &Opened, n: u8) -> Result<PacketView, IpcError> {
         }),
         _ => None,
     };
-    let errors = all.iter().filter(|x| !x.warning).count();
-    let summary = match (errors, &signed) {
+    let mut problems: Vec<Problem> = all.iter().map(problem).collect();
+    if signed
+        .as_ref()
+        .is_some_and(|s| !s.confirmed && !s.by_foreman)
+        && let Some(x) = undecided_problem(p, n, parsed.get("APPROVED BY").map_or(1, |f| f.line))
+    {
+        problems.push(x);
+    }
+    let normalization = normalization_notes(&file.text, &keys);
+    let errors = all.iter().filter(|x| !x.warning).count()
+        + problems
+            .iter()
+            .filter(|x| x.rule == "packet.undecided-early-condition")
+            .count();
+    let mut summary = match (errors, &signed) {
         (0, Some(s)) if s.confirmed => "Valid and signed.".to_owned(),
         (0, Some(_)) => "Valid. The signature isn't confirmed yet.".to_owned(),
         (0, None) => "Valid, waiting for your signature.".to_owned(),
         (1, _) => "1 problem.".to_owned(),
         (k, _) => format!("{k} problems."),
     };
+    if !normalization.is_empty() {
+        summary.push_str(" Normalizing the file fixes its formatting.");
+    }
     Ok(PacketView {
         path,
         exists: true,
@@ -169,8 +249,8 @@ pub fn view_of(p: &Opened, n: u8) -> Result<PacketView, IpcError> {
             })
         }),
         fields,
-        problems: all.iter().map(problem).collect(),
-        normalization: Vec::new(),
+        problems,
+        normalization,
         signed,
         // The tamper diff is P2 (M4-22).
         tamper: None,
@@ -189,18 +269,54 @@ pub fn packet_view(app: &App, req: PacketViewReq) -> Result<PacketView, IpcError
     view_of(&p, req.stage.0)
 }
 
-/// `packet_normalize_apply`: not built yet (M3-21: the DR-131 normalizer; IPC-R12).
+/// `packet_normalize_apply` (P1): writes the DR-131 normalization of a packet Claude wrote, after
+/// Billy reviewed the notes in `packet_view` (AC-F013-08). The file must still be the one he saw
+/// (`seenSha256`), and the write is a compare-and-swap against the stamp read now, so an edit in
+/// between is a conflict, never overwritten (SR-33). Only the changes §5.2 lists are made.
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M3-21`).
+/// `Stale` (the packet changed since it was shown; the fresh view is in `detail`), `Conflict`
+/// (it changed during the write), `NotFound`, `ReadOnly`, `PolicyViolation`, `Io`.
 pub fn packet_normalize_apply(
-    _app: &App,
-    _req: PacketNormalizeApplyReq,
+    app: &App,
+    req: PacketNormalizeApplyReq,
 ) -> Result<PacketView, IpcError> {
-    Err(IpcError::not_yet_available(
-        "packet_normalize_apply",
-        "M3-21",
-    ))
+    let _w = app.writing();
+    let mut p = project::open(app, req.project_id.as_str())?;
+    p.writable()?;
+    let n = req.stage.0;
+    if n > 17 {
+        return Err(IpcError::not_found("That stage has no packet."));
+    }
+    let Some(file) = p.packets.get(&n).cloned() else {
+        return Err(IpcError::not_found("That packet doesn't exist yet."));
+    };
+    if file.sha256 != req.seen_sha256.as_str() {
+        return Err(IpcError::stale(
+            StaleWhat::ReadStamp,
+            "The packet changed since you reviewed it.",
+            serde_json::to_value(view_of(&p, n)?).ok(),
+        ));
+    }
+    let normalized = packet::normalize_packet(&file.text);
+    if normalized.text == file.text {
+        return view_of(&p, n);
+    }
+    let rel = pathpolicy::check_write(&packet::file_name(n), WritePurpose::Repo)?;
+    let stamp = p
+        .root()?
+        .write(&rel, normalized.text.as_bytes(), &file.stamp)?;
+    let bytes = normalized.text.into_bytes();
+    p.packets.insert(
+        n,
+        project::PacketFile {
+            sha256: foreman_core::store::sha256_hex(&bytes),
+            text: String::from_utf8_lossy(&bytes).into_owned(),
+            stamp,
+        },
+    );
+    crate::watch::emit_packet_changed(app, p.id(), n);
+    view_of(&p, n)
 }
 
 /// `packet_signature_confirm` (P1): a packet whose `APPROVED BY` is `<name> on <date>` but wasn't

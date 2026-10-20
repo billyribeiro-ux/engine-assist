@@ -988,7 +988,7 @@ TS    { projectId: string }
 Res   RebuildPreview { preview_id: PreviewId, stages: Vec<StageView>, lost: Vec<String> }
 Err   NotFound · Io
 ```
-F-020 · AC-F020-11, -12 · NFR-17.
+F-020 · AC-F020-11, -12 · NFR-17. Opens the project even when `progress.json` is unreadable (the file is left as it is) and writes nothing. The rebuilt state: every step on the path of a signed stage is `done`, the step whose `out` is a stage's packet is `done` when the packet exists, Foreman's own pending decision changes are recomputed from the approvals, and pending outside changes are kept; chains, run inputs, overrides, optional parts, waits and gate runs are lost (`lost` says so). From M4, stage records add the signing entries. A missing `progress.json` (app data deleted) is rebuilt the same way on `project_open` without a preview, since nothing can be lost (M3-16).
 
 **`progress_rebuild_apply`** · P1 · M3 · **app** (the corrupt file is kept as `progress.json.corrupt-<timestamp>`)
 ```text
@@ -997,7 +997,7 @@ TS    { previewId: string }
 Res   ProjectView
 Err   Expired · Conflict
 ```
-F-020 · AC-F020-12.
+F-020 · AC-F020-12. `Conflict` when `progress.json` changed after the preview (compare-and-swap against the stamp the preview read). No native dialog (not in IPC-R11's list): Billy's press after reviewing the preview is the confirmation. An unreadable `project_open` is `Io` naming the file; the UI offers Rebuild from repo on that error (M3-16).
 
 ### 4.10 Packets and run log
 
@@ -1010,7 +1010,7 @@ Res   PacketView { path: RepoPath, exists: bool, sha256: Option<Sha256>, header:
                    signed: Option<Signature>, tamper: Option<Diff> }
 Err   NotFound
 ```
-F-013, F-014 · AC-F013-01…-09, -12, -13, AC-F014-15 · SR-26, SR-27.
+F-013, F-014 · AC-F013-01…-09, -12, -13, AC-F014-15 · SR-26, SR-27. `normalization` lists the DR-131 notes for the file as it is on disk (one per change kind and field; `field` is a format key, `header`, or `""` for the whole file, e.g. a removed fence); empty means normalizing would change nothing that §5.2 notes. `problems` are DR-133's, plus (AC-F004-12) `packet.undecided-early-condition` "Decide <condition> before signing Stage 2" on a hand-signed, unconfirmed Stage 2 packet while an early condition is `undecided` (M3-21).
 
 **`packet_normalize_apply`** · P1 · M3 · **repo**
 ```text
@@ -1019,7 +1019,7 @@ TS    { projectId: string; stage: number; seenSha256: string }
 Res   PacketView
 Err   Stale · Conflict
 ```
-F-013 · AC-F013-08 · SR-33.
+F-013 · AC-F013-08 · SR-33. Writes `packet::normalize_packet`'s output by compare-and-swap against the stamp read with `seenSha256` (no native dialog: Billy's press after reviewing the notes is the confirmation, and normalization isn't security-relevant under IPC-R11); a file that needs nothing returns the view unchanged; emits `packet:changed` (M3-21).
 
 **`packet_signature_confirm`** · P1 · M3 · **app** (`approvals/<id>.json` `outsideSignatures`)
 ```text
@@ -1325,6 +1325,8 @@ Events carry identifiers and a revision, never content (design doc §3.3). A new
 | `settings:changed` | `{ rev: number }` | `settings.json` changed on disk (reloaded) or through a command | `app::watch` (app data), commands | F-029 · AC-F029-03 | SR-33 |
 
 Rules: `events::payload_snapshot` (insta, every event), `events::no_content_fields` (every payload type has only IDs, numbers, enums and booleans), `watcher::events_never_act`.
+
+Mapping in `app::watch` (M3-21, M3-22): the project watcher starts at `project_open`; a packet or attachments change → `packet:changed` (its `rev` is an app-wide packet counter, not the project revision); a decision-file change → re-classified as on open → `decision:pending` (new pending only) and `project:changed` (when the pending list or a variables-only reload changed state); `docs/lessons.md` and `out` paths emit nothing in P1 (their readers are P2); a refused watch root stops the watcher and emits `doctor:status` (`warning`). `config:changed` comes from a per-run hint watcher over the run's fingerprint sources, with a 60 s re-check for what hints can't see (5 s for a run whose hint watcher couldn't start). Window focus re-stats every watched project and re-checks live runs.
 
 ### 6.2 Client-side rules
 

@@ -1,0 +1,191 @@
+---
+source: crates/foreman-core/tests/packet_paste.rs
+expression: golden
+---
+[
+  {
+    "notes": [
+      {
+        "kind": "codeFence",
+        "lines": [],
+        "message": "removed code fence"
+      },
+      {
+        "kind": "smartQuotes",
+        "lines": [
+          4,
+          44,
+          45,
+          47,
+          48,
+          74,
+          86,
+          99,
+          104
+        ],
+        "message": "fixed smart quotes"
+      },
+      {
+        "kind": "unsigned",
+        "lines": [
+          3
+        ],
+        "message": "unsigned"
+      },
+      {
+        "kind": "openItemsNone",
+        "lines": [
+          103
+        ],
+        "message": "OPEN ITEMS normalized to none"
+      }
+    ],
+    "stage": 1
+  },
+  {
+    "notes": [
+      {
+        "kind": "nonBreakingSpaces",
+        "lines": [
+          2,
+          3,
+          4,
+          6,
+          7,
+          9,
+          10,
+          15,
+          16,
+          17,
+          20,
+          22,
+          24,
+          25,
+          28,
+          29,
+          31,
+          32,
+          47,
+          52,
+          55,
+          57,
+          60,
+          61,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          73,
+          74,
+          76,
+          78,
+          82,
+          84,
+          86,
+          87,
+          90,
+          93,
+          98,
+          99,
+          103,
+          115,
+          117,
+          120,
+          126,
+          128,
+          131,
+          133,
+          134,
+          135,
+          138,
+          158,
+          159
+        ],
+        "message": "fixed non-breaking spaces"
+      },
+      {
+        "kind": "header",
+        "lines": [
+          1
+        ],
+        "message": "normalized header"
+      },
+      {
+        "kind": "unsigned",
+        "lines": [
+          3
+        ],
+        "message": "unsigned"
+      },
+      {
+        "kind": "openItemsNone",
+        "lines": [
+          131
+        ],
+        "message": "OPEN ITEMS normalized to none"
+      }
+    ],
+    "stage": 2
+  },
+  {
+    "notes": [
+      {
+        "kind": "header",
+        "lines": [
+          1
+        ],
+        "message": "normalized header"
+      },
+      {
+        "kind": "unsigned",
+        "lines": [
+          3
+        ],
+        "message": "unsigned"
+      },
+      {
+        "kind": "openItemsNone",
+        "lines": [
+          55
+        ],
+        "message": "OPEN ITEMS normalized to none"
+      }
+    ],
+    "stage": 3
+  },
+  {
+    "notes": [
+      {
+        "kind": "codeFence",
+        "lines": [],
+        "message": "removed code fence"
+      },
+      {
+        "kind": "header",
+        "lines": [
+          1
+        ],
+        "message": "normalized header"
+      },
+      {
+        "kind": "unsigned",
+        "lines": [
+          3
+        ],
+        "message": "unsigned"
+      },
+      {
+        "kind": "openItemsNone",
+        "lines": [
+          81
+        ],
+        "message": "OPEN ITEMS normalized to none"
+      }
+    ],
+    "stage": 4
+  }
+]

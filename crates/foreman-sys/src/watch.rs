@@ -219,3 +219,88 @@ impl ProjectWatcher {
         self.rx.try_iter().collect()
     }
 }
+
+/// A path-hint watcher for files outside the project interest set (the configuration sources of
+/// live runs, ADR-021 §7): it reports debounced paths only and never reads anything. Targets that
+/// don't exist or are symlinks (`lstat`) are skipped, so nothing is followed; a slow re-check
+/// covers them.
+pub struct HintWatcher {
+    _debouncer: Debouncer<notify::RecommendedWatcher, RecommendedCache>,
+    rx: Receiver<Vec<PathBuf>>,
+    watched: usize,
+}
+
+impl std::fmt::Debug for HintWatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HintWatcher")
+            .field("watched", &self.watched)
+            .finish_non_exhaustive()
+    }
+}
+
+fn is_plain(p: &Path) -> bool {
+    rustix::fs::lstat(p).is_ok_and(|st| {
+        rustix::fs::FileType::from_raw_mode(st.st_mode) != rustix::fs::FileType::Symlink
+    })
+}
+
+impl HintWatcher {
+    /// Watches each `(path, recursive)` target that exists and isn't a symlink.
+    ///
+    /// # Errors
+    /// [`WatchError::Notify`] when no watcher can be created at all.
+    pub fn start(targets: &[(PathBuf, bool)]) -> Result<Self, WatchError> {
+        let (tx, rx): (Sender<Vec<PathBuf>>, Receiver<Vec<PathBuf>>) = channel();
+        let handler = move |res: DebounceEventResult| {
+            let Ok(events) = res else { return };
+            let mut paths: Vec<PathBuf> = events
+                .iter()
+                .flat_map(|e| e.event.paths.iter().cloned())
+                .collect();
+            paths.sort();
+            paths.dedup();
+            if !paths.is_empty() {
+                let _ = tx.send(paths);
+            }
+        };
+        let mut debouncer = new_debouncer(DEBOUNCE, None, handler)
+            .map_err(|e| WatchError::Notify(e.to_string()))?;
+        let mut watched = 0;
+        for (path, recursive) in targets {
+            if !is_plain(path) {
+                continue;
+            }
+            let mode = if *recursive {
+                RecursiveMode::Recursive
+            } else {
+                RecursiveMode::NonRecursive
+            };
+            if debouncer.watch(path, mode).is_ok() {
+                watched += 1;
+            }
+        }
+        Ok(Self {
+            _debouncer: debouncer,
+            rx,
+            watched,
+        })
+    }
+
+    /// How many targets are watched.
+    #[must_use]
+    pub fn watched(&self) -> usize {
+        self.watched
+    }
+
+    /// Every hinted path available now.
+    #[must_use]
+    pub fn drain(&self) -> Vec<PathBuf> {
+        self.rx.try_iter().flatten().collect()
+    }
+
+    /// Waits up to `timeout` for the next batch of hinted paths.
+    #[must_use]
+    pub fn next(&self, timeout: Duration) -> Option<Vec<PathBuf>> {
+        self.rx.recv_timeout(timeout).ok()
+    }
+}

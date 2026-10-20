@@ -375,7 +375,9 @@ pub fn paste_back_preview(app: &App, req: PasteBackPreviewReq) -> Result<PastePr
             appends: s.appends.as_deref(),
             format,
         },
-        &pasteback::prepare,
+        // DR-131 in full (M3-20): fence, BOM, line ends, NBSP, smart quotes, header variants,
+        // unsigned `APPROVED BY` forms and `none`, each with its note.
+        &foreman_core::packet::normalize_paste,
     )
     .map_err(|e| paste_error(&e))?;
     let root = p.root()?;

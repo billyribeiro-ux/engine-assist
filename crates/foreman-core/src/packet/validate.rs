@@ -30,6 +30,9 @@ pub struct Problem {
     pub message: String,
     /// Warnings don't make the packet invalid.
     pub warning: bool,
+    /// The format key the problem is about, when it is about one (the fix request names it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
 }
 
 fn problem(rule: &str, line: u32, message: impl Into<String>) -> Problem {
@@ -38,6 +41,14 @@ fn problem(rule: &str, line: u32, message: impl Into<String>) -> Problem {
         line: line.max(1),
         message: message.into(),
         warning: false,
+        field: None,
+    }
+}
+
+fn about(p: Problem, key: &str) -> Problem {
+    Problem {
+        field: Some(key.to_owned()),
+        ..p
     }
 }
 
@@ -110,18 +121,24 @@ pub fn validate_packet(text: &str, fmt: &PacketFormat, ctx: &PacketCtx) -> Vec<P
     // (2) required keys, (6) placeholders, DR-136 not-applicable values.
     for k in &fmt.keys {
         let Some(f) = p.get(&k.key) else {
-            out.push(problem(
-                "packet.missing-field",
-                header_line,
-                format!("missing {}", k.key),
+            out.push(about(
+                problem(
+                    "packet.missing-field",
+                    header_line,
+                    format!("missing {}", k.key),
+                ),
+                &k.key,
             ));
             continue;
         };
         if f.value.trim().is_empty() && k.key != "APPROVED BY" {
-            out.push(problem(
-                "packet.missing-field",
-                f.line,
-                format!("{} has no value", k.key),
+            out.push(about(
+                problem(
+                    "packet.missing-field",
+                    f.line,
+                    format!("{} has no value", k.key),
+                ),
+                &k.key,
             ));
             continue;
         }
@@ -144,10 +161,13 @@ pub fn validate_packet(text: &str, fmt: &PacketFormat, ctx: &PacketCtx) -> Vec<P
             && placeholder.starts_with('<')
             && f.value.trim() == placeholder;
         if is_placeholder {
-            out.push(problem(
-                "packet.placeholder",
-                f.line,
-                format!("{} still holds the placeholder {placeholder}", k.key),
+            out.push(about(
+                problem(
+                    "packet.placeholder",
+                    f.line,
+                    format!("{} still holds the placeholder {placeholder}", k.key),
+                ),
+                &k.key,
             ));
         }
     }
@@ -198,4 +218,49 @@ pub fn validate_packet(text: &str, fmt: &PacketFormat, ctx: &PacketCtx) -> Vec<P
 #[must_use]
 pub fn is_valid(problems: &[Problem]) -> bool {
     problems.iter().all(|p| p.warning)
+}
+
+/// The fix request for a packet's problems (DR-137, AC-F012-11): "Your packet is missing: X, Y.
+/// OPEN ITEMS must be exactly `none`. Re-output the complete packet in one code block." with the
+/// actual problems. Missing keys (absent, empty or still the placeholder) are named; the OPEN ITEMS sentence appears only
+/// when rule 3 failed; any other problem is listed by its message. Warnings are left out.
+#[must_use]
+pub fn fix_request_text(problems: &[Problem]) -> String {
+    let errors: Vec<&Problem> = problems.iter().filter(|p| !p.warning).collect();
+    let mut missing: Vec<&str> = Vec::new();
+    for p in &errors {
+        if (p.rule == "packet.missing-field" || p.rule == "packet.placeholder")
+            && let Some(k) = p.field.as_deref()
+            && !missing.contains(&k)
+        {
+            missing.push(k);
+        }
+    }
+    let open_items = errors.iter().any(|p| p.rule == "packet.open-items");
+    let other: Vec<&str> = errors
+        .iter()
+        .filter(|p| {
+            p.rule != "packet.open-items"
+                && !((p.rule == "packet.missing-field" || p.rule == "packet.placeholder")
+                    && p.field.is_some())
+        })
+        .map(|p| p.message.trim_end_matches('.'))
+        .collect();
+    let mut parts: Vec<String> = Vec::new();
+    if !missing.is_empty() {
+        parts.push(format!("Your packet is missing: {}.", missing.join(", ")));
+    }
+    if !other.is_empty() {
+        let lead = if missing.is_empty() {
+            "Your packet has problems:"
+        } else {
+            "Also fix:"
+        };
+        parts.push(format!("{lead} {}.", other.join("; ")));
+    }
+    if open_items {
+        parts.push("OPEN ITEMS must be exactly `none`.".to_owned());
+    }
+    parts.push("Re-output the complete packet in one code block.".to_owned());
+    parts.join(" ")
 }

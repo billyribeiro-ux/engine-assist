@@ -1,14 +1,18 @@
-//! Handoff packets (F-012, F-013; `docs/contracts/files.md` §5): parsing after normalization, the
-//! signature forms and validation. Content never changes Foreman's behavior beyond the parsed
+//! Handoff packets (F-012, F-013; `docs/contracts/files.md` §5): normalization, splitting a
+//! paste, parsing after normalization, the signature forms, validation and the fix request. Content never changes Foreman's behavior beyond the parsed
 //! fields (AC-F013-03).
 
 use serde::{Deserialize, Serialize};
 
+pub mod adr_split;
+pub mod normalize;
 pub mod sign_fields;
 pub mod split;
 pub mod validate;
 
-pub use validate::{PacketCtx, Problem, validate_packet};
+pub use normalize::{Normalized, Note, NoteKind, normalize_packet, normalize_paste};
+pub use split::{Split, SplitError, split_paste};
+pub use validate::{PacketCtx, Problem, fix_request_text, validate_packet};
 
 /// A parsed field.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

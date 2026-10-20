@@ -10,7 +10,7 @@
     reason = "test code may use std::fs (design doc §3.2)"
 )]
 
-use foreman_core::packet::split::{self, SplitError};
+use foreman_core::packet::adr_split::{self as split, SplitError};
 use foreman_core::store::{ReadStamp, Root, RootKind};
 
 const PASTE: &str = "Here are the ADRs.\n\n# ADR-001: Desktop shell\nWe use Tauri.\n\n## Status\nAccepted\n\n# ADR-002: Frontend\nSvelteKit.\n# ADR-12: not a heading\n";

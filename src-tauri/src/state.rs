@@ -119,6 +119,8 @@ pub struct Inner {
     pub picks: OneTime<PathBuf>,
     /// Two-phase previews (`*_preview` → `*_apply`).
     pub previews: OneTime<crate::preview::Preview>,
+    /// The last `packet:changed` revision (ipc.md §6).
+    pub packet_rev: u32,
 }
 
 /// The app state.
@@ -127,6 +129,7 @@ pub struct App {
     paths: Paths,
     me: std::sync::Weak<App>,
     runs: crate::runs::Runs,
+    watchers: crate::watch::Watchers,
     launch: Mutex<crate::launch::LaunchState>,
     inner: Mutex<Inner>,
     /// Serializes mutating commands (one writer at a time; CAS still guards every file).
@@ -196,6 +199,7 @@ impl App {
             paths,
             me: me.clone(),
             runs: crate::runs::Runs::default(),
+            watchers: crate::watch::Watchers::default(),
             launch: Mutex::new(crate::launch::LaunchState::default()),
             inner: Mutex::new(Inner {
                 settings_rev: 1,
@@ -216,6 +220,12 @@ impl App {
     #[must_use]
     pub fn runs(&self) -> &crate::runs::Runs {
         &self.runs
+    }
+
+    /// The file watchers (ADR-013).
+    #[must_use]
+    pub fn watchers(&self) -> &crate::watch::Watchers {
+        &self.watchers
     }
 
     /// Plans, pending acknowledgements and re-arms (IPC-R7).

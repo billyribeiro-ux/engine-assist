@@ -119,6 +119,8 @@ export interface MPacket {
 	writtenBy: string;
 	sha: string;
 	tampered: boolean;
+	/** DR-131 notes still to apply (packet_normalize_apply clears them). */
+	normalization?: { field: string; message: string }[];
 }
 export interface MProject {
 	id: string;

@@ -66,3 +66,9 @@ Checked 2026-10-19:
 ## Exit path
 
 The watcher only produces "path may have changed" hints. Replacing notify with polling or another crate changes `watch.rs` only.
+
+## Amended 2026-10-20 (M3-21, M3-22)
+
+- **Config sources of live runs** (ADR-021 §7) get their own hint-only watcher, `foreman_sys::watch::HintWatcher`: per live run, the cwd, the repo root, the config folder and the managed folder non-recursively (for the named files, so a file created there is seen), the source folders recursively, and `~/.claude.json` and ancestor `CLAUDE.md` files above the repo directly. Home and `/` are never watched. Targets that don't exist or are symlinks (`lstat`) are skipped, so nothing is followed; a hint is relevant only if it names a source (Claude Code's own churn in the config folder, transcripts and history, is ignored). A relevant hint re-fingerprints that run through `foreman_sys::fingerprint::gather`, the only reader. A folder source that appears re-arms the run's watcher. What hints can't see (imports, programs, plugins, a file appearing where nothing is watched) is re-checked every 60 s, every 5 s for a run whose watcher couldn't start, and on window focus. Code: `src-tauri/src/watch.rs` (`config_targets`, `config_loop`).
+- **Re-stat**: on `project_open` (the first re-stat records the stamps, later ones emit what changed) and on window focus. Launch and sign re-stat stay with their tickets.
+- Tests: `watcher::packet_visible_within_1s` (p95 over 20 writes, rename-over saves), `watcher::stopped_watcher_warns_and_packets_still_validate`, `watcher::app_events_never_act`, `watcher::config_changed_by_watcher_event`, `watcher::config_targets_relevance`, `decisions::outside_edit_has_no_effect_until_accepted` (live).

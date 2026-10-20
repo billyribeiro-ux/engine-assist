@@ -149,5 +149,17 @@ pub fn run() -> tauri::Result<()> {
             window::build_main(app)?;
             Ok(())
         })
+        .on_window_event(|window, event| {
+            // ADR-013: a focus re-stats the watched projects and re-checks live runs' config, so a
+            // missed file event can't hide a change past the next interaction.
+            if let tauri::WindowEvent::Focused(true) = event
+                && let Some(s) = window.try_state::<ipc::Shared>()
+            {
+                let state = Arc::clone(s.inner());
+                let _ = std::thread::Builder::new()
+                    .name("fm-focus-restat".into())
+                    .spawn(move || watch::on_focus(&state));
+            }
+        })
         .run(tauri::generate_context!())
 }

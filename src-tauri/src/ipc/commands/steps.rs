@@ -957,33 +957,10 @@ pub fn manual_outs_changed(app: &App, p: &mut Opened) -> bool {
     any
 }
 
-/// DR-137: the fix request for a packet's problems.
+/// DR-137: the fix request for a packet's problems (`foreman_core::packet::fix_request_text`).
 #[must_use]
 pub fn fix_request(problems: &[foreman_core::packet::Problem]) -> String {
-    let missing: Vec<String> = problems
-        .iter()
-        .filter(|p| p.rule == "packet.missing-field")
-        .map(|p| p.message.clone())
-        .collect();
-    let mut out = String::from("Your packet is missing: ");
-    if missing.is_empty() {
-        out = String::from("Your packet has problems: ");
-        out.push_str(
-            &problems
-                .iter()
-                .map(|p| p.message.clone())
-                .collect::<Vec<_>>()
-                .join("; "),
-        );
-    } else {
-        out.push_str(&missing.join(", "));
-    }
-    out.push('.');
-    if problems.iter().any(|p| p.rule == "packet.open-items") {
-        out.push_str(" OPEN ITEMS must be exactly `none`.");
-    }
-    out.push_str(" Re-output the complete packet in one code block.");
-    out
+    foreman_core::packet::fix_request_text(problems)
 }
 
 /// POSIX shell quoting for Copy command: bare when only safe characters, else single quotes.

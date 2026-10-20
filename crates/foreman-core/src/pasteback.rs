@@ -113,8 +113,8 @@ pub type Normalize<'a> = &'a dyn Fn(&str) -> (String, Vec<String>);
 
 /// The structural part of DR-131 that splitting needs: BOM, CR/CRLF → LF, trailing whitespace,
 /// and a code fence wrapping the whole paste. Field-level normalization (unsigned forms, `none`,
-/// smart quotes, NBSP, header variants) is `packet::normalize_packet` (M3-20), which callers pass
-/// as the normalizer once it exists.
+/// smart quotes, NBSP, header variants) is `packet::normalize_paste` (M3-20), which
+/// `paste_back_preview` passes; this stays as the structural baseline for the planner's tests.
 #[must_use]
 pub fn prepare(text: &str) -> (String, Vec<String>) {
     let mut notes = Vec::new();

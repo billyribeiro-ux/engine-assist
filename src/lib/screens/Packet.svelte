@@ -137,6 +137,11 @@
 			ui.say(failureText(toIpcFailure(e)));
 		}
 	}
+	function fieldLabel(f: string): string {
+		if (f === '') return 'Whole file';
+		if (f === 'header') return 'Header';
+		return f;
+	}
 	const TRI: { value: TriState; label: string }[] = [
 		{ value: 'yes', label: 'Yes' },
 		{ value: 'no', label: 'No' },
@@ -216,6 +221,30 @@
 						</div>
 					{/if}
 
+					{#if pk.normalization.length}
+						<section class="section norm-box" aria-labelledby="norm-h">
+							<div class="section-head">
+								<h2 class="section-title" id="norm-h">Formatting Foreman can fix</h2>
+							</div>
+							<p class="muted small">
+								Normalizing changes only these, then re-checks the packet. Nothing is written until
+								you press the button, and a newer edit on disk is never overwritten.
+							</p>
+							<ul class="norm-list">
+								{#each pk.normalization as n, i (i)}
+									<li>
+										<span class="norm-field">{fieldLabel(n.field)}</span><span>{n.message}</span>
+									</li>
+								{/each}
+							</ul>
+							<div class="actions top">
+								<button class="btn primary" type="button" onclick={() => act('normalize')}
+									><Icon name="check" />Normalize the file</button
+								>
+							</div>
+						</section>
+					{/if}
+
 					<dl class="pfields" aria-label="Packet fields">
 						{#each pk.fields as fd (fd.key)}
 							<div
@@ -237,11 +266,9 @@
 											These items are open. Close each one of two ways: resolve it, or move it to
 											KNOWN LIMITS with a ticket ID.
 										</p>{/if}
-									{#if pk.normalization.some((n) => n.field === fd.key)}<button
-											class="btn ghost xs norm"
-											type="button"
-											onclick={() => act('normalize')}>Normalize the file</button
-										>{/if}
+																		{#each pk.normalization.filter((n) => n.field === fd.key) as n (n.message)}<span
+											class="note-tag">{n.message}</span
+										>{/each}
 									{#each fd.problems as pr, i (i)}
 										<div class="problem">
 											<p><Icon name="cross" size="sm" /><span>{pr.message}</span></p>
@@ -461,8 +488,33 @@
 		gap: var(--space-4);
 		justify-content: space-between;
 	}
-	.norm {
+	.norm-box {
+		margin-top: var(--space-5);
+		padding: var(--space-4);
+		border: var(--hairline) solid var(--accent-ink);
+		background: var(--well);
+	}
+	.norm-list {
+		margin: var(--space-3) 0 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		gap: var(--space-2);
+		font-size: var(--text-12);
+	}
+	.norm-list li {
+		display: flex;
+		gap: var(--space-4);
+	}
+	.norm-field {
+		font-family: var(--font-mono);
+		min-width: 140px;
+		color: var(--ink-muted);
+	}
+	.note-tag {
 		margin-left: var(--space-2);
+		font-size: var(--text-11);
+		color: var(--accent-ink);
 	}
 	.ink {
 		color: var(--ink);
