@@ -1,5 +1,11 @@
 //! Shared helpers for the core's integration tests.
-#![allow(dead_code, clippy::unwrap_used, clippy::panic, clippy::disallowed_methods, reason = "shared test helpers; each test binary uses a subset")]
+#![allow(
+    dead_code,
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::disallowed_methods,
+    reason = "shared test helpers; each test binary uses a subset"
+)]
 
 use std::path::{Path, PathBuf};
 
@@ -38,6 +44,9 @@ pub fn schema_validator(kind: &str) -> jsonschema::Validator {
 /// Panics with every schema error.
 pub fn assert_valid(kind: &str, v: &serde_json::Value) {
     let val = schema_validator(kind);
-    let errs: Vec<String> = val.iter_errors(v).map(|e| format!("{e} at {}", e.instance_path())).collect();
+    let errs: Vec<String> = val
+        .iter_errors(v)
+        .map(|e| format!("{e} at {}", e.instance_path()))
+        .collect();
     assert!(errs.is_empty(), "{kind}: {errs:#?}");
 }

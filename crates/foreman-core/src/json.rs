@@ -182,7 +182,12 @@ mod tests {
         assert_eq!(parse_value(deep.as_bytes()), Err(JsonError::TooDeep));
         let ok = "[".repeat(64) + &"]".repeat(64);
         assert!(parse_value(ok.as_bytes()).is_ok());
-        assert!(parse_value(br#"{"a":"[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[["}"#).is_ok());
+        assert!(
+            parse_value(
+                br#"{"a":"[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[["}"#
+            )
+            .is_ok()
+        );
     }
 
     #[test]

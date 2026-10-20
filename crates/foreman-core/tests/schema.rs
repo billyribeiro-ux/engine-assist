@@ -1,6 +1,14 @@
 //! M1-02 / M1-29: schema versioning (ADR-023) and the app-data file contracts (files.md §2–§4).
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "test code")]
-#![allow(clippy::disallowed_methods, reason = "test code may use std::fs (design doc §3.2)")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test code may use std::fs (design doc §3.2)"
+)]
 
 mod common;
 
@@ -61,13 +69,18 @@ mod schema {
         assert_eq!(
             l,
             Loaded::Migrated {
-                value: Synthetic { schema_version: 3, b: 5, c: true },
+                value: Synthetic {
+                    schema_version: 3,
+                    b: 5,
+                    c: true
+                },
                 from: 1
             }
         );
         let l = schema::migrate::<Synthetic>(json!({"schemaVersion": 2, "b": 7})).unwrap();
         assert!(matches!(l, Loaded::Migrated { from: 2, .. }));
-        let l = schema::migrate::<Synthetic>(json!({"schemaVersion": 3, "b": 1, "c": false})).unwrap();
+        let l =
+            schema::migrate::<Synthetic>(json!({"schemaVersion": 3, "b": 1, "c": false})).unwrap();
         assert!(matches!(l, Loaded::Current(_)));
         // deny_unknown_fields after migrating.
         assert!(matches!(
@@ -96,7 +109,9 @@ mod schema {
     }
 
     fn v2_to_v3(mut v: Value) -> Result<Value, MigrationError> {
-        v.as_object_mut().unwrap().insert("c".into(), Value::Bool(true));
+        v.as_object_mut()
+            .unwrap()
+            .insert("c".into(), Value::Bool(true));
         Ok(v)
     }
 
@@ -126,7 +141,10 @@ mod schema {
             "name": "TradeLog", "verifyCommands": [{"id": "x"}], "conditions": {"brandNew": "maybe"}}"#;
         let h = Header::read(text.as_bytes()).unwrap();
         assert_eq!(h.schema_version, 5);
-        assert_eq!(h.project_id.as_deref(), Some("3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b"));
+        assert_eq!(
+            h.project_id.as_deref(),
+            Some("3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b")
+        );
         assert_eq!(h.name.as_deref(), Some("TradeLog"));
         let l = schema::load::<ProjectFile>(text.as_bytes()).unwrap();
         assert_eq!(l, Loaded::NewerReadOnly(h));
@@ -140,21 +158,30 @@ mod schema {
         let old = "{\n  \"a\": 2,\n  \"schemaVersion\": 1\n}\n";
         std::fs::write(&path, old).unwrap();
         let before = std::fs::metadata(&path).unwrap();
-        let root = foreman_core::store::Root::open(dir.path(), foreman_core::store::RootKind::AppData).unwrap();
+        let root =
+            foreman_core::store::Root::open(dir.path(), foreman_core::store::RootKind::AppData)
+                .unwrap();
         let p = foreman_core::pathpolicy::check_app_data("synthetic.json").unwrap();
-        let (bytes, _) = root.read(&p, foreman_core::pathpolicy::ReadClass::Decision).unwrap();
+        let (bytes, _) = root
+            .read(&p, foreman_core::pathpolicy::ReadClass::Decision)
+            .unwrap();
         let loaded = schema::load::<Synthetic>(&bytes).unwrap();
         assert!(matches!(loaded, Loaded::Migrated { from: 1, .. }));
         let after = std::fs::metadata(&path).unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), old);
         assert_eq!(before.modified().unwrap(), after.modified().unwrap());
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "no temp or backup files");
+        assert_eq!(
+            std::fs::read_dir(dir.path()).unwrap().count(),
+            1,
+            "no temp or backup files"
+        );
     }
 
     /// The schema files under tests/schema equal the JSON Schemas in docs/contracts/files.md.
     #[test]
     fn schemas_match_contract() {
-        let md = std::fs::read_to_string(common::repo_root().join("docs/contracts/files.md")).unwrap();
+        let md =
+            std::fs::read_to_string(common::repo_root().join("docs/contracts/files.md")).unwrap();
         let mut n = 0;
         for block in md.split("```json\n").skip(1) {
             let body = block.split("```").next().unwrap();
@@ -170,7 +197,8 @@ mod schema {
             let id = v["$id"].as_str().unwrap();
             let name = id.rsplit(':').next().unwrap().trim_end_matches(".v1");
             let file: Value =
-                serde_json::from_str(&common::read_fixture(&format!("schema/{name}.schema.json"))).unwrap();
+                serde_json::from_str(&common::read_fixture(&format!("schema/{name}.schema.json")))
+                    .unwrap();
             assert_eq!(v, file, "{name}");
             n += 1;
         }
