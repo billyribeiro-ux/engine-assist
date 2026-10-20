@@ -140,8 +140,15 @@ pub fn handle(app: &App, project_id: &str, change: &Change) -> bool {
             true
         }
         Interest::Decision { .. } => crate::project::refresh_decisions(app, project_id).is_ok(),
-        // No P1 reader: lessons (F-016) and `out` paths (round tracker) are P2.
-        Interest::Lessons | Interest::Out { .. } | Interest::SensorEvent { .. } => false,
+        // P2 round tracker (M4-11, AC-F009-12): an `out` file written bumps the project's
+        // revision, so `project:changed` refreshes the step's outputs and Open output.
+        Interest::Out { .. } => {
+            let _w = app.writing();
+            crate::project::open(app, project_id)
+                .and_then(|mut p| p.save_progress(app))
+                .is_ok()
+        }
+        Interest::Lessons | Interest::SensorEvent { .. } => false,
     }
 }
 

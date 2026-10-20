@@ -701,7 +701,9 @@ export class MockIpcClient implements IpcClient {
 			switches:
 				st.tpl.key === '2.4'
 					? [{ text: 'Re-arms the council session with Accept edits when Claude is idle.' }]
-					: [],
+					: st.tpl.key === '2.2'
+						? [{ text: 'Next: after you approve the plan, choose Accept edits' }]
+						: [],
 			chips,
 			argvPreview: this.argv(p, st),
 			envNames:
@@ -719,8 +721,15 @@ export class MockIpcClient implements IpcClient {
 						: [],
 			override: this.overrides.get(`${p.id}/${st.tpl.key}`) ?? null,
 			parts: st.parts,
-			copiedAt: st.copiedAt
+			copiedAt: st.copiedAt,
+			live: (st.run ? this.liveModes.get(st.run) : undefined) ?? null
 		};
+	}
+	/** P2 sensor (M4-11): the live session's mode for a run (`expected` set on a mismatch). */
+	private liveModes = new Map<string, T.LiveMode>();
+	setLiveMode(runId: string, live: T.LiveMode | null): void {
+		if (live) this.liveModes.set(runId, live);
+		else this.liveModes.delete(runId);
 	}
 
 	// ---------------------------------------------------------------- 4.1 App
@@ -3201,15 +3210,39 @@ export class MockIpcClient implements IpcClient {
 			const p = this.project(req.projectId);
 			const st = this.step(p, req.step);
 			if (st.tpl.surface !== 'desktop') throw notAllowed('not-desktop-step');
+			this.writable(p);
+			progress?.({ phase: 'version', found: '2.1.304 (Claude Code)' });
+			progress?.({ phase: 'auth', cached: false });
+			progress?.({ phase: 'spawning' });
 			progress?.({ phase: 'done' });
-			return { chips: { chips: [], link: null, linkLabel: null } };
+			this.world.clipboard = PROMPTS[st.tpl.key] ?? st.tpl.title;
+			if (st.state === 'notStarted') st.state = 'copied';
+			this.touch(p);
+			return {
+				chips: {
+					chips: [
+						{ id: 'session', label: 'New Desktop session', strong: true },
+						{ id: 'model', label: 'Opus 5.5', strong: false },
+						{ id: 'effort', label: 'high effort', strong: false },
+						{ id: 'mode', label: 'Plan', strong: false }
+					],
+					link: null,
+					linkLabel: null
+				}
+			};
 		});
 	}
+	private handedOff = new Set<string>();
 	desktopHandoff(req: Requests['desktop_handoff']): Promise<null> {
 		return this.run('desktop_handoff', req, () => {
 			const r = this.chainRun(req.chain);
 			if (!r) throw notFound();
 			if (r.live) throw notAllowed('chain-live');
+			if (this.handedOff.has(req.chain)) {
+				// Already handed off: Rust asks natively whether Desktop is closed.
+				this.ask();
+				this.handedOff.delete(req.chain);
+			} else this.handedOff.add(req.chain);
 			return null;
 		});
 	}

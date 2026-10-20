@@ -69,6 +69,15 @@
 		(a) => (a ? [`project:${a.projectId}`] : [])
 	);
 	const v: StepView | null = $derived(view.value ?? null);
+	// AC-F023-01: a Stage 4 chat step shows how much of the knowledge is in the Project.
+	const knowledge = resource(
+		() =>
+			expanded && full && stage.stage === 4 && step.surface === 'chat'
+				? { projectId: pid, rev: project.summary.rev }
+				: null,
+		(c, a) => (a ? c.manifestView({ projectId: a.projectId }) : Promise.resolve(null)),
+		(a) => (a ? [`project:${a.projectId}`] : [])
+	);
 
 	const LOCK =
 		'Core: protects production quality. Change it in the blueprint with a Change Request.';
@@ -511,6 +520,11 @@
 						<button class="btn" type="button" onclick={() => copy('prompt').then(report)}
 							><Icon name="copy" />Copy prompt</button
 						>
+						{#if knowledge.value && knowledge.value.total > 0}
+							<span class={['reason', knowledge.value.ready < knowledge.value.total && 'attention']}
+								>Knowledge ready {knowledge.value.ready} of {knowledge.value.total}</span
+							>
+						{/if}
 						{#if step.surface === 'cli'}
 							<button class="btn ghost" type="button" onclick={() => copy('command').then(report)}
 								>Copy command</button

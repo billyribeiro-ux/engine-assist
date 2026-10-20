@@ -77,6 +77,22 @@ export async function runStep(t: RunTarget): Promise<true | string> {
 			);
 			return true;
 		}
+		if (t.surface === 'desktop') {
+			// F-024: the prompt is copied and `claude --desktop` opens Desktop on the step's folder;
+			// Billy picks the model, effort and mode there from the chips (AC-F024-01).
+			const r = await client.desktopOpen({ projectId: t.projectId, step: t.step });
+			refresh(`project:${t.projectId}`, 'today');
+			const pick = r.chips.chips
+				.filter((c) => c.id !== 'session')
+				.map((c) => c.label)
+				.join(', ');
+			ui.toast(
+				`Prompt copied and Claude Desktop opened. Paste it there${pick ? ` and pick ${pick}` : ''}.`,
+				'pass',
+				'copy'
+			);
+			return true;
+		}
 		const prep = await client.launchPrepare({
 			projectId: t.projectId,
 			step: t.step,

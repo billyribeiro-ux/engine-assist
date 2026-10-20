@@ -193,6 +193,33 @@ pub fn observed(root: &Root, run_id: &str) -> Option<Observed> {
     })
 }
 
+/// (M4-11) The live mode of a live run with the sensor, for the Now/Next strip: its display
+/// name, and the expected mode's name when the live one is neither `intended`'s mode nor one of
+/// `allowed` (the step's switch targets).
+#[must_use]
+pub fn live_mode(
+    app: &App,
+    run_id: &str,
+    intended: Start,
+    allowed: &[foreman_core::ids::Mode],
+) -> Option<crate::ipc::dto::steps::LiveMode> {
+    if !app.runs().get(run_id).is_some_and(|r| r.session.is_live()) {
+        return None;
+    }
+    let raw = live_state(app, run_id)?.permission_mode?;
+    let parsed = foreman_core::ids::Mode::parse(&raw);
+    let ok = parsed.is_some_and(|m| intended.mode == Some(m) || allowed.contains(&m));
+    Some(crate::ipc::dto::steps::LiveMode {
+        mode: parsed.map_or_else(
+            || crate::render::escape_visible(&raw.chars().take(20).collect::<String>()),
+            crate::project::mode_name,
+        ),
+        expected: (!ok)
+            .then(|| intended.mode.map(crate::project::mode_name))
+            .flatten(),
+    })
+}
+
 /// The mode guard (AC-F011-06): a warning when the live mode or effort differs from the step's.
 /// Shown only; nothing is enforced.
 #[must_use]

@@ -67,4 +67,57 @@ describe('StageWorkspace', () => {
 		await expect.element(again.getByRole('button', { name: 'Copy prompt' })).toBeVisible();
 		expect(document.activeElement?.closest('.actions')).toBeNull();
 	});
+
+	it('AC-F024-01: a desktop step opens in Desktop with the prompt copied and the chips named', async () => {
+		const m = fresh('happy');
+		const open = vi.spyOn(m, 'desktopOpen');
+		const v = await m.addStep({
+			projectId: IDS.tradelog,
+			stage: 2,
+			after: '2.4',
+			copyConfigFrom: '2.4',
+			title: 'Review the stack in Desktop',
+			text: 'List what could break first.',
+			config: {
+				surface: 'desktop',
+				cwd: 'spec',
+				start: { model: 'opus', effort: 'high', mode: 'plan' },
+				out: []
+			},
+			tag: 'optional'
+		});
+		const key =
+			v.stages[2]?.steps.find((x) => x.title === 'Review the stack in Desktop')?.key ?? '';
+		const s = await render(StageWorkspace, { project: v, stageNo: 2, stepKey: key });
+		await s.getByRole('button', { name: /Open in Desktop/ }).click();
+		await vi.waitFor(() =>
+			expect(open).toHaveBeenCalledWith({ projectId: IDS.tradelog, step: key })
+		);
+		await vi.waitFor(() => expect(m.getClipboard()).toContain('List what could break first.'));
+		await vi.waitFor(() =>
+			expect(ui.toasts.map((t) => t.text).join('\n')).toContain(
+				'Prompt copied and Claude Desktop opened. Paste it there and pick Opus 5.5, high effort, Plan.'
+			)
+		);
+	});
+
+	it('AC-F027-02: Export run sheet goes through the Rust save dialog; Cancel writes nothing', async () => {
+		const m = fresh('happy');
+		const exp = vi.spyOn(m, 'runSheetExport');
+		const p = await project(m, IDS.tradelog);
+		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
+		const b = s.getByRole('button', { name: 'Export run sheet…' });
+		await b.click();
+		await vi.waitFor(() => expect(exp).toHaveBeenCalledWith({ projectId: IDS.tradelog, stage: 2 }));
+		await vi.waitFor(() =>
+			expect(ui.toasts.map((t) => t.text).join('\n')).toContain(
+				'Run sheet exported to ~/Desktop/tradelog-stage-02-run-sheet.md'
+			)
+		);
+		ui.toasts = [];
+		m.setDialogAnswer('cancel');
+		await b.click();
+		await vi.waitFor(() => expect(exp).toHaveBeenCalledTimes(2));
+		expect(ui.toasts).toEqual([]);
+	});
 });

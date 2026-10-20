@@ -23,4 +23,20 @@ describe('TerminalDrawer', () => {
 			.element(s.getByRole('tab', { name: /fm-tradelog-s05-5-1.*waiting for permission/ }))
 			.toBeVisible();
 	});
+
+	it('AC-F009-13: focus mode toggles the drawer (⌘⇧T runs the same toggle, dispatch test)', async () => {
+		fresh('happy');
+		const a = 'a0000000-0000-4000-8000-0000000000a1';
+		terminal.add({ runId: a, chain: 'c1', tabName: 'fm-tradelog-s02-2-2' }, null);
+		const s = await render(TerminalDrawer);
+		const b = s.getByRole('button', { name: 'Focus mode (⌘⇧T)' });
+		await expect.element(b).toHaveAttribute('aria-pressed', 'false');
+		await b.click();
+		await expect.element(b).toHaveAttribute('aria-pressed', 'true');
+		expect(terminal.focusMode).toBe(true);
+		const drawer = s.getByRole('region', { name: 'Terminal drawer' });
+		expect(drawer.element().classList.contains('focus-mode')).toBe(true);
+		terminal.focusMode = false;
+		await expect.element(b).toHaveAttribute('aria-pressed', 'false');
+	});
 });

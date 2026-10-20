@@ -4,12 +4,13 @@
 	// tablist (← → move); empty states invite the next action.
 	import type { Snippet } from 'svelte';
 
-	import type { ProjectView, StageView, StepSummary } from '#lib/ipc/types.ts';
+	import type { Manifest, ProjectView, StageView, StepSummary } from '#lib/ipc/types.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
 
 	import Icon from './Icon.svelte';
+	import KnowledgeManifest from './KnowledgeManifest.svelte';
 
 	let {
 		project,
@@ -131,33 +132,18 @@
 					{/if}
 				</div>
 			{/if}
-			{#if step?.surface === 'chat'}
+			{#if step?.surface === 'chat' && manifest.value}
+				<KnowledgeManifest
+					projectId={pid}
+					manifest={manifest.value}
+					onchange={(m: Manifest) => manifest.set(m)}
+				/>
+			{:else if step?.surface === 'chat'}
 				<div>
 					<h2 class="insp-title">Knowledge for this chat</h2>
-					{#if manifest.value?.files.length}
-						<ul class="insp-list">
-							{#each manifest.value.files as f (f.path)}
-								<li>
-									<Icon
-										name={f.inProject ? 'check' : 'ring'}
-										size="glyph"
-										tone={f.inProject ? 'pass' : 'muted'}
-									/>
-									<span
-										><code>{f.path}</code><span class="kind"
-											>{f.inProject
-												? 'In the claude.ai Project'
-												: 'Upload to the claude.ai Project'}</span
-										></span
-									>
-								</li>
-							{/each}
-						</ul>
-					{:else}
-						<p class="insp-sub">
-							Nothing to upload yet. Signed packets appear here for the claude.ai Project.
-						</p>
-					{/if}
+					<p class="insp-sub">
+						Nothing to upload yet. Signed packets appear here for the claude.ai Project.
+					</p>
 				</div>
 			{/if}
 		{:else if tab === 'gate'}

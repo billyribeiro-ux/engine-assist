@@ -72,13 +72,15 @@
 			: null
 	);
 
-	async function save(p: Partial<SettingsPatch>, done: string): Promise<void> {
-		if (!s) return;
+	/** Saves a patch; true when it was saved (a Cancel in Rust's dialog keeps what was typed). */
+	async function save(p: Partial<SettingsPatch>, done: string): Promise<boolean> {
+		if (!s) return false;
 		const c = await ipc();
 		try {
 			settings.set(await c.settingsUpdate({ expectRev: s.rev, patch: patch(p) }));
 			ui.toast(done);
 			refresh('settings');
+			return true;
 		} catch (e: unknown) {
 			const f = toIpcFailure(e);
 			if (f.code === 'stale') {
@@ -86,6 +88,7 @@
 				ui.say('Settings changed on disk. Foreman reloaded them; make the change again.');
 			} else if (f.code === 'cancelled') ui.say('Cancelled. Nothing changed.');
 			else ui.say(failureText(f));
+			return false;
 		}
 	}
 	async function pick(tool: ToolKind): Promise<void> {
@@ -412,7 +415,9 @@
 										void save(
 											{ envPassthrough: [...s.envPassthrough, addEnv.trim()] },
 											`${addEnv.trim()} added`
-										).then(() => (addEnv = ''));
+										).then((ok) => {
+											if (ok) addEnv = '';
+										});
 								}}
 							>
 								<label class="vh" for="s-addenv">Add a variable</label>

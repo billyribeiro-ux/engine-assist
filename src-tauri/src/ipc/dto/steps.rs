@@ -79,6 +79,17 @@ response!(
         r#override: Option<RunOverride>,
         parts: Vec<StepPart>,
         copied_at: Option<Timestamp>,
+        live: Option<LiveMode>,
+    }
+);
+
+response!(
+    /// (M4-11, AC-F009-11) The live session's mode as the P2 sensor reports it, for the Now/Next
+    /// strip: `mode` is its display name; `expected` is set when it is neither the step's start
+    /// mode nor a switch target (the mode guard's mismatch, AC-F011-06).
+    LiveMode {
+        mode: String,
+        expected: Option<String>,
     }
 );
 

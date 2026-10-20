@@ -386,12 +386,20 @@ pub fn view_of(app: &App, p: &Opened, key: &str) -> Result<StepView, IpcError> {
         .map(|ok| ok.notes.clone())
         .unwrap_or_default();
     // P2 mode guard (AC-F011-06): the live session's mode or effort differs from the run's.
+    let mut live = None;
     if let Some(run) = progress.last_run_id.as_deref()
         && let Ok((f, _)) = crate::runs::read_run(&p.app_root, run)
         && let Some(intended) = f.intended
-        && let Some(w) = crate::sensor_ingest::mode_guard(app, run, intended)
     {
-        warnings.push(w);
+        if let Some(w) = crate::sensor_ingest::mode_guard(app, run, intended) {
+            warnings.push(w);
+        }
+        // M4-11: the Now/Next strip's live mode (a switch target isn't a mismatch).
+        let targets: Vec<foreman_core::ids::Mode> = policy::effective_switches(s, &project.model_policy)
+            .iter()
+            .filter_map(|w| w.to.mode)
+            .collect();
+        live = crate::sensor_ingest::live_mode(app, run, intended, &targets);
     }
     Ok(StepView {
         prompt: r.as_ref().map(|r| segments(s, r)).unwrap_or_default(),
@@ -415,6 +423,7 @@ pub fn view_of(app: &App, p: &Opened, key: &str) -> Result<StepView, IpcError> {
             mode: o.mode.map(Into::into),
         }),
         parts,
+        live,
         copied_at: progress.copied_at.map(Timestamp),
         summary,
     })

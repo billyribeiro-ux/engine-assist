@@ -128,8 +128,8 @@
 					</div>
 					{#if spotless}
 						<p class="empty none" role="status">
-							<strong>No errors or warnings.</strong>Every annotation in blueprint {h.version} parsed cleanly
-							and the prose agrees with it.
+							<strong>No errors or warnings.</strong>Every annotation in blueprint {h.version} parsed
+							cleanly and the prose agrees with it.
 						</p>
 					{/if}
 					{#each byStage as g (g.stage)}

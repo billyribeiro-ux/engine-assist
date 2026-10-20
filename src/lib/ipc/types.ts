@@ -144,6 +144,7 @@ export type { LessonsStatusReq } from './bindings/LessonsStatusReq.ts';
 export type { LinkOutcome } from './bindings/LinkOutcome.ts';
 export type { LinkSource } from './bindings/LinkSource.ts';
 export type { LinkText } from './bindings/LinkText.ts';
+export type { LiveMode } from './bindings/LiveMode.ts';
 export type { LoginPathPreview } from './bindings/LoginPathPreview.ts';
 export type { LoginPathView } from './bindings/LoginPathView.ts';
 export type { Manifest } from './bindings/Manifest.ts';

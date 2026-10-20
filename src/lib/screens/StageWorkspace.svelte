@@ -42,6 +42,18 @@
 		});
 	});
 
+	// F-027 (AC-F027-02): Rust shows the save dialog and writes the Markdown sheet; Cancel writes
+	// nothing.
+	async function exportRunSheet(): Promise<void> {
+		const c = await ipc();
+		try {
+			const r = await c.runSheetExport({ projectId: pid, stage: stageNo });
+			if (r.kind === 'saved') ui.toast(`Run sheet exported to ${r.displayPath}`);
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
+		}
+	}
+
 	function defaultKey(): string | null {
 		return (
 			stepKey ??
@@ -177,6 +189,9 @@
 				<div>
 					<h1 class="stage-title" id="stage-title">{stage.title}</h1>
 					<p class="stage-sub">{stage.subtitle}</p>
+					<button class="btn ghost sheet-export" type="button" onclick={exportRunSheet}
+						><Icon name="file" />Export run sheet…</button
+					>
 				</div>
 				<TitleBlock {project} {stage} />
 			</div>
@@ -294,6 +309,10 @@
 		font-size: var(--text-12);
 		color: var(--ink-muted);
 		border-bottom: var(--hairline) solid var(--rule);
+	}
+	.sheet-export {
+		margin-top: var(--space-2);
+		margin-left: calc(-1 * var(--space-3));
 	}
 	@media (max-width: 1359px) {
 		.steps {

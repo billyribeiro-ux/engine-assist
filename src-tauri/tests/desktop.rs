@@ -373,3 +373,58 @@ mod runsheet {
         assert!(!txt.exists());
     }
 }
+
+mod round_tracker {
+    use super::*;
+    use foreman_app::ipc::commands::{projects, steps};
+
+    fn written(p: &ProjectApp) -> Vec<String> {
+        steps::step_view(&p.t.app, req(json!({ "projectId": p.id, "step": "2.2" })))
+            .unwrap()
+            .outs
+            .iter()
+            .filter(|o| o.exists)
+            .map(|o| o.path.as_str().to_owned())
+            .collect()
+    }
+
+    fn changed_events(p: &ProjectApp) -> usize {
+        p.t.os
+            .events()
+            .iter()
+            .filter(|e| e.name() == "project:changed")
+            .count()
+    }
+
+    /// AC-F009-12: a step with several `out=` files: as the watcher sees each written, the
+    /// project's revision moves (`project:changed`) and the step's outputs advance one by one,
+    /// each then offering Open output.
+    #[test]
+    fn advances_per_output() {
+        let p = ProjectApp::new(json!({}));
+        projects::project_open(&p.t.app, req(json!({ "projectId": p.id }))).unwrap();
+        let outs: Vec<String> =
+            steps::step_view(&p.t.app, req(json!({ "projectId": p.id, "step": "2.2" })))
+                .unwrap()
+                .outs
+                .iter()
+                .map(|o| o.path.as_str().to_owned())
+                .collect();
+        assert!(outs.len() >= 3, "{outs:?}");
+        assert!(written(&p).is_empty());
+        for (i, out) in outs.iter().take(3).enumerate() {
+            let before = changed_events(&p);
+            let f = p.project.join(out);
+            std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+            std::fs::write(&f, format!("# round {i}\n")).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while changed_events(&p) == before && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            assert!(changed_events(&p) > before, "no project:changed for {out}");
+            let now = written(&p);
+            assert_eq!(now.len(), i + 1, "{now:?}");
+            assert!(now.contains(out));
+        }
+    }
+}

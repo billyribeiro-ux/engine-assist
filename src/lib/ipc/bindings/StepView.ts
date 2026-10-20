@@ -3,6 +3,7 @@ import type { Blocker } from "./Blocker";
 import type { ChatChips } from "./ChatChips";
 import type { EnvName } from "./EnvName";
 import type { Explained } from "./Explained";
+import type { LiveMode } from "./LiveMode";
 import type { OutView } from "./OutView";
 import type { PromptSegment } from "./PromptSegment";
 import type { RunInputView } from "./RunInputView";
@@ -17,4 +18,4 @@ import type { Timestamp } from "./Timestamp";
  * `StepView` (§4.4) with `parts` and `copiedAt` (§2.4). `override` is the wire name of
  * the contract's `override_`.
  */
-export type StepView = { summary: StepSummary, prompt: Array<PromptSegment>, inputs: Array<RunInputView>, start: Explained<Start> | null, switches: Array<SwitchCue>, chips: ChatChips | null, argvPreview: Array<string> | null, envNames: Array<EnvName>, blockers: Array<Blocker>, warnings: Array<string>, remaps: Array<string>, outs: Array<OutView>, override: RunOverride | null, parts: Array<StepPart>, copiedAt: Timestamp | null, };
+export type StepView = { summary: StepSummary, prompt: Array<PromptSegment>, inputs: Array<RunInputView>, start: Explained<Start> | null, switches: Array<SwitchCue>, chips: ChatChips | null, argvPreview: Array<string> | null, envNames: Array<EnvName>, blockers: Array<Blocker>, warnings: Array<string>, remaps: Array<string>, outs: Array<OutView>, override: RunOverride | null, parts: Array<StepPart>, copiedAt: Timestamp | null, live: LiveMode | null, };

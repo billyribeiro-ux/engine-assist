@@ -70,7 +70,8 @@ describe('TemplateHealth', () => {
 
 	it('loading: says it is reading the blueprint', async () => {
 		const m = fresh('happy');
-		vi.spyOn(m, 'templateHealth').mockReturnValue(new Promise(() => {}));
+		// A load that never answers.
+		vi.spyOn(m, 'templateHealth').mockReturnValue(new Promise(() => undefined));
 		const s = await render(TemplateHealth);
 		await expect.element(s.getByText(/Reading the blueprint/)).toBeVisible();
 		await expect.element(s.getByText(/Reading the blueprint/)).toHaveAttribute('role', 'status');

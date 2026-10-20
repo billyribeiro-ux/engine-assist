@@ -36,7 +36,9 @@
 		return RUN[t.status].word;
 	}
 
-	async function act(kind: 'interrupt' | 'terminate' | 'copy' | 'resume'): Promise<void> {
+	async function act(
+		kind: 'interrupt' | 'terminate' | 'copy' | 'resume' | 'desktop'
+	): Promise<void> {
 		menuOpen = false;
 		if (!active) return;
 		const client = await ipc();
@@ -62,6 +64,13 @@
 					stage: null
 				});
 				ui.toast('Session ID copied', 'pass', 'copy');
+			}
+			if (kind === 'desktop') {
+				// F-024: `claude --desktop --resume <id>` (Rust checks the version, auth and that the
+				// session ended); the next continuing step then forks (AC-F010-15).
+				await client.desktopHandoff({ chain: active.chain });
+				ui.toast('Opened in Claude Desktop. The next step in this chain starts a fork.', 'pass');
+				if (active.projectId) refresh(`project:${active.projectId}`);
 			}
 		} catch (e: unknown) {
 			const f = toIpcFailure(e);
@@ -214,6 +223,11 @@
 						<button role="menuitem" type="button" onclick={() => act('copy')}
 							>Copy session ID</button
 						>
+						{#if active.status === 'exited' || active.status === 'interrupted'}
+							<button role="menuitem" type="button" onclick={() => act('desktop')}
+								>Open this session in Desktop</button
+							>
+						{/if}
 						<button role="menuitem" type="button" onclick={() => close(active.runId, active.status)}
 							>Close tab</button
 						>
