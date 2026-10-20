@@ -1,8 +1,7 @@
 // Shared helpers for the smoke specs: reading page state and the production CSP.
 import { readFileSync } from 'node:fs';
 
-import { browser } from '@wdio/globals';
-
+import type { WebDriver } from '../webdriver.ts';
 import { configuredCsp, type CspDirectives } from './csp.ts';
 import { READ_STATE } from './scripts.ts';
 
@@ -17,8 +16,8 @@ export interface PageState {
 	mockIpc: string;
 }
 
-export async function readState(): Promise<PageState> {
-	return browser.execute<PageState, []>(READ_STATE);
+export function readState(driver: WebDriver): Promise<PageState> {
+	return driver.execute<PageState>(READ_STATE);
 }
 
 /** The production policy: `app.security.csp` from the repo's tauri.conf.json (not `devCsp`). */
