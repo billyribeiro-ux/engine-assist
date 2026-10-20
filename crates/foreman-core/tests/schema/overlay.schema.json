@@ -1,145 +1,122 @@
 {
-  "$id": "urn:foreman:overlay.v1",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "addedItems": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "pattern": "^xi-[0-9]{1,2}-[0-9]{1,3}$",
-            "type": "string"
-          },
-          "kind": {
-            "const": "attest"
-          },
-          "stage": {
-            "$ref": "urn:foreman:common#/$defs/stage"
-          },
-          "text": {
-            "$ref": "urn:foreman:common#/$defs/shortText"
-          }
-        },
-        "required": [
-          "id",
-          "stage",
-          "text",
-          "kind"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    },
-    "addedSteps": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "after": {
-            "$ref": "urn:foreman:common#/$defs/stepKey"
-          },
-          "copiedFrom": {
-            "$ref": "urn:foreman:common#/$defs/stepKey"
-          },
-          "cwd": {
-            "oneOf": [
-              {
-                "enum": [
-                  "project",
-                  "spec"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "id": {
-            "pattern": "^x-[0-9]{1,2}-[0-9]{1,3}$",
-            "type": "string"
-          },
-          "out": {
-            "items": {
-              "$ref": "urn:foreman:common#/$defs/repoPath"
-            },
-            "type": "array"
-          },
-          "stage": {
-            "$ref": "urn:foreman:common#/$defs/stage"
-          },
-          "start": {
-            "$ref": "urn:foreman:common#/$defs/start"
-          },
-          "surface": {
-            "enum": [
-              "chat",
-              "cli",
-              "desktop"
-            ]
-          },
-          "tag": {
-            "enum": [
-              "optional",
-              "core"
-            ]
-          },
-          "text": {
-            "maxLength": 65536,
-            "type": "string"
-          },
-          "title": {
-            "$ref": "urn:foreman:common#/$defs/shortText"
-          }
-        },
-        "required": [
-          "id",
-          "stage",
-          "after",
-          "copiedFrom",
-          "title",
-          "tag",
-          "text",
-          "surface",
-          "cwd",
-          "start",
-          "out"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    },
-    "schemaVersion": {
-      "const": 1
-    },
-    "skips": {
-      "additionalProperties": {
-        "additionalProperties": false,
-        "properties": {
-          "at": {
-            "$ref": "urn:foreman:common#/$defs/timestamp"
-          },
-          "reason": {
-            "$ref": "urn:foreman:common#/$defs/shortText",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "reason",
-          "at"
-        ],
-        "type": "object"
-      },
-      "propertyNames": {
-        "$ref": "urn:foreman:common#/$defs/stepKey"
-      },
-      "type": "object"
-    }
-  },
-  "required": [
-    "schemaVersion",
-    "skips",
-    "addedSteps",
-    "addedItems"
-  ],
-  "type": "object"
+	"$id": "urn:foreman:overlay.v1",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"properties": {
+		"addedItems": {
+			"items": {
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"pattern": "^xi-[0-9]{1,2}-[0-9]{1,3}$",
+						"type": "string"
+					},
+					"kind": {
+						"const": "attest"
+					},
+					"stage": {
+						"$ref": "urn:foreman:common#/$defs/stage"
+					},
+					"text": {
+						"$ref": "urn:foreman:common#/$defs/shortText"
+					}
+				},
+				"required": ["id", "stage", "text", "kind"],
+				"type": "object"
+			},
+			"type": "array"
+		},
+		"addedSteps": {
+			"items": {
+				"additionalProperties": false,
+				"properties": {
+					"after": {
+						"$ref": "urn:foreman:common#/$defs/stepKey"
+					},
+					"copiedFrom": {
+						"$ref": "urn:foreman:common#/$defs/stepKey"
+					},
+					"cwd": {
+						"oneOf": [
+							{
+								"enum": ["project", "spec"]
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"id": {
+						"pattern": "^x-[0-9]{1,2}-[0-9]{1,3}$",
+						"type": "string"
+					},
+					"out": {
+						"items": {
+							"$ref": "urn:foreman:common#/$defs/repoPath"
+						},
+						"type": "array"
+					},
+					"stage": {
+						"$ref": "urn:foreman:common#/$defs/stage"
+					},
+					"start": {
+						"$ref": "urn:foreman:common#/$defs/start"
+					},
+					"surface": {
+						"enum": ["chat", "cli", "desktop"]
+					},
+					"tag": {
+						"enum": ["optional", "core"]
+					},
+					"text": {
+						"maxLength": 65536,
+						"type": "string"
+					},
+					"title": {
+						"$ref": "urn:foreman:common#/$defs/shortText"
+					}
+				},
+				"required": [
+					"id",
+					"stage",
+					"after",
+					"copiedFrom",
+					"title",
+					"tag",
+					"text",
+					"surface",
+					"cwd",
+					"start",
+					"out"
+				],
+				"type": "object"
+			},
+			"type": "array"
+		},
+		"schemaVersion": {
+			"const": 1
+		},
+		"skips": {
+			"additionalProperties": {
+				"additionalProperties": false,
+				"properties": {
+					"at": {
+						"$ref": "urn:foreman:common#/$defs/timestamp"
+					},
+					"reason": {
+						"$ref": "urn:foreman:common#/$defs/shortText",
+						"minLength": 1
+					}
+				},
+				"required": ["reason", "at"],
+				"type": "object"
+			},
+			"propertyNames": {
+				"$ref": "urn:foreman:common#/$defs/stepKey"
+			},
+			"type": "object"
+		}
+	},
+	"required": ["schemaVersion", "skips", "addedSteps", "addedItems"],
+	"type": "object"
 }

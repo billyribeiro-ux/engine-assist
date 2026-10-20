@@ -103,6 +103,11 @@ export default defineConfig(
 		}
 	},
 	{
+		// node:test's describe/it/before/after return promises that the runner collects.
+		files: ['e2e/specs/**'],
+		rules: { '@typescript-eslint/no-floating-promises': 'off' }
+	},
+	{
 		files: [
 			'**/+page.server.*',
 			'**/+layout.server.*',
@@ -118,8 +123,9 @@ export default defineConfig(
 		}
 	},
 	{
-		// Tooling scripts run in Node, outside the webview; they may use the network-free Node APIs.
-		files: ['scripts/**', '*.config.*', 'tests/**'],
+		// Tooling scripts run in Node, outside the webview. e2e/ talks only to the test app's loopback
+		// WebDriver server (ADR-015); it never ships.
+		files: ['scripts/**', '*.config.*', 'tests/**', 'e2e/**'],
 		rules: { 'no-restricted-globals': 'off' }
 	}
 );

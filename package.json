@@ -34,7 +34,8 @@
 		"fixtures:hostile": "node scripts/make-hostile-repo.mjs",
 		"release": "scripts/build-release",
 		"test:flows": "playwright test",
-		"spikes": "node scripts/spikes/run.mjs"
+		"spikes": "node scripts/spikes/run.mjs",
+		"test:e2e": "node e2e/run.mjs"
 	},
 	"dependencies": {
 		"@tauri-apps/api": "2.12.4"

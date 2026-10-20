@@ -1,167 +1,134 @@
 {
-  "$id": "urn:foreman:fingerprint-cache.v1",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "acked": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "at": {
-              "$ref": "urn:foreman:common#/$defs/timestamp"
-            },
-            "fingerprint": {
-              "$ref": "urn:foreman:common#/$defs/sha256"
-            },
-            "snapshot": {
-              "items": {
-                "additionalProperties": false,
-                "properties": {
-                  "path": {
-                    "type": "string"
-                  },
-                  "redacted": {},
-                  "sha256": {
-                    "$ref": "urn:foreman:common#/$defs/sha256"
-                  },
-                  "source": {
-                    "enum": [
-                      "userSettings",
-                      "managedSettings",
-                      "managedDropIn",
-                      "claudeJsonMcp",
-                      "userMemory",
-                      "userDir",
-                      "claudeMd",
-                      "claudeLocalMd",
-                      "import",
-                      "projectClaudeDir",
-                      "mcpJson",
-                      "plugin",
-                      "program"
-                    ]
-                  }
-                },
-                "required": [
-                  "source",
-                  "path",
-                  "sha256",
-                  "redacted"
-                ],
-                "type": "object"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "fingerprint",
-            "at",
-            "snapshot"
-          ],
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "auth": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "at": {
-              "$ref": "urn:foreman:common#/$defs/timestamp"
-            },
-            "authMethod": {
-              "maxLength": 64,
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "claudeVersion": {
-              "type": "string"
-            },
-            "envKey": {
-              "$ref": "urn:foreman:common#/$defs/sha256"
-            },
-            "exit": {
-              "type": "integer"
-            },
-            "fingerprint": {
-              "$ref": "urn:foreman:common#/$defs/sha256"
-            }
-          },
-          "required": [
-            "fingerprint",
-            "claudeVersion",
-            "envKey",
-            "authMethod",
-            "exit",
-            "at"
-          ],
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "cwd": {
-      "pattern": "^/",
-      "type": "string"
-    },
-    "projectId": {
-      "$ref": "urn:foreman:common#/$defs/uuid"
-    },
-    "schemaVersion": {
-      "const": 1
-    },
-    "stat": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "dev": {
-            "type": "integer"
-          },
-          "ino": {
-            "type": "integer"
-          },
-          "mtimeNs": {
-            "type": "integer"
-          },
-          "path": {
-            "type": "string"
-          },
-          "sha256": {
-            "$ref": "urn:foreman:common#/$defs/sha256"
-          },
-          "size": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "path",
-          "dev",
-          "ino",
-          "size",
-          "mtimeNs",
-          "sha256"
-        ],
-        "type": "object"
-      },
-      "type": "array"
-    }
-  },
-  "required": [
-    "schemaVersion",
-    "projectId",
-    "cwd",
-    "acked",
-    "stat",
-    "auth"
-  ],
-  "type": "object"
+	"$id": "urn:foreman:fingerprint-cache.v1",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"properties": {
+		"acked": {
+			"oneOf": [
+				{
+					"additionalProperties": false,
+					"properties": {
+						"at": {
+							"$ref": "urn:foreman:common#/$defs/timestamp"
+						},
+						"fingerprint": {
+							"$ref": "urn:foreman:common#/$defs/sha256"
+						},
+						"snapshot": {
+							"items": {
+								"additionalProperties": false,
+								"properties": {
+									"path": {
+										"type": "string"
+									},
+									"redacted": {},
+									"sha256": {
+										"$ref": "urn:foreman:common#/$defs/sha256"
+									},
+									"source": {
+										"enum": [
+											"userSettings",
+											"managedSettings",
+											"managedDropIn",
+											"claudeJsonMcp",
+											"userMemory",
+											"userDir",
+											"claudeMd",
+											"claudeLocalMd",
+											"import",
+											"projectClaudeDir",
+											"mcpJson",
+											"plugin",
+											"program"
+										]
+									}
+								},
+								"required": ["source", "path", "sha256", "redacted"],
+								"type": "object"
+							},
+							"type": "array"
+						}
+					},
+					"required": ["fingerprint", "at", "snapshot"],
+					"type": "object"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"auth": {
+			"oneOf": [
+				{
+					"additionalProperties": false,
+					"properties": {
+						"at": {
+							"$ref": "urn:foreman:common#/$defs/timestamp"
+						},
+						"authMethod": {
+							"maxLength": 64,
+							"type": ["string", "null"]
+						},
+						"claudeVersion": {
+							"type": "string"
+						},
+						"envKey": {
+							"$ref": "urn:foreman:common#/$defs/sha256"
+						},
+						"exit": {
+							"type": "integer"
+						},
+						"fingerprint": {
+							"$ref": "urn:foreman:common#/$defs/sha256"
+						}
+					},
+					"required": ["fingerprint", "claudeVersion", "envKey", "authMethod", "exit", "at"],
+					"type": "object"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"cwd": {
+			"pattern": "^/",
+			"type": "string"
+		},
+		"projectId": {
+			"$ref": "urn:foreman:common#/$defs/uuid"
+		},
+		"schemaVersion": {
+			"const": 1
+		},
+		"stat": {
+			"items": {
+				"additionalProperties": false,
+				"properties": {
+					"dev": {
+						"type": "integer"
+					},
+					"ino": {
+						"type": "integer"
+					},
+					"mtimeNs": {
+						"type": "integer"
+					},
+					"path": {
+						"type": "string"
+					},
+					"sha256": {
+						"$ref": "urn:foreman:common#/$defs/sha256"
+					},
+					"size": {
+						"type": "integer"
+					}
+				},
+				"required": ["path", "dev", "ino", "size", "mtimeNs", "sha256"],
+				"type": "object"
+			},
+			"type": "array"
+		}
+	},
+	"required": ["schemaVersion", "projectId", "cwd", "acked", "stat", "auth"],
+	"type": "object"
 }

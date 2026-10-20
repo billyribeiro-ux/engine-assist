@@ -84,10 +84,10 @@ Stage: 5
 Depends on: M0-01, M0-04
 ADRs: ADR-015, ADR-017
 Threats mitigated: T-010
-Likely files: crates/fake-claude/src/main.rs, crates/fake-claude/scripts/, vitest.config.ts, playwright.config.ts, wdio.conf.ts, src-tauri/Cargo.toml (`e2e` feature with tauri-plugin-wdio-webdriver 1.5.0), crates/foreman-core/benches/, tests/e2e/smoke.e2e.ts
+Likely files: crates/fake-claude/src/main.rs, crates/fake-claude/scripts/, vitest.config.ts, playwright.config.ts, src-tauri/Cargo.toml (`e2e` feature with tauri-plugin-wdio-webdriver 1.5.0), e2e/webdriver.ts, e2e/specs/01-launch.e2e.ts (ADR-015 amendment 2026-10-20: in-repo WebDriver client instead of WDIO, so no wdio.conf.ts), crates/foreman-core/benches/
 Acceptance criteria:
 - Given the fake `claude`, when spawned, then it records argv, environment and cwd to a file named by an env var, plays scripted output and exit codes, and answers `-v` and `auth status` from its script
-- Given Vitest browser mode, Playwright (WebKit) + axe and the WDIO `e2e` feature, then each has one passing example test; criterion, proptest and insta are wired in `foreman-core`
+- Given Vitest browser mode, Playwright (WebKit) + axe and the `e2e` feature smoke (in-repo WebDriver client, ADR-015), then each has one passing example test; criterion, proptest and insta are wired in `foreman-core`
 - Given a release build, then the `e2e` feature and the webdriver plugin are absent
 Required tests:
 - release::no_webdriver
@@ -1260,7 +1260,7 @@ Stage: 7
 Depends on: M2-14, M2-16, M2-18, M2-20, M2-22, M2-24, M2-26
 ADRs: ADR-015
 Threats mitigated: none
-Likely files: src/routes/**/*.test.ts, tests/flows/*.spec.ts, tests/e2e/smoke.e2e.ts, src/lib/perf.ts
+Likely files: src/routes/**/*.test.ts, tests/flows/*.spec.ts, e2e/specs/*.e2e.ts, src/lib/perf.ts
 Acceptance criteria:
 - EX-M2-03
 - Given the run log and frontend marks, then NFR-01, NFR-02 and NFR-07 are instrumented and reported (targets enforced in M5-09)

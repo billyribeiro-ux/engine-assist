@@ -112,7 +112,41 @@ Also run here:
 3. **`pnpm dev:mock`** in the Desktop browser pane (AC-M0-12).
 4. **`pnpm release`** (AC-M0-11): ad-hoc signed build, install, the rollback drill, and two-build reproducibility hashes (runbook tables).
 5. **M0-11**: `cargo test -p foreman-app --test network` (`network::blocked_network_run`, macOS-only) and `scripts/no-network-run.sh` on the scaffold app; record sandbox-exec vs pf in the runbook. The `.sb` profile syntax for Unix sockets is UNVERIFIED.
-6. **M0-05 leftovers**: the WDIO real-app smoke (`@wdio/tauri-service` 1.5.0, `wdio.conf.ts`, `tests/e2e/smoke.e2e.ts`) isn't written, because WKWebView WebDriver only runs on the Mac. The `e2e` cargo feature and plugin wiring exist. Playwright's WebKit project also only runs on the Mac/CI.
+6. **M0-05 leftovers**: the real-app smoke is written (`e2e/`, section "Real-app smoke" below) but has never run against WKWebView. Run `pnpm test:e2e` on the Mac. Playwright's WebKit project also only runs on the Mac/CI.
 7. **Spikes M0-12…M0-18 and the baseline M0-19**: by hand, per the tickets.
 8. **CI first run**: push the branch and check every job on `macos-latest`. Likely first-run fixes: `pnpm why` / Playwright browser install time, the `cargo cyclonedx` output file location, and Semgrep registry packs needing network.
 9. **Re-pin** the six one-patch-behind dev tools on their eligible dates, and drop the exemptions after 2026-10-21 (see "Dependency freshness").
+
+## Real-app smoke (`pnpm test:e2e`, ADR-015 layer 5)
+
+Three specs run against the built debug app in the real WKWebView, through an in-repo W3C WebDriver client (`e2e/webdriver.ts`) and `node:test`. WebdriverIO is not used: its tree failed the audit, license and trust gates (ADR-015 amendment 2026-10-20 has the evidence and the cost).
+
+| Spec | Proves |
+|---|---|
+| `e2e/specs/01-launch.e2e.ts` | the app starts and reaches Today (EX-M2-03), on the app origin and the real IPC bridge, the `app_bootstrap` call succeeded (no start-up error banner), one window |
+| `e2e/specs/02-csp.e2e.ts` | SR-20: an injected inline `<script>` does not run and raises an enforced `securitypolicyviolation`; the policy the app serves equals `app.security.csp` from `tauri.conf.json` (not `devCsp`), allowing only Tauri's generated script hash and style nonce, with no `'unsafe-inline'`/`'unsafe-eval'` in `script-src` and a hash for the bootstrap script |
+| `e2e/specs/03-navigation.e2e.ts` | SR-29: `window.open` (`_blank`, `_self`), `location.assign` and clicked links to a remote URL change nothing (no new window, same document and URL); control: a same-origin navigation still reloads the app |
+
+**Run it (Mac only).** `pnpm install --frozen-lockfile`, then `pnpm test:e2e`. It runs `tauri build --debug --no-bundle --features e2e` (builds the frontend, then the app at `target/debug/foreman-app`), then `node --test` over `e2e/specs/*.e2e.ts`, one app launch per spec file. `FOREMAN_E2E_SKIP_BUILD=1` reuses an existing build; `FOREMAN_E2E_APP=<path>` points at another binary; `CARGO_TARGET_DIR` is honored. On any other OS `pnpm test:e2e` prints `SKIPPED (macOS only)` and exits 0. Each launch gets a free loopback port through `TAURI_WEBDRIVER_PORT`.
+
+**How it is wired** (checked against the published `tauri-plugin-wdio-webdriver` 1.5.0 crate and tauri-cli 2.12.3 sources, 2026-10-20):
+
+- `src-tauri/Cargo.toml` feature `e2e = ["dep:tauri-plugin-wdio-webdriver"]` (optional dependency, `default = []`); `foreman_app::builder` registers `tauri_plugin_wdio_webdriver::init()` under `#[cfg(feature = "e2e")]`. The plugin runs an HTTP WebDriver server on `127.0.0.1:$TAURI_WEBDRIVER_PORT` (default 4445). It has no commands, so no capability permission is added (`wdio-webdriver:default` grants none, and `capabilities::main_window_snapshot` fails if any permission is added).
+- `tauri build --debug` rather than `cargo build` because only the CLI adds `tauri/custom-protocol` (tauri-cli `build_options`). A plain `cargo build` binary loads the Vite dev server and `devCsp`, so it would test the wrong policy.
+- Page scripts are plain strings (`e2e/helpers/scripts.ts`). The plugin runs a script body as an `async` function, so `await` and `return` work in `execute/sync`.
+- The page's `connect-src` has no `'self'`, so it can't fetch its own headers. The served policy is read from the violation event's `originalPolicy` instead.
+- `compareServedCsp` (`e2e/helpers/csp.ts`) is pure and unit-tested on every OS (`tests/e2e-helpers.test.ts`); the client is unit-tested against a fake server (`tests/e2e-client.test.ts`). If Tauri adds a token the spec doesn't expect, spec 2 fails with the exact directive; record it in ADR-014 rather than loosening the check.
+
+**Dry run on Linux (2026-10-20, Xvfb + WebKitGTK, not WKWebView).** The plugin supports Linux, so the same suite ran against a Linux `tauri build --debug --no-bundle --features e2e` binary with `node --test`: CSP spec 3/3, navigation spec 6/6, launch spec 2/3. The one failure is expected there: `main-window.json` is `platforms: ["macOS"]`, so `app_bootstrap` is refused on Linux and Today shows its error banner, which is the assertion working. This validates the specs, the client and the plugin wiring, not WKWebView behavior; the first Mac run is still the real test.
+
+**Known limits.**
+
+- WebDriver script calls carry no user activation, so WebKit may refuse `window.open` and link clicks by itself. Spec 3 then still passes (outcome-based) but proves less; the rule itself is proven by `webview::navigation_denied_to_remote` and the handlers being installed in `window::build_main`. A passing control test shows navigation isn't just broken.
+- The target is `https://example.invalid/` (reserved TLD), so even a regressed denial reaches no network.
+- When the app starts writing state (M1+), `startApp` must pass an env pointing it at a temp state directory so the smoke never touches Billy's real data.
+- The Today heading is the constant `TODAY_HEADING` in `e2e/helpers/scripts.ts`; update it there if M2 renames it.
+- The client supports only what the specs use (CSS selectors, scripts, URL, window handles); extend `e2e/webdriver.ts` and its fake-server test together.
+
+**Release builds never contain the plugin.** `e2e` is off by default and in `pnpm release`. Proofs: `cargo test -p foreman-app --test release` (`release::no_webdriver`: `cargo tree -e normal --target aarch64-apple-darwin` for the default graph has no `tauri-plugin-wdio-webdriver`, `axum` or `hyper`, and the same command with `--features e2e` does contain the plugin, so the check can fail); `scripts/build-release` repeats the check before building; CI greps `cargo tree -e features`; `deny.toml` bans `axum` and `hyper` outright and `deny-e2e.toml` allows them only as dependencies of the plugin (`wrappers`), which the `deny-e2e` job runs with `--features e2e`.
+
+**Lockfile scan fix.** `scripts/check-lockfile-sources.mjs` treated `get-caller-file: 2.0.5` as a `file:` source. The pattern is now `(?<![\w-])(file|link):`; `tests/lockfile-sources.test.ts` covers both the false positive and real `file:`/`link:` sources.

@@ -1,307 +1,231 @@
 {
-  "$id": "urn:foreman:run.v1",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "argv": {
-      "items": {
-        "not": {
-          "pattern": "[\\u0000-\\u0008\\u000b-\\u001f]"
-        },
-        "type": "string"
-      },
-      "type": "array"
-    },
-    "chainId": {
-      "oneOf": [
-        {
-          "$ref": "urn:foreman:common#/$defs/uuid"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "claudeVersion": {
-      "maxLength": 64,
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "copyPromptOnCli": {
-      "type": "boolean"
-    },
-    "cwd": {
-      "oneOf": [
-        {
-          "enum": [
-            "project",
-            "spec",
-            "probe"
-          ]
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "entryPoint": {
-      "enum": [
-        "doNext",
-        "palette",
-        "stageView",
-        "rearm",
-        "repair",
-        "probe"
-      ]
-    },
-    "envNames": {
-      "items": {
-        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-        "type": "string"
-      },
-      "type": "array",
-      "uniqueItems": true
-    },
-    "exitCode": {
-      "type": [
-        "integer",
-        "null"
-      ]
-    },
-    "intended": {
-      "oneOf": [
-        {
-          "$ref": "urn:foreman:common#/$defs/start"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "kind": {
-      "enum": [
-        "launch",
-        "rearm",
-        "followupCopy",
-        "chatCopy",
-        "desktop",
-        "probe"
-      ]
-    },
-    "name": {
-      "oneOf": [
-        {
-          "pattern": "^fm-[a-z0-9-]{1,80}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "observed": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "effort": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "mode": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "model": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "model",
-            "effort",
-            "mode"
-          ],
-          "type": "object"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "override": {
-      "type": "boolean"
-    },
-    "pid": {
-      "minimum": 1,
-      "type": [
-        "integer",
-        "null"
-      ]
-    },
-    "projectId": {
-      "$ref": "urn:foreman:common#/$defs/uuid"
-    },
-    "promptSha256": {
-      "oneOf": [
-        {
-          "$ref": "urn:foreman:common#/$defs/sha256"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "runId": {
-      "$ref": "urn:foreman:common#/$defs/uuid"
-    },
-    "runInputInterventions": {
-      "minimum": 0,
-      "type": "integer"
-    },
-    "runSettingsSha256": {
-      "oneOf": [
-        {
-          "$ref": "urn:foreman:common#/$defs/sha256"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "schemaVersion": {
-      "const": 1
-    },
-    "sensorToken": {
-      "oneOf": [
-        {
-          "pattern": "^[0-9a-f]{64}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "stage": {
-      "$ref": "urn:foreman:common#/$defs/stage"
-    },
-    "status": {
-      "enum": [
-        "running",
-        "exited",
-        "errored",
-        "interrupted",
-        "copied"
-      ]
-    },
-    "stepId": {
-      "$ref": "urn:foreman:common#/$defs/stepKey"
-    },
-    "surface": {
-      "enum": [
-        "chat",
-        "cli",
-        "desktop",
-        "probe"
-      ]
-    },
-    "t": {
-      "additionalProperties": false,
-      "properties": {
-        "confirmed": {
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "exited": {
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "lookStart": {
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "prepared": {
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "spawned": {
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "wallStart": {
-          "$ref": "urn:foreman:common#/$defs/timestamp"
-        }
-      },
-      "required": [
-        "wallStart",
-        "lookStart",
-        "prepared",
-        "confirmed",
-        "spawned",
-        "exited"
-      ],
-      "type": "object"
-    },
-    "timeToStartMs": {
-      "minimum": 0,
-      "type": [
-        "integer",
-        "null"
-      ]
-    }
-  },
-  "required": [
-    "schemaVersion",
-    "runId",
-    "projectId",
-    "stage",
-    "stepId",
-    "surface",
-    "kind",
-    "chainId",
-    "name",
-    "argv",
-    "envNames",
-    "cwd",
-    "promptSha256",
-    "runSettingsSha256",
-    "intended",
-    "override",
-    "observed",
-    "entryPoint",
-    "t",
-    "timeToStartMs",
-    "runInputInterventions",
-    "copyPromptOnCli",
-    "status",
-    "exitCode",
-    "claudeVersion",
-    "pid",
-    "sensorToken"
-  ],
-  "type": "object"
+	"$id": "urn:foreman:run.v1",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"properties": {
+		"argv": {
+			"items": {
+				"not": {
+					"pattern": "[\\u0000-\\u0008\\u000b-\\u001f]"
+				},
+				"type": "string"
+			},
+			"type": "array"
+		},
+		"chainId": {
+			"oneOf": [
+				{
+					"$ref": "urn:foreman:common#/$defs/uuid"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"claudeVersion": {
+			"maxLength": 64,
+			"type": ["string", "null"]
+		},
+		"copyPromptOnCli": {
+			"type": "boolean"
+		},
+		"cwd": {
+			"oneOf": [
+				{
+					"enum": ["project", "spec", "probe"]
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"entryPoint": {
+			"enum": ["doNext", "palette", "stageView", "rearm", "repair", "probe"]
+		},
+		"envNames": {
+			"items": {
+				"pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+				"type": "string"
+			},
+			"type": "array",
+			"uniqueItems": true
+		},
+		"exitCode": {
+			"type": ["integer", "null"]
+		},
+		"intended": {
+			"oneOf": [
+				{
+					"$ref": "urn:foreman:common#/$defs/start"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"kind": {
+			"enum": ["launch", "rearm", "followupCopy", "chatCopy", "desktop", "probe"]
+		},
+		"name": {
+			"oneOf": [
+				{
+					"pattern": "^fm-[a-z0-9-]{1,80}$",
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"observed": {
+			"oneOf": [
+				{
+					"additionalProperties": false,
+					"properties": {
+						"effort": {
+							"type": ["string", "null"]
+						},
+						"mode": {
+							"type": ["string", "null"]
+						},
+						"model": {
+							"type": ["string", "null"]
+						}
+					},
+					"required": ["model", "effort", "mode"],
+					"type": "object"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"override": {
+			"type": "boolean"
+		},
+		"pid": {
+			"minimum": 1,
+			"type": ["integer", "null"]
+		},
+		"projectId": {
+			"$ref": "urn:foreman:common#/$defs/uuid"
+		},
+		"promptSha256": {
+			"oneOf": [
+				{
+					"$ref": "urn:foreman:common#/$defs/sha256"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"runId": {
+			"$ref": "urn:foreman:common#/$defs/uuid"
+		},
+		"runInputInterventions": {
+			"minimum": 0,
+			"type": "integer"
+		},
+		"runSettingsSha256": {
+			"oneOf": [
+				{
+					"$ref": "urn:foreman:common#/$defs/sha256"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"schemaVersion": {
+			"const": 1
+		},
+		"sensorToken": {
+			"oneOf": [
+				{
+					"pattern": "^[0-9a-f]{64}$",
+					"type": "string"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"stage": {
+			"$ref": "urn:foreman:common#/$defs/stage"
+		},
+		"status": {
+			"enum": ["running", "exited", "errored", "interrupted", "copied"]
+		},
+		"stepId": {
+			"$ref": "urn:foreman:common#/$defs/stepKey"
+		},
+		"surface": {
+			"enum": ["chat", "cli", "desktop", "probe"]
+		},
+		"t": {
+			"additionalProperties": false,
+			"properties": {
+				"confirmed": {
+					"minimum": 0,
+					"type": ["integer", "null"]
+				},
+				"exited": {
+					"minimum": 0,
+					"type": ["integer", "null"]
+				},
+				"lookStart": {
+					"minimum": 0,
+					"type": ["integer", "null"]
+				},
+				"prepared": {
+					"minimum": 0,
+					"type": ["integer", "null"]
+				},
+				"spawned": {
+					"minimum": 0,
+					"type": ["integer", "null"]
+				},
+				"wallStart": {
+					"$ref": "urn:foreman:common#/$defs/timestamp"
+				}
+			},
+			"required": ["wallStart", "lookStart", "prepared", "confirmed", "spawned", "exited"],
+			"type": "object"
+		},
+		"timeToStartMs": {
+			"minimum": 0,
+			"type": ["integer", "null"]
+		}
+	},
+	"required": [
+		"schemaVersion",
+		"runId",
+		"projectId",
+		"stage",
+		"stepId",
+		"surface",
+		"kind",
+		"chainId",
+		"name",
+		"argv",
+		"envNames",
+		"cwd",
+		"promptSha256",
+		"runSettingsSha256",
+		"intended",
+		"override",
+		"observed",
+		"entryPoint",
+		"t",
+		"timeToStartMs",
+		"runInputInterventions",
+		"copyPromptOnCli",
+		"status",
+		"exitCode",
+		"claudeVersion",
+		"pid",
+		"sensorToken"
+	],
+	"type": "object"
 }

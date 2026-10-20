@@ -33,7 +33,7 @@ lines.forEach((line, i) => {
 		/(git\+|git:\/\/|codeload\.github\.com|github:|gitlab:|bitbucket:|\btype:\s*git\b)/.test(line)
 	)
 		problems.push(`${at}: git source: ${line.trim()}`);
-	if (/\b(file|link):(?!\.\/?$)/.test(line) && !/version: link:\./.test(line))
+	if (/(?<![\w-])(file|link):(?!\.\/?$)/.test(line) && !/version: link:\./.test(line))
 		problems.push(`${at}: file:/link: source: ${line.trim()}`);
 });
 

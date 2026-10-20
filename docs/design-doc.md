@@ -170,7 +170,7 @@ Dev: `proptest` 1.12.0, `insta` 1.49.0, `criterion` 0.8.2, `tempfile` 3.27.0.
 - `notify` 8.2.0 + `notify-debouncer-full` 0.7.0;
 - `tracing` 0.1.44 + `tracing-subscriber` 0.3.23;
 - plugins (Rust side only): opener 2.7.2, clipboard-manager 2.5.0, dialog 2.8.3, window-state 2.5.0, **notification 2.7.0** (latest stable, filling MASTER-SPEC §10's open version; per SR-56 it ships with the first feature that needs it, the F-007 `wait` steps in P1);
-- `tauri-plugin-wdio-webdriver` 1.5.0 under the `e2e` feature only.
+- `tauri-plugin-wdio-webdriver` 1.5.0 under the `e2e` feature only. Its client is in-repo (`e2e/webdriver.ts`, no dependencies); `@wdio/tauri-service` and webdriverio are not used (ADR-015 amendment 2026-10-20).
 
 #### 3.2.1 `foreman-core` modules and public APIs (signature level)
 
@@ -639,7 +639,7 @@ A failed probe disables only the dependent feature; an inconclusive one keeps th
 | 2. Sys/app integration | Tauri `test` feature (`mock_builder`, `get_ipc_response`), fake-claude, fixture git repos | Commands, spawn, PTY, re-arm, git plumbing, watcher, sensor ingest |
 | 3. Component | Vitest 5.0.5 browser mode with `MockIpcClient` | Components, stores, the IPC contract |
 | 4. Flow | Playwright 1.64.1 (WebKit) + axe 4.14.0 with the mock | Keyboard flows, a11y, routes |
-| 5. Real-app smoke | @wdio/tauri-service 1.5.0 + webdriver plugin under `e2e` | About 5 paths, plus the CSP header and inline-script test (SR-20) |
+| 5. Real-app smoke | In-repo W3C WebDriver client + `node:test` + webdriver plugin under `e2e` (ADR-015 amendment) | About 5 paths, plus the CSP header and inline-script test (SR-20) |
 | 6. Benchmarks | criterion 0.8.2 | NFR-02 to NFR-04 |
 
 ## 7. Risks this design carries
