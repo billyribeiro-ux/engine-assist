@@ -1,0 +1,33 @@
+{
+	"perSurface": [
+		{
+			"surface": "cli",
+			"medianTimeToStartMs": 6200,
+			"p95TimeToStartMs": 9100,
+			"medianActiveMsPerStep": 1380000
+		},
+		{
+			"surface": "chat",
+			"medianTimeToStartMs": 8900,
+			"p95TimeToStartMs": 9600,
+			"medianActiveMsPerStep": 960000
+		}
+	],
+	"manualEditsByStage": [
+		{
+			"stage": 1,
+			"edits": 0
+		},
+		{
+			"stage": 2,
+			"edits": 0
+		}
+	],
+	"stagesThroughForeman": 2,
+	"baseline": {
+		"baselineMedianMs": 94000,
+		"foremanMedianMs": 6200
+	},
+	"runsCounted": 212,
+	"p95AllMs": 9400
+}

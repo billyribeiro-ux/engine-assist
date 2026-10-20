@@ -94,6 +94,21 @@ export default defineConfig(
 		}
 	},
 	{
+		// Typed rules: only for files with type information (not the plain .js configs).
+		files: ['**/*.ts', '**/*.svelte'],
+		rules: {
+			// Numbers in template literals are routine in UI text ("Stage 2 of 19").
+			'@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+			// `onclick={() => ui.toggleDrawer()}` is the idiomatic Svelte handler shape.
+			'@typescript-eslint/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true }]
+		}
+	},
+	{
+		// `{@render snippet()}` parses as a void call inside an expression; templates are exempt.
+		files: ['**/*.svelte'],
+		rules: { '@typescript-eslint/no-confusing-void-expression': 'off' }
+	},
+	{
 		files: ['src/lib/ipc/tauri.ts'],
 		rules: {
 			'no-restricted-imports': [

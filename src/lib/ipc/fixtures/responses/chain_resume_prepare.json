@@ -1,0 +1,19 @@
+{
+	"kind": "ready",
+	"planId": "f0000000-0000-4000-8000-000000000001",
+	"expiresInMs": 60000,
+	"prompt": [],
+	"argv": [
+		"/opt/homebrew/bin/claude",
+		"--resume",
+		"7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871",
+		"--name",
+		"fm-tradelog-s02-2-3"
+	],
+	"envNames": ["HOME", "LANG", "PATH", "SHELL", "TERM", "USER"],
+	"runSettingsSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+	"confirm": [],
+	"rearm": null,
+	"warnings": [],
+	"remaps": []
+}

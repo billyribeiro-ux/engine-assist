@@ -1,0 +1,14 @@
+{
+	"claude": {
+		"path": "/opt/homebrew/bin/claude",
+		"version": "2.1.288",
+		"autoDetected": false,
+		"problem": null
+	},
+	"git": {
+		"path": "/usr/bin/git",
+		"version": "2.51.0",
+		"autoDetected": true,
+		"problem": null
+	}
+}

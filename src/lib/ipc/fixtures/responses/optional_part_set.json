@@ -1,0 +1,152 @@
+{
+	"summary": {
+		"key": "x-2-1",
+		"number": "x‑2‑1",
+		"title": "Re-rank pain with interview notes",
+		"state": "notStarted",
+		"tag": "added",
+		"surface": "cli",
+		"specLine": {
+			"surface": "cli",
+			"where": "CLI, continues 2.2",
+			"model": {
+				"value": "Fable 5.1",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"effort": {
+				"value": "high",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"mode": {
+				"value": "Accept edits",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"agents": ["user-advocate"],
+			"droppedAgents": [],
+			"note": null
+		},
+		"whyNotRunnable": "Added steps always confirm before running.",
+		"stateText": "Not started, optional",
+		"conditionNote": null,
+		"kind": "followup",
+		"run": null,
+		"next": false
+	},
+	"prompt": [
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "Here are my interview notes: "
+				}
+			]
+		},
+		{
+			"kind": "resolved",
+			"token": "[interview notes]",
+			"class": "runInput",
+			"text": "Spoke with 6 members of the trading room on 16 Oct. 4 of 6 keep their journal in a spreadsheet; all 6 skip it after a losing day.",
+			"note": "Run input"
+		},
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "\nCompare them with the pain map in council/r1-positions.md.\n"
+				}
+			]
+		},
+		{
+			"kind": "removedPart",
+			"expr": "rerank",
+			"reason": "Optional part turned off"
+		},
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "\nDon't change the feature specs."
+				}
+			]
+		}
+	],
+	"inputs": [
+		{
+			"name": "notes",
+			"label": "Interview notes",
+			"token": "[interview notes]",
+			"multiline": true,
+			"remember": true,
+			"required": true,
+			"value": "Spoke with 6 members of the trading room on 16 Oct. 4 of 6 keep their journal in a spreadsheet; all 6 skip it after a losing day.",
+			"warning": null
+		}
+	],
+	"start": {
+		"value": {
+			"model": "fable",
+			"effort": "high",
+			"mode": "acceptEdits"
+		},
+		"origin": {
+			"kind": "template"
+		},
+		"from": null
+	},
+	"switches": [],
+	"chips": null,
+	"argvPreview": [
+		"/opt/homebrew/bin/claude",
+		"--resume",
+		"7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871",
+		"--model",
+		"fable",
+		"--effort",
+		"high",
+		"--permission-mode",
+		"acceptEdits",
+		"--agents",
+		".foreman/agents/x-2-1.json",
+		"--name",
+		"fm-tradelog-s02-x-2-1",
+		"--settings",
+		"~/Library/Application Support/dev.foreman/runs/r_0193/settings.json",
+		"Here are my interview notes: Spoke with 6 members of the trading room on 16 Oct. 4 of 6 keep their journal in a spreadsheet; all 6 skip it after a losing day.\nCompare them with the pain map in council/r1-positions.md.\n\nDon't change the feature specs."
+	],
+	"envNames": [
+		"HOME",
+		"LANG",
+		"PATH",
+		"SHELL",
+		"TERM",
+		"USER",
+		"HTTPS_PROXY",
+		"NODE_EXTRA_CA_CERTS"
+	],
+	"blockers": [],
+	"warnings": [],
+	"remaps": [],
+	"outs": [],
+	"override": null,
+	"parts": [
+		{
+			"partId": "rerank",
+			"label": "ask user-advocate to re-rank the pain map",
+			"included": false,
+			"locked": false
+		}
+	],
+	"copiedAt": null
+}

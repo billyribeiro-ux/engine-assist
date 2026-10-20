@@ -1,0 +1,208 @@
+{
+	"previewId": "e0000000-0000-4000-8000-000000000003",
+	"writes": [
+		{
+			"path": ".foreman/",
+			"action": "create",
+			"reason": "project, overlay, lock"
+		},
+		{
+			"path": "docs/handoff/",
+			"action": "create",
+			"reason": null
+		},
+		{
+			"path": "docs/templates/",
+			"action": "create",
+			"reason": null
+		},
+		{
+			"path": "docs/change-requests/",
+			"action": "create",
+			"reason": null
+		},
+		{
+			"path": "docs/postmortems/",
+			"action": "create",
+			"reason": null
+		},
+		{
+			"path": "spec/",
+			"action": "create",
+			"reason": null
+		},
+		{
+			"path": "docs/lessons.md",
+			"action": "leaveAlone",
+			"reason": "Already exists; Foreman never overwrites it."
+		},
+		{
+			"path": ".git/",
+			"action": "leaveAlone",
+			"reason": "Already a repository on branch main."
+		},
+		{
+			"path": "docs/templates/handoff-packet.md",
+			"action": "refuse",
+			"reason": "Differs from the pinned kit. Move it aside to let Foreman write it."
+		}
+	],
+	"gitInit": false,
+	"pin": {
+		"version": "2.2",
+		"commit": "a3f9c1",
+		"clean": true
+	},
+	"path": {
+		"applies": 17,
+		"total": 19,
+		"summary": "17 of 19 stages apply; 0 and 10 don't yet",
+		"rows": [
+			{
+				"stages": "0",
+				"title": "Land Survey",
+				"status": "notApplicable",
+				"why": "Not applicable: you already know the idea (idea_known = yes)"
+			},
+			{
+				"stages": "1",
+				"title": "Meet the Architect",
+				"status": "applies",
+				"why": "Applies. 1.3 demand test is skipped (commercial = no); press release part included"
+			},
+			{
+				"stages": "2",
+				"title": "Architect's Design Studio",
+				"status": "applies",
+				"why": "Applies. 2.1 teardown and 2 council roles skipped (commercial = no)"
+			},
+			{
+				"stages": "3",
+				"title": "Permits & Zoning",
+				"status": "applies",
+				"why": "Applies. 3.1 pricing waits on payments; legal part skipped (others_data = undecided)"
+			},
+			{
+				"stages": "4",
+				"title": "Construction Drawings",
+				"status": "applies",
+				"why": "Applies, including 4.5 design system (has_ui = undecided)"
+			},
+			{
+				"stages": "5",
+				"title": "Site Prep & Excavation",
+				"status": "applies",
+				"why": "Applies, including the staging pipeline (server = undecided)"
+			},
+			{
+				"stages": "10",
+				"title": "Electrical",
+				"status": "undecided",
+				"why": "Decide payments before signing Stage 2"
+			},
+			{
+				"stages": "6–18",
+				"title": "Foundation to Maintenance",
+				"status": "needsAnnotation",
+				"why": "Shown but not runnable until a later blueprint annotates them"
+			}
+		],
+		"strip": [
+			{
+				"stage": 0,
+				"status": "notApplicable",
+				"why": "idea_known = yes"
+			},
+			{
+				"stage": 1,
+				"status": "ready",
+				"why": null
+			},
+			{
+				"stage": 2,
+				"status": "locked",
+				"why": null
+			},
+			{
+				"stage": 3,
+				"status": "locked",
+				"why": null
+			},
+			{
+				"stage": 4,
+				"status": "locked",
+				"why": null
+			},
+			{
+				"stage": 5,
+				"status": "locked",
+				"why": null
+			},
+			{
+				"stage": 6,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 7,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 8,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 9,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 10,
+				"status": "undecided",
+				"why": "payments = undecided"
+			},
+			{
+				"stage": 11,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 12,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 13,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 14,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 15,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 16,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 17,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			},
+			{
+				"stage": 18,
+				"status": "needsAnnotation",
+				"why": "blueprint 2.2 annotates stages 0 to 5"
+			}
+		]
+	}
+}

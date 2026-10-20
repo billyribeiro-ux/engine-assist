@@ -1,0 +1,162 @@
+{
+	"previewId": "e0000000-0000-4000-8000-000000000001",
+	"action": "writeBlocks",
+	"writes": [
+		{
+			"path": "spec/.claude/agents/principal-engineer.md",
+			"exists": false,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "name: principal-engineer"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": "spec/.claude/agents/security-architect.md",
+			"exists": false,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "name: security-architect"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": "spec/.claude/agents/user-advocate.md",
+			"exists": false,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "name: user-advocate"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": "spec/.claude/agents/product-strategist.md",
+			"exists": false,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "name: product-strategist"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "---"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

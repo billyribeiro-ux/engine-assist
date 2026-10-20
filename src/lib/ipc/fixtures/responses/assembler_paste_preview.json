@@ -1,0 +1,48 @@
+{
+	"previewId": "e0000000-0000-4000-8000-000000000001",
+	"kind": "output",
+	"targets": [
+		{
+			"path": "docs/tickets.md",
+			"exists": true,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "# Tickets"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": ""
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "## M0 · Site prep"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"problems": [],
+	"notes": [],
+	"packetFields": null
+}

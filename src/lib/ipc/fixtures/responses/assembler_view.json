@@ -1,0 +1,107 @@
+{
+	"rows": [
+		{
+			"path": "docs/MASTER-SPEC.md",
+			"state": "exists",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "docs/requirements.md",
+			"state": "exists",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "docs/design-doc.md",
+			"state": "exists",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "docs/migrations/0001_init.sql",
+			"state": "exists",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "docs/tickets.md",
+			"state": "empty",
+			"rule": null,
+			"note": "The file exists but has no content. Paste the tickets from 4.6."
+		},
+		{
+			"path": "docs/threat-model.md",
+			"state": "missing",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "docs/design/tokens.css",
+			"state": "missing",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "CLAUDE.md",
+			"state": "exists",
+			"rule": null,
+			"note": "Claude Code loads this file in every session. Writing it asks you again in a macOS dialog."
+		},
+		{
+			"path": ".github/workflows/ci.yml",
+			"state": "refused",
+			"rule": "github-dir",
+			"note": "Foreman doesn't write under .github/ (path policy). Create this file yourself or in a Stage 5 session."
+		},
+		{
+			"path": "docs/adr/README.md",
+			"state": "exists",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "docs/contracts/ipc.md",
+			"state": "exists",
+			"rule": null,
+			"note": null
+		},
+		{
+			"path": "docs/lessons.md",
+			"state": "exists",
+			"rule": null,
+			"note": null
+		}
+	],
+	"complete": false,
+	"lateConditions": [
+		{
+			"condition": "has_database",
+			"value": "undecided",
+			"proposed": "yes",
+			"evidence": "docs/migrations/0001_init.sql",
+			"decided": null
+		},
+		{
+			"condition": "has_uploads",
+			"value": "undecided",
+			"proposed": null,
+			"evidence": null,
+			"decided": null
+		},
+		{
+			"condition": "has_email",
+			"value": "undecided",
+			"proposed": null,
+			"evidence": null,
+			"decided": null
+		},
+		{
+			"condition": "has_integrations",
+			"value": "no",
+			"proposed": null,
+			"evidence": null,
+			"decided": "Decided by you on 2026-10-18 (\"broker CSV import only, no API\")."
+		}
+	]
+}

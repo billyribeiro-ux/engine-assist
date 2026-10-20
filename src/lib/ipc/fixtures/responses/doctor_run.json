@@ -1,0 +1,228 @@
+{
+	"level": "failing",
+	"checks": [
+		{
+			"id": "version",
+			"group": "claude",
+			"name": "Version",
+			"level": "failing",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "strong",
+					"children": [
+						{
+							"kind": "plain",
+							"text": "Claude Code 2.1.288 found. Haiku 5.5 in the Stage 5 test-runner agent needs 2.1.293 or later."
+						}
+					]
+				},
+				{
+					"kind": "plain",
+					"text": " Run "
+				},
+				{
+					"kind": "code",
+					"text": "claude update"
+				},
+				{
+					"kind": "plain",
+					"text": ", then check again."
+				}
+			],
+			"found": "2.1.288",
+			"foundMono": true,
+			"action": null
+		},
+		{
+			"id": "path",
+			"group": "claude",
+			"name": "Found at an allowed path",
+			"level": "ok",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "plain",
+					"text": "Foreman only launches this exact file."
+				}
+			],
+			"found": "/opt/homebrew/bin/claude",
+			"foundMono": true,
+			"action": null
+		},
+		{
+			"id": "auth",
+			"group": "claude",
+			"name": "Signed in with your plan",
+			"level": "ok",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "code",
+					"text": "claude auth status"
+				},
+				{
+					"kind": "plain",
+					"text": " in ~/Code/tradelog/spec reports "
+				},
+				{
+					"kind": "strong",
+					"children": [
+						{
+							"kind": "plain",
+							"text": "claude.ai"
+						}
+					]
+				},
+				{
+					"kind": "plain",
+					"text": ". No API key or helper in any config Foreman checked."
+				}
+			],
+			"found": "claude.ai",
+			"foundMono": false,
+			"action": null
+		},
+		{
+			"id": "cleanup",
+			"group": "claude",
+			"name": "Transcripts kept",
+			"level": "warning",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "plain",
+					"text": "cleanupPeriodDays is 30. Chains idle longer than that break. Raise it in ~/.claude/settings.json if your stages run long; Foreman doesn't edit that file."
+				}
+			],
+			"found": "30 days",
+			"foundMono": true,
+			"action": null
+		},
+		{
+			"id": "hooks",
+			"group": "claude",
+			"name": "Hooks enabled",
+			"level": "ok",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "plain",
+					"text": "disableAllHooks isn't set, so the session sensor can run."
+				}
+			],
+			"found": "on",
+			"foundMono": false,
+			"action": null
+		},
+		{
+			"id": "allow",
+			"group": "claude",
+			"name": "Broad allow rules",
+			"level": "warning",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "code",
+					"text": "Bash(*)"
+				},
+				{
+					"kind": "plain",
+					"text": " in user settings. No effect in v1; it matters for headless gates in v1.1."
+				}
+			],
+			"found": "1 rule",
+			"foundMono": false,
+			"action": null
+		}
+	],
+	"capabilities": [
+		{
+			"feature": "Fable 5.1",
+			"code": false,
+			"minimum": "2.1.257",
+			"found": true,
+			"blocks": null
+		},
+		{
+			"feature": "--permission-prompts",
+			"code": true,
+			"minimum": "2.1.259",
+			"found": true,
+			"blocks": null
+		},
+		{
+			"feature": "Opus 5.5",
+			"code": false,
+			"minimum": "2.1.280",
+			"found": true,
+			"blocks": null
+		},
+		{
+			"feature": "--agents file form",
+			"code": true,
+			"minimum": "2.1.281",
+			"found": true,
+			"blocks": null
+		},
+		{
+			"feature": "Sonnet 5.5",
+			"code": false,
+			"minimum": "2.1.284",
+			"found": true,
+			"blocks": null
+		},
+		{
+			"feature": "--desktop",
+			"code": true,
+			"minimum": "2.1.285",
+			"found": true,
+			"blocks": null
+		},
+		{
+			"feature": "Haiku 5.5",
+			"code": false,
+			"minimum": "2.1.293",
+			"found": false,
+			"blocks": "Stage 5 Gate A (test-runner)"
+		}
+	],
+	"probes": [
+		{
+			"probe": [
+				{
+					"kind": "plain",
+					"text": "Flags parse and per-launch hooks fire ("
+				},
+				{
+					"kind": "code",
+					"text": "--init-only"
+				},
+				{
+					"kind": "plain",
+					"text": ")"
+				}
+			],
+			"result": "pass",
+			"text": "Pass on 2.1.288",
+			"detail": null
+		},
+		{
+			"probe": [
+				{
+					"kind": "code",
+					"text": "--resume"
+				},
+				{
+					"kind": "plain",
+					"text": " parses"
+				}
+			],
+			"result": "inconclusive",
+			"text": "Inconclusive",
+			"detail": "Timed out after 20 s. Keeping the last verified state, 2.1.284."
+		}
+	],
+	"probeNote": "Contract verified on 2.1.284. Probe folder trusted 12 Oct.",
+	"ranAt": "2026-10-19T09:00:00Z"
+}

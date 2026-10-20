@@ -1,0 +1,16 @@
+{
+	"expectRev": 7,
+	"patch": {
+		"driName": "Billy Ribeiro",
+		"editor": null,
+		"theme": null,
+		"terminal": null,
+		"envPassthrough": null,
+		"globalVariables": null,
+		"resetTool": null,
+		"clearLoginPath": null,
+		"removeAllowlistEntry": null,
+		"screenReaderMode": null,
+		"osDisplay": null
+	}
+}

@@ -105,6 +105,21 @@ Also run here:
 - **No git in scripts**: `pnpm verify`'s bindings-drift step compares content hashes of `src/lib/ipc/bindings` before and after regenerating. The CI job also uses `git diff --exit-code`.
 - **CI jobs** are split so they cover exactly `pnpm verify` without running it twice: `verify` (static checks), `test` (vitest, release-bundle, cargo test, lint plants, Playwright WebKit), `bindings-drift`, `deny`, `deny-e2e`, `audit`, `pnpm-audit`, `pnpm-policy`, `actions-pinned`, `gitleaks` (history + tree), `semgrep` (p/rust, p/typescript, p/javascript + `.semgrep.yml`), `sbom` (cargo-cyclonedx + `pnpm sbom`, uploaded). Action SHAs were resolved with `git ls-remote` (checkout v7.0.1, setup-node v7.1.0, pnpm/action-setup v6.1.0, rust-cache v2.9.2, upload-artifact v7.0.2).
 
+## UI against the mock (stage/05-ui)
+
+What exists: every v1 screen (Today, first run, setup form and wizard, stage workspace with the chat and CLI step views, gate and signing, packet, outside change, Doctor, run log with metrics, settings, template health, assembler), the ⌘K palette, the terminal drawer (xterm 6.0.0) and every A.7 shortcut plus ⌘⇧↵, ⌘⇧V, ⌘D, ⌘⇧T, ⌘⇧E and ⌘1–⌘9. `pnpm dev:mock` shows the whole app; `?scenario=<name>` picks a world (`src/lib/ipc/mock/world.ts`: happy, firstRun, empty, blockedVersion, blockedAuth, configChanged, conflict, readOnly, brokenChain, outsideChange, tamper, stage1, stage4, stage5, invalidPacket) and `?dialog=cancel` makes every native dialog answer Cancel.
+
+Tests: `src/lib/screens/*.svelte.test.ts` (each screen's primary action plus its empty, error, locked and not-applicable states, through `#lib/test/screen.ts`), `src/lib/render/render.svelte.test.ts` (the five `render::` tests), `src/lib/styles/styles.lint.test.ts` (tokens are a byte copy of `docs/design/tokens.css`, no hard-coded design values, every pair in `contrast-check.py` passes in both themes), `tests/flows/p1-loop.spec.ts` (keyboard only) and `tests/flows/a11y.spec.ts` (axe on every route, Night and Vellum). Fixtures regenerate with `FIXTURES_WRITE=1 pnpm exec vitest run --project unit src/lib/ipc/fixtures.test.ts`.
+
+Contract gaps (marked `GAP:` in `src/lib/ipc/types.ts`): the screens need fields ipc.md doesn't define yet, among them `RunSummary`, `Capabilities`, `TemplateHealthSummary`, the blueprint repo's `variables`/`conditions`, `StepView.parts`/`copiedAt`, `StageView.subtitle`/`status`/`statusWhy`, `ProjectView.branch`/`blueprint`/`dri`/`configChanged`, `DoctorReport.probes`, `PacketView.raw`/`writtenBy`/`summary`, `GateView.importedFrom`, `SignPreview.branch`/`commitMessage`/`pathNotes`, and artifact copy. Each needs an ipc.md amendment and a Rust binding before the Tauri client can serve it. The TS contract test checks the 91 commands against ipc.md §4.15, because the Rust `commands.json` lists only `app_bootstrap` so far.
+
+Deviations from the mockups, with reasons:
+- No drawn traffic lights: the real window uses the macOS overlay title bar.
+- bits-ui isn't used: its primitives set inline styles, which the CSP (`style-src 'self'`) blocks. Dialog, palette, segmented control, tabs and the strip are hand-built and keyboard-complete; dynamic sizes go through CSSOM.
+- P2 tags on step rows are not shown; redacted config diffs have no context lines (the redacted diff carries none); setup lists writes per path rather than grouped; Settings doesn't show an invalid `claude` path by default (paths come only from Rust's picker).
+- The mock's TradeLog world follows the mockups (commercial = no, payments undecided), not ipc.md §7.2's "all yes".
+- Terminal dim text (SGR 2) uses `--term-muted` instead of 50% alpha, so it passes AA.
+
 ## Left for Billy's Mac
 
 1. **Rust 1.99.1**: `rustup show` in the repo installs it from `rust-toolchain.toml`. Then run `pnpm verify` without `RUSTUP_TOOLCHAIN`; fix anything new that 1.99.1's clippy reports.

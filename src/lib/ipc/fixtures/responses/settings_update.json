@@ -1,0 +1,163 @@
+{
+	"rev": 8,
+	"driName": "Billy Ribeiro",
+	"tools": {
+		"claude": {
+			"path": "/opt/homebrew/bin/claude",
+			"version": "2.1.288",
+			"autoDetected": true,
+			"problem": null
+		},
+		"git": {
+			"path": "/usr/bin/git",
+			"version": "2.51.0",
+			"autoDetected": true,
+			"problem": null
+		}
+	},
+	"editorBundleId": "com.microsoft.VSCode",
+	"blueprintRepo": {
+		"displayPath": "~/claude-blueprint",
+		"commit": "a3f9c1",
+		"version": "2.2",
+		"grammarVersion": 1,
+		"dirty": false,
+		"health": {
+			"runnable": "0 to 5",
+			"needsAnnotation": "6 to 18",
+			"errors": 1,
+			"warnings": 2
+		},
+		"variables": [
+			{
+				"name": "ROUGH_IDEA",
+				"label": "Rough idea",
+				"placeholder": "<one or two sentences>",
+				"multiline": true,
+				"fromSettings": false
+			},
+			{
+				"name": "TARGET_USERS",
+				"label": "Who it's for",
+				"placeholder": "<who it's for>",
+				"multiline": false,
+				"fromSettings": false
+			},
+			{
+				"name": "PREFERRED_STACK",
+				"label": "Preferred stack",
+				"placeholder": "<your stack>",
+				"multiline": false,
+				"fromSettings": true
+			},
+			{
+				"name": "QUALITY_BAR",
+				"label": "Quality bar",
+				"placeholder": "<quality bar>",
+				"multiline": false,
+				"fromSettings": true
+			}
+		],
+		"conditions": [
+			{
+				"id": "idea_known",
+				"label": "You already know the idea",
+				"effect": "Yes skips Stage 0, Land Survey.",
+				"late": false
+			},
+			{
+				"id": "commercial",
+				"label": "You'll sell it",
+				"effect": "Adds the demand test, competitor teardown, pricing and marketing pages.",
+				"late": false
+			},
+			{
+				"id": "payments",
+				"label": "It takes payments",
+				"effect": "Adds Stage 10, Electrical, and live payments at launch.",
+				"late": false
+			},
+			{
+				"id": "multi_user",
+				"label": "More than one person signs in",
+				"effect": "Adds authentication, onboarding, the beta ring and analytics.",
+				"late": false
+			},
+			{
+				"id": "public",
+				"label": "Anyone on the internet can reach it",
+				"effect": "Adds authentication hardening and public-facing reviews.",
+				"late": false
+			},
+			{
+				"id": "has_ui",
+				"label": "It has a user interface",
+				"effect": "Adds 4.5 design system and Stage 13 accessibility.",
+				"late": false
+			},
+			{
+				"id": "others_data",
+				"label": "It stores other people's data",
+				"effect": "Adds the legal part of 3.2 and legal pages.",
+				"late": false
+			},
+			{
+				"id": "server",
+				"label": "It runs on a server",
+				"effect": "Adds the staging pipeline, SLOs and load tests.",
+				"late": false
+			},
+			{
+				"id": "has_database",
+				"label": "It has a database",
+				"effect": "Adds 6.1 migrations.",
+				"late": true
+			},
+			{
+				"id": "has_uploads",
+				"label": "It takes uploads",
+				"effect": "Adds the uploads part of Stage 9.",
+				"late": true
+			},
+			{
+				"id": "has_email",
+				"label": "It sends email",
+				"effect": "Adds the email part of Stage 9.",
+				"late": true
+			},
+			{
+				"id": "has_integrations",
+				"label": "It integrates other services",
+				"effect": "Adds integration tests to Stage 9.",
+				"late": true
+			}
+		]
+	},
+	"theme": "system",
+	"terminal": {
+		"fontSize": 12,
+		"scrollback": 10000,
+		"macOptionIsMeta": true
+	},
+	"envPassthrough": ["HTTPS_PROXY", "NODE_EXTRA_CA_CERTS"],
+	"loginPath": {
+		"capturedAt": "2026-10-12T10:20:00Z",
+		"entries": [
+			"/opt/homebrew/bin",
+			"/Users/billy/.cargo/bin",
+			"/Users/billy/Library/pnpm",
+			"/usr/bin",
+			"/bin"
+		]
+	},
+	"globalVariables": {
+		"PREFERRED_STACK": "SvelteKit + Rust/Axum + Postgres",
+		"QUALITY_BAR": "Principal-engineer strict"
+	},
+	"authKeyAllowlist": [],
+	"screenReaderMode": false,
+	"runHistory": {
+		"runs": 212,
+		"megabytes": 38
+	}
+}
