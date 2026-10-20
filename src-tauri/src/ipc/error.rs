@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::dto::doctor::AnnotationProblem;
 use super::types::{ReadOnly, RepoPath, ToolKind};
 
 /// The error every command returns (IPC-R3).
@@ -80,6 +81,10 @@ pub enum IpcErrorDetail {
     ReadOnly(ReadOnly),
     NotAllowed {
         rule: String,
+    },
+    /// (CR-003) code `NotAllowed`: a pin refused for annotation errors in Stages 1–2 or F.2.
+    AnnotationErrors {
+        errors: Vec<AnnotationProblem>,
     },
     Conflict {
         path: RepoPath,
@@ -301,6 +306,26 @@ impl IpcError {
             "Something went wrong inside Foreman. Nothing was changed by this request.",
             None,
         )
+    }
+}
+
+impl From<foreman_core::lock::LockError> for IpcError {
+    fn from(e: foreman_core::lock::LockError) -> Self {
+        use foreman_core::lock::LockError;
+        match e {
+            LockError::Dirty { .. } => Self::not_allowed("blueprint-dirty", e.to_string()),
+            LockError::RepinClosed => {
+                Self::not_allowed("repin-after-stage-1-signed", e.to_string())
+            }
+            LockError::AnnotationErrors { ref problems } => Self::new(
+                IpcErrorCode::NotAllowed,
+                e.to_string(),
+                Some(IpcErrorDetail::AnnotationErrors {
+                    errors: problems.iter().map(AnnotationProblem::from).collect(),
+                }),
+            ),
+            LockError::Store(s) => s.into(),
+        }
     }
 }
 

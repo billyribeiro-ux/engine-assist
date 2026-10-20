@@ -49,4 +49,19 @@ describe('Setup', () => {
 		await userEvent.tab();
 		await expect.element(s.getByText(/Describe who it's for in your words/)).toBeVisible();
 	});
+
+	it('error: annotation errors in Stages 1–2 stop the pin, each listed (CR-003)', async () => {
+		fresh('annotationErrors');
+		const s = await render(Setup);
+		await s.getByRole('button', { name: 'Choose…' }).click();
+		await s.getByRole('button', { name: 'Choose…' }).click();
+		const list = s.getByRole('list', { name: 'Annotation errors' });
+		await expect.element(list).toBeVisible();
+		await expect.element(s.getByText('Stage 1 step 1.2, line 141')).toBeVisible();
+		await expect.element(s.getByText('Stage 2 step 2.5, line 214')).toBeVisible();
+		await expect.element(s.getByText(/unknown key `bogus`/)).toBeVisible();
+		await expect
+			.element(s.getByText(/2 annotation errors in Stages 1–2 and F\.2 stop the pin/))
+			.toBeVisible();
+	});
 });

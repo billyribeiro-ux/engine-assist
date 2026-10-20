@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use foreman_core::decisions::{Decisions, OwnChange};
 use foreman_core::git::{GitOp, RevParse};
 use foreman_core::ids::{ConditionId as CoreCondition, TriState as CoreTri};
-use foreman_core::lock::{self, BlueprintState, LockError};
+use foreman_core::lock::{self, BlueprintState};
 use foreman_core::pathpolicy::{self, ReadClass, WritePurpose};
 use foreman_core::resolver::tokens::PROJECT_VARIABLES;
 use foreman_core::rules::{self, Applicability as CoreApp, RuleError, StageState};
@@ -424,6 +424,9 @@ pub fn setup_preview(app: &App, req: SetupPreviewReq) -> Result<SetupPreview, Ip
             ),
         ));
     }
+    // CR-003: the pin's annotation check, before anything is written; `setup_apply` pins the
+    // same blob (its oid is compared), so it can't meet a different answer.
+    foreman_core::pin_check::p1_annotation_errors(&String::from_utf8_lossy(&r.bytes))?;
     let adopt = foreman_schema(&folder).map(|(_, h)| h);
     let git_init = !is_own_repo(app, &folder)?;
     let conditions: BTreeMap<CoreCondition, CoreTri> = CoreCondition::ALL
@@ -607,14 +610,7 @@ pub fn setup_apply(app: &App, req: SetupApplyReq) -> Result<ProjectSummary, IpcE
             .own_change(kind, bytes.as_bytes(), false, &now)
             .map_err(|e| IpcError::io(e.to_string()))?;
     }
-    let pinned =
-        lock::pin(&root, &app_root, BLUEPRINT_FILE, &state, false, &now).map_err(|e| match e {
-            LockError::Dirty { .. } => IpcError::not_allowed("blueprint-dirty", e.to_string()),
-            LockError::RepinClosed => {
-                IpcError::not_allowed("repin-after-stage-1-signed", e.to_string())
-            }
-            LockError::Store(s) => s.into(),
-        })?;
+    let pinned = lock::pin(&root, &app_root, BLUEPRINT_FILE, &state, false, &now)?;
     let lock_bytes =
         foreman_core::json::to_canonical(&pinned).map_err(|e| IpcError::io(e.to_string()))?;
     d.approve(
@@ -748,15 +744,7 @@ pub fn blueprint_repin(app: &App, req: BlueprintRepinReq) -> Result<ProjectView,
     let stage1 = p.signed().contains(&1);
     let now = app.now();
     let root = p.root()?;
-    let pinned = lock::pin(root, &p.app_root, BLUEPRINT_FILE, &state, stage1, &now).map_err(
-        |e| match e {
-            LockError::RepinClosed => {
-                IpcError::not_allowed("repin-after-stage-1-signed", e.to_string())
-            }
-            LockError::Dirty { .. } => IpcError::not_allowed("blueprint-dirty", e.to_string()),
-            LockError::Store(s) => s.into(),
-        },
-    )?;
+    let pinned = lock::pin(root, &p.app_root, BLUEPRINT_FILE, &state, stage1, &now)?;
     let bytes =
         foreman_core::json::to_canonical(&pinned).map_err(|e| IpcError::io(e.to_string()))?;
     let d = Decisions {

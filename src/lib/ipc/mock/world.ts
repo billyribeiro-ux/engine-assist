@@ -67,7 +67,8 @@ export type Scenario =
 	| 'stage1'
 	| 'stage4'
 	| 'stage5'
-	| 'invalidPacket';
+	| 'invalidPacket'
+	| 'annotationErrors';
 export const SCENARIOS: readonly Scenario[] = [
 	'happy',
 	'firstRun',
@@ -83,7 +84,8 @@ export const SCENARIOS: readonly Scenario[] = [
 	'stage1',
 	'stage4',
 	'stage5',
-	'invalidPacket'
+	'invalidPacket',
+	'annotationErrors'
 ];
 
 export interface MStep {

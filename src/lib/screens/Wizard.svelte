@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount, tick, untrack } from 'svelte';
 
+	import AnnotationProblems from '#lib/components/AnnotationProblems.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import type { IconName } from '#lib/components/icons.ts';
 	import Segmented from '#lib/components/Segmented.svelte';
@@ -267,6 +268,8 @@
 							</div>
 						{/each}
 					</div>
+				{:else if f.previewProblems.length}
+					<AnnotationProblems problems={f.previewProblems} />
 				{:else if f.previewError}
 					<p class="err" role="alert"><Icon name="cross" size="glyph" />{f.previewError}</p>
 				{/if}

@@ -39,7 +39,8 @@ Every type below derives `Serialize`/`Deserialize` as needed, `ts_rs::TS` with `
 
 | Rust | Wire / TS | Validation (Rust) |
 |---|---|---|
-| `ProjectId(Uuid)`, `RunId(Uuid)`, `ChainId(Uuid)`, `PlanId(Uuid)`, `PreviewId(Uuid)`, `ChangeId(Uuid)`, `PickId(Uuid)`, `HitId(Uuid)` | `string` (`#[ts(type = "string")]`) | Lowercase hyphenated UUID; `NotFound` if unknown |
+| `ProjectId(Uuid)`, `RunId(Uuid)`, `ChainId(Uuid)`, `PlanId(Uuid)`, `PreviewId(Uuid)`, `ChangeId(Uuid)`, `PickId(Uuid)` | `string` (`#[ts(type = "string")]`) | Lowercase hyphenated UUID; `NotFound` if unknown |
+| `HitId` (§2.4) | `string` | 64 lowercase hex: the SHA-256 hit ID `fingerprint::auth_key_hits` gives an auth-key hit (stable across scans, never the value); `NotFound` if unknown |
 | `StepKey(String)` | `string` | `^(?:[0-9]{1,2}\.[0-9]{1,2}[a-z]?\|council-setup\|[0-9]{1,2}:(?:gate\.[ABC]\|F\.2)\|x-[0-9]{1,2}-[0-9]{1,3})$` (domain-rules DR-005) |
 | `ItemId(String)` | `string` | `^(?:[a-z][a-z0-9-]{0,47}\|xi-[0-9]{1,2}-[0-9]{1,3})$` |
 | `Stage(u8)` | `number` | `0..=18` |
@@ -173,6 +174,12 @@ Stage 4 left types that §2–§4 name but never define, and fields the screens 
 - `Problem.fix` lists every fix offered, in order (a packet problem offers `openInEditor` and `copyFixRequest`).
 - `Blocker::NotRunnable` carries `text`, Foreman's sentence for the row. `NotRunnableReason` gains `waiting`, `running`, `notCli` (a `launch_prepare` on a step that isn't CLI) and `chainNotStarted` (a continuing step whose chain hasn't started).
 - `SettingsView.screenReaderMode` is the Settings toggle `settings_update` patches. `settings.json` v1 has no field for it, so it is kept in memory until `settings.json` v2 adds `screenReaderMode` (files.md §4.1, proposal); `runHistory` counts `runs/` once run records exist (M2-10).
+- `HitId` is the hit's SHA-256 ID from `fingerprint::AuthKeyHit` (not a UUID), so the same hit keeps its ID across scans; Rust maps it back to file, key and value hash.
+- `Requirement { feature, min, source }`: the feature that needs the newer Claude Code, its minimum version and where the requirement comes from (`step 2.3`, `Foreman`), as `foreman-core::launch` reports it.
+- `ToolPathProblem` gains `worldWritable` (the configured `claude` or a directory above it is writable by others, SR-03); `AuthProblem.exit.code` is `number | null` (killed by a signal).
+- `LaunchProgress`: `Version.found` and `Exited.code` are `string | null` and `number | null`; `Contract.outcome` is `ContractOutcome` (`pass`, `flagFailure`, `inconclusive`, `skipped`), the probe result without its output.
+- (CR-003) A pin refused for annotation errors is `code: notAllowed` with `detail: { kind: "annotationErrors", errors }` instead of the `notAllowed` detail, so the rule name `p1-annotation-errors` isn't on the wire; the UI branches on `detail.kind` and lists each error (stage, step ID, line, rule, message). `setup_preview` runs the same check before anything is written (`foreman_core::pin_check`), and `setup_apply` pins the same blob (its oid is compared).
+- A decision-file write that meets an outside change still pending review returns `Conflict` with the file's path (the pending change is reviewed first; DR-148).
 - `AppBootstrap.interrupted` lists runs whose `run.json` says `running` at startup (SR-57: listed, never relaunched); `capabilities` gates Desktop (`--desktop` ≥ 2.1.285), the P2 sensor and the verified probes.
 
 **Nested request objects.** A tagged object inside a request (`EditorSetting`, `LinkSource`, `AttestOutcome`, `SignBranch`) is an enum whose variants hold a struct with `deny_unknown_fields`, so an extra field inside it is `Invalid` too (IPC-R1). The wire form is unchanged (`{ kind: "set", bundleId }`); ts-rs writes it as `{ "kind": "set" } & EditorSet`.
@@ -180,6 +187,8 @@ Stage 4 left types that §2–§4 name but never define, and fields the screens 
 New types:
 
 ```ts
+export type HitId = string;
+export type ContractOutcome = "pass" | "flagFailure" | "inconclusive" | "skipped";
 export type RunSummary = { runId: RunId, chain: ChainId, project: ProjectId, projectName: string, step: StepKey | null, stepTitle: string, tabName: string, ranWith: string, substituted: string | null, status: RunStatus, exitCode: number | null, error: string | null, startedAt: Timestamp, timeToStartMs: number | null, argv: Array<string>, resumable: boolean, whyNotResumable: string | null, };
 export type Capabilities = { claudeVersion: string | null, desktop: boolean, sensor: boolean, probesVerified: boolean, };
 export type ToolPathView = { path: string | null, version: string | null, autoDetected: boolean, problem: string | null, };
@@ -254,9 +263,9 @@ export type ImportResult = "pass" | "fail" | "unmatched";
 export type Tag = "core" | "conditional" | "optional" | "added";
 export type StepKind = "prompt" | "followup" | "action" | "manual" | "wait" | "repeatable" | "gate" | "lessons";
 export type NotRunnableReason = "notApplicable" | "undecided" | "needsAnnotation" | "done" | "needsNewerForeman" | "waiting" | "running" | "notCli" | "chainNotStarted";
-export type ToolPathProblem = "relative" | "missing" | "notExecutable" | "inProject" | "symlinkIntoProject";
-export type AuthProblem = { "kind": "wrongMethod", method: string, } | { "kind": "unknownMethod" } | { "kind": "unparsable" } | { "kind": "exit", code: number, } | { "kind": "timeout" };
-export type Requirement = { what: string, version: string, };
+export type ToolPathProblem = "relative" | "missing" | "notExecutable" | "inProject" | "symlinkIntoProject" | "worldWritable";
+export type AuthProblem = { "kind": "wrongMethod", method: string, } | { "kind": "unknownMethod" } | { "kind": "unparsable" } | { "kind": "exit", code: number | null, } | { "kind": "timeout" };
+export type Requirement = { feature: string, min: string, source: string, };
 export type DecisionFileKind = "project" | "overlay" | "blueprintLock";
 export type FixAction = "repair" | "openInEditor" | "copyFixRequest";
 export type Problem = { rule: string, line: number | null, message: string, fix: Array<FixAction> | null, };
@@ -1293,7 +1302,7 @@ This file is the only command list; the design doc points here (Stage 4.7 fix pa
 | Channel type | Wire | Created by | Payload | Rules |
 |---|---|---|---|---|
 | **PTY output** `Channel<tauri::ipc::Response>` | `InvokeResponseBody::Raw` → `ArrayBuffer` | `launch_start`, `rearm_start`, `rearm_continue`, `pty_attach`, `probe_folder_open` | Raw PTY bytes, chunks ≤ 64 KB (`Response::new(Vec<u8>)`) | Never JSON (a `Channel<Vec<u8>>` would send a number array). The webview writes with `term.write(new Uint8Array(buf), cb)` and calls `pty_flow(paused=true)` above 1 MB pending (NFR-08). Ordered per channel. One channel per run; a re-arm's relaunch gets a new run and a new channel; the old buffer is archived client-side. Tests: `pty::channel_sends_raw_bytes`, `pty::burst_1mb_backpressure`. |
-| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `chain_resume_prepare`, `packet_repair_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found }` · `Contract { outcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code }` · `Spawning` · `Done` | Phases arrive in DR-120's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
+| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `chain_resume_prepare`, `packet_repair_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found: Option<String> }` · `Contract { outcome: ContractOutcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code: Option<i32> }` · `Spawning` · `Done` | Phases arrive in DR-120's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
 | **Sign progress** `Channel<SignProgress>` (P2) | JSON | `sign_apply`, `sign_retry_commit` | `ReRead` · `Write { path }` · `HashObject { path }` · `WriteTree` · `CommitTree { signed: bool }` · `UpdateRef` · `RefreshIndex` · `ReadBack { path, ok }` · `Done { commit }` | One message per plumbing step (ADR-012). Test: `sign::progress_matches_plumbing_order`. |
 
 Channels need no capability permission (SR-22). The TS client wraps each in `#lib/ipc/tauri.ts`; components receive callbacks, never `Channel` objects.

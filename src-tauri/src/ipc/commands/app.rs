@@ -64,7 +64,7 @@ pub fn app_bootstrap(app: &App, req: AppBootstrapReq) -> Result<AppBootstrap, Ip
         settings_rev: Rev(settings_rev),
         projects,
         // Run records exist once the launch pipeline lands (M2-10, M3-10); none before.
-        interrupted: Vec::new(),
+        interrupted: crate::runs::interrupted(app)?,
         doctor,
         capabilities: capabilities(app, &s),
     })

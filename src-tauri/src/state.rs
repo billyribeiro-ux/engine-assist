@@ -235,6 +235,28 @@ impl App {
         &self.paths
     }
 
+    /// Foreman's own environment as a launch sees it (SR-05's input): `HOME` is the home folder
+    /// Foreman uses, so the preflight and the child agree on `~/.claude`; a `CLAUDE_CONFIG_DIR`
+    /// set for a different home doesn't carry over.
+    #[must_use]
+    pub fn own_env(&self) -> Vec<(String, String)> {
+        let home = self.paths.home.display().to_string();
+        let same_home = std::env::var("HOME").is_ok_and(|h| h == home);
+        std::env::vars()
+            .filter(|(k, _)| k != "HOME" && (same_home || k != "CLAUDE_CONFIG_DIR"))
+            .chain(std::iter::once(("HOME".to_owned(), home)))
+            .collect()
+    }
+
+    /// `CLAUDE_CONFIG_DIR` from [`App::own_env`].
+    #[must_use]
+    pub fn config_dir_env(&self) -> Option<PathBuf> {
+        self.own_env()
+            .into_iter()
+            .find(|(k, _)| k == "CLAUDE_CONFIG_DIR")
+            .map(|(_, v)| PathBuf::from(v))
+    }
+
     /// The in-memory state.
     pub fn inner(&self) -> MutexGuard<'_, Inner> {
         guard(&self.inner)

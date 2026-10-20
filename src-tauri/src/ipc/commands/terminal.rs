@@ -198,11 +198,21 @@ fn drive(
     first: bool,
 ) -> Result<RearmOutcome, IpcError> {
     let old = app.runs().of_chain(chain);
-    let opened = RefCell::new(project::open(app, &held.project_id)?);
+    // The old session's exit rewrites `progress.json` (DR-065), so each hook reopens the project
+    // rather than holding a stale read.
+    let title = project::open(app, &held.project_id)?
+        .step(&held.step)
+        .map(|s| s.title.clone())
+        .unwrap_or_default();
     let fresh: RefCell<Option<launch::Prepared>> = RefCell::new(None);
     let started: RefCell<Option<launch::Started>> = RefCell::new(None);
     let mut prepare_again = || -> SysOutcome {
-        let mut p = opened.borrow_mut();
+        let Ok(mut p) = project::open(app, &held.project_id) else {
+            return SysOutcome::Blocked {
+                blockers: Vec::new(),
+                warnings: Vec::new(),
+            };
+        };
         match launch::prepare(
             app,
             &mut p,
@@ -230,7 +240,7 @@ fn drive(
         }
     };
     let divider = foreman_core::ids::StepKey::parse(&held.step)
-        .map(|k| foreman_core::rearm::divider(&k, "", &held.intended))
+        .map(|k| foreman_core::rearm::divider(&k, &title, &held.intended))
         .unwrap_or_default();
     let out_for_archive = output.clone();
     let mut archive = || {
@@ -238,7 +248,7 @@ fn drive(
     };
     let out_cell = RefCell::new(Some(output));
     let mut relaunch = |plan: &foreman_sys::launch::LaunchPlan| -> Result<pty::PtySession, String> {
-        let mut p = opened.borrow_mut();
+        let mut p = project::open(app, &held.project_id).map_err(|e| e.message)?;
         let mut h = held.clone();
         h.plan = plan.clone();
         let s = launch::start(
@@ -281,7 +291,6 @@ fn drive(
             &mut hooks,
         )
     };
-    drop(hooks);
     match result {
         Ok(SysRearm::Relaunched { .. }) => {
             let s = started.into_inner().ok_or_else(IpcError::internal)?;

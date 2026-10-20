@@ -83,6 +83,34 @@ function fail(code: T.IpcErrorCode, detail: T.IpcErrorDetail | null = null): Ipc
 }
 const notAllowed = (rule: string) => fail('notAllowed', { kind: 'notAllowed', rule });
 const notFound = () => fail('notFound');
+
+/** CR-003: the pin refused for annotation errors in Stages 1–2 and F.2 (`annotationErrors` world). */
+function annotationErrors(): IpcFailure {
+	const diag = (line: number, rule: string, text: string, stage: number): T.Diagnostic => ({
+		severity: 'error',
+		rule,
+		file: 'claude-build-blueprint.md',
+		line,
+		column: 1,
+		message: [{ kind: 'plain', text }],
+		stage
+	});
+	return fail('notAllowed', {
+		kind: 'annotationErrors',
+		errors: [
+			{
+				stage: 1,
+				step: '1.2',
+				diagnostic: diag(141, 'grammar.bad-chain', 'chain=1.9 names no earlier step in Stage 1', 1)
+			},
+			{
+				stage: 2,
+				step: '2.5',
+				diagnostic: diag(214, 'grammar.unknown-key', 'unknown key `bogus` (grammar v1)', 2)
+			}
+		]
+	});
+}
 const cancelled = () => fail('cancelled');
 const invalidField = (field: string, rule: string) =>
 	fail('invalid', { kind: 'invalid', field, rule });
@@ -1058,6 +1086,7 @@ export class MockIpcClient implements IpcClient {
 		return this.run('setup_preview', req, () => {
 			if (!this.pickIds.has(req.pickId)) throw fail('expired');
 			if (!/^[a-z0-9-]{1,40}$/.test(req.slug)) throw invalidField('slug', 'pattern');
+			if (this.world.scenario === 'annotationErrors') throw annotationErrors();
 			for (const k of Object.keys(req.variables))
 				if (!/^[A-Z][A-Z0-9_]*$/.test(k)) throw invalidField(`variables.${k}`, 'name');
 			if (req.chatProjectUrl && !req.chatProjectUrl.startsWith('https://claude.ai/'))
@@ -1272,6 +1301,7 @@ export class MockIpcClient implements IpcClient {
 		return this.run('blueprint_repin', req, () => {
 			const p = this.project(req.projectId);
 			if (p.stages[1]?.status === 'signed') throw notAllowed('repin-after-stage-1-signed');
+			if (this.world.scenario === 'annotationErrors') throw annotationErrors();
 			p.readOnly = null;
 			this.touch(p);
 			return this.projectView(p);

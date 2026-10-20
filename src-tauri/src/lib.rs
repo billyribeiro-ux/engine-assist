@@ -14,6 +14,7 @@ pub mod render;
 pub mod runs;
 pub mod state;
 pub mod text;
+pub mod watch;
 pub mod window;
 
 use std::sync::Arc;
@@ -140,7 +141,9 @@ pub fn run() -> tauri::Result<()> {
                 home: app.path().home_dir()?,
             };
             let os = Arc::new(os::TauriOs::new(app.handle().clone()));
-            app.manage::<ipc::Shared>(state::App::new(os, paths));
+            let state = state::App::new(os, paths);
+            watch::start(state.weak());
+            app.manage::<ipc::Shared>(state);
             window::build_main(app)?;
             Ok(())
         })

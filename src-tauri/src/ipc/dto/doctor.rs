@@ -162,6 +162,44 @@ response!(
     }
 );
 
+impl From<&foreman_core::diagnostic::Diagnostic> for Diagnostic {
+    fn from(d: &foreman_core::diagnostic::Diagnostic) -> Self {
+        Self {
+            severity: if d.is_error() {
+                Severity::Error
+            } else {
+                Severity::Warning
+            },
+            rule: d.rule.clone(),
+            file: d.file.clone(),
+            line: d.line,
+            column: d.column,
+            message: crate::render::spans(&d.message),
+            stage: Stage(d.stage.unwrap_or(0)),
+        }
+    }
+}
+
+response!(
+    /// (CR-003) `AnnotationProblem` (§3): one annotation error that stops a pin; `step` is the
+    /// annotation ID (`2.3`, `F.2`).
+    AnnotationProblem {
+        stage: Option<Stage>,
+        step: Option<String>,
+        diagnostic: Diagnostic,
+    }
+);
+
+impl From<&foreman_core::lock::AnnotationProblem> for AnnotationProblem {
+    fn from(p: &foreman_core::lock::AnnotationProblem) -> Self {
+        Self {
+            stage: p.stage.map(Stage),
+            step: p.step.clone(),
+            diagnostic: (&p.diagnostic).into(),
+        }
+    }
+}
+
 response!(
     /// `TemplateHealth` (§4.2) with `commit` and `file` (§2.4).
     TemplateHealth {

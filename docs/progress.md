@@ -57,8 +57,8 @@ Where the M1 build differs from the docs, the doc that should change (or the dec
 | - | --------- | ----- | --------------------------------- | ------ |
 | 1 | The hostile-repo fixture and the 20,000-line blueprint are generated in code each run, not committed (`fixtures/hostile-repo/`, `fixtures/blueprint-20k.md`). Generating them keeps the repo small and the content deterministic; the 20k file is the v2.2 blueprint plus synthetic appendix notes, so it is not a real blueprint. | `crates/foreman-sys/tests/common/mod.rs` (`hostile_repo`), `crates/foreman-core/benches/template.rs` (`blueprint_20k`) | `docs/tickets.md` M1-08 and M1-32 "Likely files". | Doc changed. No CR (no behavior). |
 | 2 | The file-system-reported name is read by inode from a `getdents` listing, not `F_GETPATH`, and Linux fakes it through `Root::with_name_reporter`. The real case-insensitive volume test (`fs_policy::case_and_normalization_variants`, an APFS disk image) runs on macOS only; Linux proves only the hook (`reported_name_checked`). The case-sensitive volume half of ADR-011's verification isn't built. | `crates/foreman-core/src/store/walk.rs`, `tests/fs_policy.rs` | ADR-011 (FS-reported name check, Verification). | ADR-011 changed. **Mac task:** run `cargo test -p foreman-core --test fs_policy` on macOS and record that the APFS test passed (Stage 5 packet). |
-| 3 | Pinning didn't refuse annotation errors. `lock::pin` refused only a file that differed from HEAD or a re-pin after Stage 1 is signed, then pinned whatever parsed. No document required refusal (AC-F001-15 says errors in an unused stage are listed and the project opens), but the Stage 1 exit criterion expects the P1 stages to parse with zero errors, and a pinned P1 step in error can't be repaired once Stage 1 is signed. | `crates/foreman-core/src/lock.rs` (`pin`) | [CR-003](change-requests/CR-003-pin-refuses-p1-annotation-errors.md) (Approved, option B): DR-155, AC-F002-02, `docs/contracts/ipc.md` (§3, `setup_preview`, `blueprint_repin`) and M1-17 changed, each edit marked "(CR-003)". | **Resolved by CR-003**, approved by Billy on 2026-10-20 (in chat, 12:38 ET). `lock::pin` refuses while Stages 1–2 or F.2 have errors and returns the diagnostics (`LockError::AnnotationErrors`); errors in other stages still pin. Tests `lock::pin_refuses_p1_annotation_errors`, `lock::pin_allows_errors_outside_p1`, `lock::pin_clean_p1`. **Follow-up (M2):** map the error to `IpcError`/`AnnotationErrors` and its ts-rs binding in the pin commands (none exist in `src-tauri` yet). |
-| 4 | Foreman's own decision change won't overwrite an unreviewed outside edit: `own_change` returns `OutsidePending` when the repo file is neither the approved nor the last committed content. SR-33 and ADR-022 §4 imply it; no rule said it for Foreman's own writes. The IPC error for it isn't in `docs/contracts/ipc.md`. | `crates/foreman-core/src/decisions.rs` (`own_change`) | DR-153 and ADR-022 §5 (the refusal). `docs/contracts/ipc.md` needs an error case on the commands that change decision files; that file belongs to the src-tauri/IPC work, so it is not edited here. | DR-153 and ADR-022 changed. **Follow-up:** add the ipc.md error mapping (M2-01). |
+| 3 | Pinning didn't refuse annotation errors. `lock::pin` refused only a file that differed from HEAD or a re-pin after Stage 1 is signed, then pinned whatever parsed. No document required refusal (AC-F001-15 says errors in an unused stage are listed and the project opens), but the Stage 1 exit criterion expects the P1 stages to parse with zero errors, and a pinned P1 step in error can't be repaired once Stage 1 is signed. | `crates/foreman-core/src/lock.rs` (`pin`) | [CR-003](change-requests/CR-003-pin-refuses-p1-annotation-errors.md) (Approved, option B): DR-155, AC-F002-02, `docs/contracts/ipc.md` (§3, `setup_preview`, `blueprint_repin`) and M1-17 changed, each edit marked "(CR-003)". | **Resolved by CR-003**, approved by Billy on 2026-10-20 (in chat, 12:38 ET). `lock::pin` refuses while Stages 1–2 or F.2 have errors and returns the diagnostics (`LockError::AnnotationErrors`); errors in other stages still pin. Tests `lock::pin_refuses_p1_annotation_errors`, `lock::pin_allows_errors_outside_p1`, `lock::pin_clean_p1`. **Follow-up (M2): done** in `stage/05-app` (`IpcError{notAllowed, detail: annotationErrors}`, binding, mock, Setup list). |
+| 4 | Foreman's own decision change won't overwrite an unreviewed outside edit: `own_change` returns `OutsidePending` when the repo file is neither the approved nor the last committed content. SR-33 and ADR-022 §4 imply it; no rule said it for Foreman's own writes. The IPC error for it isn't in `docs/contracts/ipc.md`. | `crates/foreman-core/src/decisions.rs` (`own_change`) | DR-153 and ADR-022 §5 (the refusal). `docs/contracts/ipc.md` needs an error case on the commands that change decision files; that file belongs to the src-tauri/IPC work, so it is not edited here. | DR-153 and ADR-022 changed. **Follow-up: done** (ipc.md §2.4: `Conflict` with the file's path). |
 | 5 | From Stage 5 on, Foreman's own decision changes go to the approved copy and `progress.json` only; the repo file is left alone until the next signing commit. DR-153 read as if the repo file were written too, which contradicted its own drift rule (the repo file must still match `committedSha256`) and ADR-022 §5. | `decisions.rs` (`own_change`, `stage5_signed`) | **DR-153 now matches ADR-022 §5.** ADR-022's rule is the safer one: the working-tree file stays what Claude Code (and `git status`) sees as committed, nothing uncommitted can be swept into a commit that bypasses Foreman's signing, and drift needs no special case. | DR-153 changed. Billy confirms with the Stage 5 packet. |
 | 6 | A CLI prompt step is done only on exit 0; a non-zero exit ends the run (code recorded) and returns the step to `notStarted`. DR-066 says a CLI step finishes "when the run exits (any code; the exit code is recorded)", and DR-065 says `running → done` on "exit 0" and `running → notStarted` when errored. The previous code made every exit code done. | `crates/foreman-core/src/steps/mod.rs` | Reading: DR-066's "any code" means the run is over and the code is recorded; DR-065 decides the step state. DR-066 should say "the run ends on any exit code (recorded); exit 0 finishes the step (DR-065)". | Code and tests fixed (`steps::finish_rules`, `steps::transitions_exhaustive` snapshot). DR-066 wording aligned with DR-065 (no behavior change); Billy confirms with the Stage 5 packet. |
 | 7 | The real-index refresh runs with attributes neutralized and is skipped when `info/attributes` is non-empty. | `crates/foreman-sys/src/git/` | [CR-002](change-requests/CR-002-git-attributes-on-index-refresh.md) (Approved). | **CR-002 approved** by Billy on 2026-10-20 (in chat, 12:38 ET). Doc changed: SR-44, SR-45, AC-XC-04, ADR-012, T-040, DR-140, DR-143, design doc, files.md §4.3 (each edit marked "(CR-002)"). The git 2.39 residual stays open (UNVERIFIED on his Mac). |
@@ -81,22 +81,22 @@ The runner halves below are built and tested; each ticket's IPC command, native 
 | ------ | ------ | --------------------- | ---------------- |
 | M2-06 | in-progress | argv builder, fixed flags, prompt last, `--name`; `argv::*`, `spawn::no_shell_in_any_code_path`, abuse argv | preview UI |
 | M2-07 | in-progress | child env + PATH sanitizing; `env::*` | pass-through setting |
-| M2-08 | in-progress | PTY/non-PTY lifecycle, no inherited fds, SIGHUP quit path | `lifecycle::crash_leaves_interrupted` (run table) |
+| M2-08 | in-progress | PTY/non-PTY lifecycle, no inherited fds, SIGHUP quit path | app: run table + startup scan done, `lifecycle::crash_leaves_interrupted` passes (`src-tauri/tests/launch.rs`); quit guard left (M3-13) |
 | M2-09 | in-progress | run settings file (fresh, `0600`); `run_settings::*` | — |
 | M2-11 | in-progress | `claude -v`, `auth status` readers (fail closed) | Doctor |
 | M3-01 | in-progress | fingerprint over every source, stat cache, symlink rules, streamed `~/.claude.json`; `preflight::*_detected`, `fingerprint::*` | — |
-| M3-02 | in-progress | redacted diff and `acknowledge` | banner, `config_ack` native dialog |
-| M3-03 | in-progress | SR-07 blocks incl. `forceLoginMethod`; allowlist | `auth_key_allowlist_add`, `project_env_approve` |
+| M3-02 | in-progress | redacted diff and `acknowledge` | app: `config_ack` (native dialog, stale fingerprint refused) done; banner UI left |
+| M3-03 | in-progress | SR-07 blocks incl. `forceLoginMethod`; allowlist | app: `auth_key_allowlist_add` done; `project_env_approve` answers `Unsupported` until S-7′ is recorded |
 | M3-04 | in-progress | auth in the step cwd, after the fingerprint, cached | — |
 | M3-05 | in-progress | DR-120 order, version floor; `launch::progress_phase_order`, `compat::blocks_below_floor` | plan IDs, bench |
 | M3-09 | in-progress | `PtySession` (env exact, no fds, back-pressure, live-only writes) | Channel adapter |
-| M3-10 | in-progress | `start_session` | `launch_start`, tabs, `runlog::record_before_spawn` (PTY path) |
-| M3-12 | in-progress | SR-28 paste sanitizer; `pty::paste_strips_escape_sequences` | `pty_paste`, links |
-| M3-13 | in-progress | terminate (SIGTERM → SIGKILL), hangup | native dialogs, quit guard |
+| M3-10 | in-progress | `start_session` | app: `launch_start`, `run.json` before spawn, index lines, `runlog::record_before_spawn`/`argv_prompt_redacted`/`no_env_values` done; tabs UI left |
+| M3-12 | in-progress | SR-28 paste sanitizer; `pty::paste_strips_escape_sequences` | app: `pty_paste` done; `terminal_link_open` waits for an opener (`Unsupported`) |
+| M3-13 | in-progress | terminate (SIGTERM → SIGKILL), hangup | app: `pty_terminate` native dialog done; quit guard left |
 | M3-14 | in-progress | chain planning, S-3/S-8 branches, transcript path; `chain::*` | — |
-| M3-15 | in-progress | re-arm machine + driver; `rearm::*` | `rearm_start`/`rearm_continue`, native idle dialog |
-| M3-19 | in-progress | watcher (interest set, lstat roots, re-read by stamp); `watcher::*` | event mapping, `config_changed_marks_open_runs` |
-| M4-09/M4-12 (sys part) | in-progress | sensor ingest, contract probes (probe B redesigned, ADR-017) | `probe_run`, Doctor rows, retention |
+| M3-15 | in-progress | re-arm machine + driver; `rearm::*` | app: `rearm_start`/`rearm_continue` with the native idle dialog done (`rearm::relaunches_after_idle_confirm`) |
+| M3-19 | in-progress | watcher (interest set, lstat roots, re-read by stamp); `watcher::*` | app: `watcher::config_changed_marks_open_runs` done (`src-tauri/src/watch.rs`, a 5 s re-fingerprint tick while runs are live; the watcher has no config interest); `ProjectWatcher` → `packet:changed`/`decision:pending` event mapping left |
+| M4-09/M4-12 (sys part) | in-progress | sensor ingest, contract probes (probe B redesigned, ADR-017) | `probe_run` (still `Unsupported`, M4-12: needs the P2 sensor hooks and `sensor::hash_checked_per_run`, M4-08), Doctor rows, retention |
 ## M2 tickets (stage/05-app: IPC, the Tauri app)
 
 Statuses for the app side of each ticket. A command not built yet answers `Unsupported`
@@ -115,16 +115,16 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 | M2-21 | in-progress | Stage workspace backend (`step_view`, `step_skip`, `action_preview`, `action_apply`) |
 | M2-22 | in-progress | Run inputs and prompt block (`run_input_set`, `optional_part_set`) |
 | M2-24 | in-progress | Conditions, variables, outside-change review (`condition_set`, `variable_set`, `pending_*`) |
-| M2-25 | todo | Launch preview (`launch_prepare` returns prompt-side blockers; the plan needs the argv builder and run settings) |
+| M2-25 | in-progress | Launch preview (`launch_prepare`, `chain_resume_prepare`, `do_next` → `prepare_launch`; plans held 60 s, one use) |
 | M2-26 | in-progress | `step_mark_done` |
 
 ### Commands not built yet (IPC-R12), by ticket
 
 | Ticket | Commands |
 | ------ | -------- |
-| M2-25, M3-01…M3-05 | `launch_prepare` (plan), `config_ack`, `auth_key_allowlist_add`, `project_env_approve` |
+| S-7′ | `project_env_approve` |
 | M2-06 | `clipboard_copy { target: "command" }` |
-| M3-10…M3-16 | `launch_start`, `chain_resume_prepare`, `pty_*`, `rearm_*`, `terminal_link_open`, `progress_rebuild_*` |
+| M3-12, M3-16 | `terminal_link_open`, `progress_rebuild_*` |
 | M3-18, M4-12…M4-14 | `probe_folder_open`, `probe_run`, `doctor_capture_login_path`, `doctor_login_path_apply` |
 | M3-21 | `packet_normalize_apply` (the DR-131 normalizer) |
 | M3-23, M3-24 | `chat_copy_and_open`, `chat_link_set`, `paste_back_*` |
@@ -136,3 +136,8 @@ Statuses for the app side of each ticket. A command not built yet answers `Unsup
 - `settings.json` v2 with `screenReaderMode` (core schema + migration; files.md §4.1 proposal).
 - `project_remove` removes the registry entry only; deleting `projects/<id>/`, approvals and fingerprints needs a store delete (M4-02).
 - `foreman-core::store::dirs::ensure_dir` (new, for setup's empty folders) needs a core review.
+- (CR-003) `foreman-core::pin_check::p1_annotation_errors` (new) lets `setup_preview` refuse before anything is written; it mirrors `lock`'s private `problem`/`step_at` (pinned by `pin_check::preview_check_matches_pin`). The core owner may fold it into `lock.rs`. Pin refusals map to `IpcError{notAllowed, detail: annotationErrors}`; Setup and the wizard list each error (`AnnotationProblems.svelte`). No re-pin screen exists yet; it should reuse that component.
+- `PtySession::wait_exit` now returns only after the sink was told of the exit (`pty::write_requires_live_run` raced the sink: 3 of 60 runs under load failed; 0 of 60 after).
+- The launch's own environment takes `HOME` from the app's home folder (`App::own_env`), so the transcript check and the child agree on `~/.claude` (tests no longer write to the real `~/.claude/projects`).
+- `sensor::hash_checked_per_run` (M4-08) waits for the P2 sensor hooks; the app passes `sensor: None`.
+- Item 4 above: the `OutsidePending` refusal maps to `Conflict` with the file's path (ipc.md §2.4).

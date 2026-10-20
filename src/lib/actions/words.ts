@@ -1,7 +1,14 @@
 // Foreman-written sentences for typed results (A.9 writing rules). The UI never parses Rust's
 // `message`; it branches on `code` and `detail.kind` (ADR-004 §5).
 import { IPC_ERROR_TEXT, type IpcFailure } from '#lib/ipc/errors.ts';
-import type { Blocker, ConfirmReason, Model, Mode, Start } from '#lib/ipc/types.ts';
+import type {
+	AnnotationProblem,
+	Blocker,
+	ConfirmReason,
+	Model,
+	Mode,
+	Start
+} from '#lib/ipc/types.ts';
 
 export const MODEL_NAME: Record<Model, string> = {
 	fable: 'Fable 5.1',
@@ -90,6 +97,19 @@ export function confirmText(c: ConfirmReason): string {
 }
 
 /** One sentence for a failed command, by code and detail (never Rust's message text). */
+/** Where an annotation error sits (CR-003): "Stage 2 step 2.3", "Stage 2", "Step F.2" or "The blueprint". */
+export function problemPlace(p: AnnotationProblem): string {
+	if (p.stage !== null && p.step !== null) return `Stage ${p.stage} step ${p.step}`;
+	if (p.stage !== null) return `Stage ${p.stage}`;
+	if (p.step !== null) return `Step ${p.step}`;
+	return 'The blueprint';
+}
+
+/** The annotation errors an `IpcFailure` carries (CR-003), else none. */
+export function annotationProblems(e: IpcFailure): AnnotationProblem[] {
+	return e.detail?.kind === 'annotationErrors' ? e.detail.errors : [];
+}
+
 export function failureText(e: IpcFailure): string {
 	const d = e.detail;
 	switch (d?.kind) {
@@ -117,6 +137,10 @@ export function failureText(e: IpcFailure): string {
 			return `${IPC_ERROR_TEXT.unsupported} (${d.why})`;
 		case 'invalid':
 			return `${IPC_ERROR_TEXT.invalid} (${d.field})`;
+		case 'annotationErrors':
+			return d.errors.length === 1 && d.errors[0]
+				? `${problemPlace(d.errors[0])} has an annotation error on line ${d.errors[0].diagnostic.line}. Fix the blueprint, then pin again.`
+				: `${d.errors.length} annotation errors in Stages 1–2 and F.2 stop the pin. Fix the blueprint, then pin again.`;
 		default:
 			return IPC_ERROR_TEXT[e.code];
 	}

@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
+	import AnnotationProblems from '#lib/components/AnnotationProblems.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Segmented from '#lib/components/Segmented.svelte';
 	import type { TriState } from '#lib/ipc/types.ts';
@@ -248,7 +249,8 @@
 					overwrite.
 				</p>
 			{/if}
-			{#if f.previewError}<p class="err" role="alert">
+			{#if f.previewProblems.length}<AnnotationProblems problems={f.previewProblems} />
+			{:else if f.previewError}<p class="err" role="alert">
 					<Icon name="cross" size="glyph" />{f.previewError}
 				</p>{/if}
 			<div class="actions">
@@ -260,7 +262,8 @@
 				>
 			</div>
 			{#if createWhy}<p class="reason" id="create-why">{createWhy}</p>{/if}
-			{#if f.createError}<p class="err" role="alert">
+			{#if f.createProblems.length}<AnnotationProblems problems={f.createProblems} />
+			{:else if f.createError}<p class="err" role="alert">
 					<Icon name="cross" size="glyph" />{f.createError}
 				</p>{/if}
 		</aside>

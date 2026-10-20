@@ -3,4 +3,4 @@
 /**
  * Why a tool path was refused (SR-01).
  */
-export type ToolPathProblem = "relative" | "missing" | "notExecutable" | "inProject" | "symlinkIntoProject";
+export type ToolPathProblem = "relative" | "missing" | "notExecutable" | "inProject" | "symlinkIntoProject" | "worldWritable";

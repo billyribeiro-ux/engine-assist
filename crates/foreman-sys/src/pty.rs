@@ -118,6 +118,9 @@ struct Inner {
     paused: Mutex<bool>,
     flow: Condvar,
     status: Mutex<PtyStatus>,
+    /// Set after the sink was told of the exit; what `wait_exit` waits on, so a caller that saw
+    /// the exit also sees everything the sink did with it.
+    reported: Mutex<Option<ExitInfo>>,
     exited: Condvar,
     live: AtomicBool,
 }
@@ -203,6 +206,7 @@ impl PtySession {
             paused: Mutex::new(false),
             flow: Condvar::new(),
             status: Mutex::new(PtyStatus::Running),
+            reported: Mutex::new(None),
             exited: Condvar::new(),
             live: AtomicBool::new(true),
         });
@@ -305,13 +309,14 @@ impl PtySession {
         )
     }
 
-    /// Waits up to `timeout` for the exit.
+    /// Waits up to `timeout` for the exit; returns only after the sink was told of it (so the
+    /// sink's `exited` must not call this).
     #[must_use]
     pub fn wait_exit(&self, timeout: Duration) -> Option<ExitInfo> {
         let deadline = Instant::now() + timeout;
-        let mut st = lock(&self.inner.status);
+        let mut st = lock(&self.inner.reported);
         loop {
-            if let PtyStatus::Exited(i) = *st {
+            if let Some(i) = *st {
                 return Some(i);
             }
             let now = Instant::now();
@@ -426,8 +431,9 @@ fn wait_loop(
         }
     }
     *lock(&inner.status) = PtyStatus::Exited(info);
-    inner.exited.notify_all();
     sink.exited(info);
+    *lock(&inner.reported) = Some(info);
+    inner.exited.notify_all();
 }
 
 /// A sanitized paste (`pty_paste` → `PasteText`): ESC, C0 (except TAB, LF, CR), DEL and C1 are

@@ -3,4 +3,4 @@
 /**
  * Why `claude auth status` blocked (SR-08).
  */
-export type AuthProblem = { "kind": "wrongMethod", method: string, } | { "kind": "unknownMethod" } | { "kind": "unparsable" } | { "kind": "exit", code: number, } | { "kind": "timeout" };
+export type AuthProblem = { "kind": "wrongMethod", method: string, } | { "kind": "unknownMethod" } | { "kind": "unparsable" } | { "kind": "exit", code: number | null, } | { "kind": "timeout" };

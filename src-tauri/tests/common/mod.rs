@@ -7,6 +7,7 @@
     reason = "shared test helpers; test code may use std::fs (design doc §3.2)"
 )]
 
+pub mod project;
 pub mod table;
 
 use std::path::{Path, PathBuf};

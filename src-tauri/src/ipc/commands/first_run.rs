@@ -11,13 +11,10 @@ use foreman_sys::lock::{StateError, blueprint_state};
 
 use crate::ipc::IpcError;
 use crate::ipc::dto::app::{BlueprintRepoInfo, ConditionSpec, TemplateHealthSummary, VariableSpec};
-use crate::ipc::dto::doctor::{
-    Counts, Diagnostic, Severity, StageHealth, StageHealthStatus, TemplateHealth,
-};
+use crate::ipc::dto::doctor::{Counts, Diagnostic, StageHealth, StageHealthStatus, TemplateHealth};
 use crate::ipc::dto::requests::{BlueprintPickRepoReq, PickMode, TemplateHealthReq};
-use crate::ipc::types::{ConditionId, Stage, ToolKind};
+use crate::ipc::types::{ConditionId, ToolKind};
 use crate::os::Pick;
-use crate::render::spans;
 use crate::state::App;
 use crate::text;
 
@@ -308,23 +305,7 @@ pub fn health(t: &Template, commit: &str) -> TemplateHealth {
             warnings: count(t.diagnostics.len() - errors),
         },
         stages: stage_health(t),
-        diagnostics: t
-            .diagnostics
-            .iter()
-            .map(|d| Diagnostic {
-                severity: if d.is_error() {
-                    Severity::Error
-                } else {
-                    Severity::Warning
-                },
-                rule: d.rule.clone(),
-                file: d.file.clone(),
-                line: d.line,
-                column: d.column,
-                message: spans(&d.message),
-                stage: Stage(d.stage.unwrap_or(0)),
-            })
-            .collect(),
+        diagnostics: t.diagnostics.iter().map(Diagnostic::from).collect(),
         commit: commit.chars().take(7).collect(),
         file: BLUEPRINT_FILE.to_owned(),
     }

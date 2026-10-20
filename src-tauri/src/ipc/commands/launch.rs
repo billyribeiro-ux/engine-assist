@@ -292,7 +292,7 @@ pub fn auth_key_allowlist_add(
     let (settings, _, _) = app.settings()?;
     let reg = app.registry()?.0;
     let ctx = app.spawn_ctx(&settings, &reg);
-    let cfg = std::env::var_os("CLAUDE_CONFIG_DIR").map(std::path::PathBuf::from);
+    let cfg = app.config_dir_env();
     let w = foreman_sys::fingerprint::Where {
         cwd: &dir,
         repo_root: &root,

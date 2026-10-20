@@ -2,10 +2,11 @@
 // fields, the same checks, the same preview and create (AC-F018-01). Rust re-validates everything;
 // the folder comes only from Rust's dialog (setup_pick_folder), never from typed text (SR-24).
 import { slugOf } from '#lib/actions/slug.ts';
-import { failureText } from '#lib/actions/words.ts';
+import { annotationProblems, failureText } from '#lib/actions/words.ts';
 import { toIpcFailure } from '#lib/ipc/errors.ts';
 import { ipc } from '#lib/ipc/index.ts';
 import type {
+	AnnotationProblem,
 	ConditionId,
 	ConditionSpec,
 	FolderPick,
@@ -29,6 +30,9 @@ export class SetupForm {
 	preview = $state<SetupPreview | null>(null);
 	previewError = $state<string | null>(null);
 	createError = $state<string | null>(null);
+	/** CR-003: the annotation errors that stop the pin, listed under the preview or Create. */
+	previewProblems = $state<AnnotationProblem[]>([]);
+	createProblems = $state<AnnotationProblem[]>([]);
 	touched = $state<Record<string, boolean>>({});
 	busy = $state(false);
 	private timer: ReturnType<typeof setTimeout> | undefined;
@@ -117,8 +121,11 @@ export class SetupForm {
 				chatProjectUrl: this.url && !this.errors.url ? this.url : null
 			});
 			this.previewError = null;
+			this.previewProblems = [];
 		} catch (e: unknown) {
-			this.previewError = failureText(toIpcFailure(e));
+			const f = toIpcFailure(e);
+			this.previewError = failureText(f);
+			this.previewProblems = annotationProblems(f);
 		}
 	}
 
@@ -129,10 +136,13 @@ export class SetupForm {
 		this.busy = true;
 		try {
 			const p = await c.setupApply({ previewId: this.preview.previewId });
+			this.createProblems = [];
 			refresh('projects', 'today');
 			return p;
 		} catch (e: unknown) {
-			this.createError = failureText(toIpcFailure(e));
+			const f = toIpcFailure(e);
+			this.createError = failureText(f);
+			this.createProblems = annotationProblems(f);
 			return null;
 		} finally {
 			this.busy = false;

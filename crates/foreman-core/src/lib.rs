@@ -19,6 +19,7 @@ pub mod launch;
 pub mod lock;
 pub mod packet;
 pub mod pathpolicy;
+pub mod pin_check;
 pub mod policy;
 pub mod probe;
 pub mod rearm;

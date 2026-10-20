@@ -288,7 +288,7 @@ pub fn prepare(
     };
     let (cwd, cwd_kind) = step_cwd(p, &s)?;
     let root_path = foreman_sys::spawn::canonical(p.root()?.path());
-    let own_env: Vec<(String, String)> = std::env::vars().collect();
+    let own_env: Vec<(String, String)> = app.own_env();
     let sources = path_sources(
         app,
         settings
