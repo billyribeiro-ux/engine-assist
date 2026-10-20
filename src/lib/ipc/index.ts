@@ -8,8 +8,8 @@ let client: Promise<IpcClient> | undefined;
 export function ipc(): Promise<IpcClient> {
 	client ??=
 		import.meta.env.VITE_IPC === 'mock'
-			? import('./mock.ts').then((m) => new m.MockIpcClient())
-			: import('./tauri.ts').then((m) => new m.TauriIpcClient());
+			? import('./mock.ts').then((m) => m.mockClient())
+			: import('./tauri.ts').then((m) => m.TauriIpcClient.create());
 	return client;
 }
 
