@@ -1,0 +1,13 @@
+---
+source: crates/foreman-core/tests/rules.rs
+expression: "rows.join(\"\\n\")"
+---
+yes yes → & yes | yes
+yes no → & no | yes
+yes undecided → & undecided | yes
+no yes → & no | yes
+no no → & no | no
+no undecided → & no | undecided
+undecided yes → & undecided | yes
+undecided no → & no | undecided
+undecided undecided → & undecided | undecided

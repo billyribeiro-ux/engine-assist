@@ -6,11 +6,13 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
 
+pub mod compat;
 pub mod diagnostic;
 pub mod git;
 pub mod ids;
 pub mod json;
 pub mod pathpolicy;
+pub mod policy;
 pub mod resolver;
 pub mod rules;
 pub mod schema;
