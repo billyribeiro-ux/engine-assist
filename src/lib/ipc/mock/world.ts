@@ -943,7 +943,7 @@ function tradelog(snap: Snap): MProject {
 		s4: 'stage/04-drawings',
 		s5: 'stage/05-site-prep'
 	}[snap];
-	p.packets[1] = stage1Packet('TradeLog');
+	if (signedUpTo >= 1) p.packets[1] = stage1Packet('TradeLog');
 	p.gates[2] = stage2Gate();
 	p.gates[5] = stage5Gate();
 	if (snap === 's1') {

@@ -8,11 +8,10 @@
 
 	let { project, stage }: { project: ProjectView; stage: StageView } = $props();
 
-	const applicable = $derived(stage.steps.filter((s) => s.state !== 'needsAnnotation'));
-	const done = $derived(
-		applicable.filter((s) => ['done', 'skipped', 'notApplicable', 'running'].includes(s.state))
-			.length
+	const applicable = $derived(
+		stage.steps.filter((s) => s.state !== 'needsAnnotation' && s.state !== 'notApplicable')
 	);
+	const done = $derived(applicable.filter((s) => s.state === 'done' || s.state === 'skipped').length);
 	const status = $derived(
 		stage.signed
 			? stage.signed.merged

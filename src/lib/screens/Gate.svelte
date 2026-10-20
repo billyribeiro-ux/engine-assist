@@ -55,9 +55,12 @@
 	const drafts = $state<
 		Record<string, { kind: 'done' | 'notApplicable'; note: string; error: string | null }>
 	>({});
+	$effect(() => {
+		for (const it of g?.items ?? [])
+			if (it.status === 'waiting' && !(it.id in drafts)) drafts[it.id] = { kind: 'done', note: it.note ?? '', error: null };
+	});
 	function draft(it: GateItemView) {
-		drafts[it.id] ??= { kind: 'done', note: it.note ?? '', error: null };
-		return drafts[it.id] ?? { kind: 'done', note: '', error: null };
+		return drafts[it.id] ?? { kind: 'done' as const, note: '', error: null };
 	}
 	const NOTE_RULES: Record<string, string> = {
 		'note-too-short':
@@ -250,7 +253,7 @@
 </script>
 
 {#snippet item(it: GateItemView)}
-	{@const d = it.status === 'waiting' ? draft(it) : null}
+	{@const d = it.status === 'waiting' ? (drafts[it.id] ?? null) : null}
 	<div
 		class={['item', selected?.id === it.id && 'is-selected']}
 		role="listitem"
@@ -290,7 +293,7 @@
 						><Icon name="wrench" />Fix this</button
 					>
 					<span class="reason"
-						>{it.failures >= 2 ? 'A third failure offers the F.4 prompt. ' : ''}Opens a new CLI
+						>Opens a new CLI
 						chain: Opus 5.5, high, Plan, with this item and its evidence</span
 					>
 				</div>
@@ -426,7 +429,7 @@
 			{#snippet gatePane()}
 				{#if selected}
 					<div>
-						<h2 class="insp-title">Evidence for {selected.id.replace(/-/g, ' ')}</h2>
+						<h2 class="insp-title">Evidence for {selected.id.split('-').map((w) => (w.length <= 3 ? w.toUpperCase() : w)).join(' ')}</h2>
 						<p class="insp-sub">
 							{selected.session
 								? "From the Gate A session's last message"
@@ -545,18 +548,29 @@
 		</div>
 		<div class="field">
 			<span class="field-label" id="branch-l">Branch</span>
-			<Segmented
-				options={[
-					{ value: 'current', label: `Current branch, ${project.branch}` },
-					{ value: 'other', label: 'Another branch' }
-				]}
-				value={branchKind}
-				labelledby="branch-l"
-				onchange={(v: 'current' | 'other') => {
-					branchKind = v;
-					void previewSign();
-				}}
-			/>
+			<div class="radio-list" role="radiogroup" aria-labelledby="branch-l">
+				{#each [{ v: 'current' as const, label: 'Current branch,', code: project.branch }, { v: 'other' as const, label: 'Sign on another branch (leaves your working tree untouched)', code: '' }] as o, i (o.v)}
+					<button
+						type="button"
+						class="radio"
+						role="radio"
+						aria-checked={branchKind === o.v}
+						tabindex={branchKind === o.v ? 0 : -1}
+						onclick={() => {
+							branchKind = o.v;
+							void previewSign();
+						}}
+						onkeydown={(e) => {
+							if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+							e.preventDefault();
+							branchKind = i === 0 ? 'other' : 'current';
+							void previewSign();
+							const host = e.currentTarget.parentElement;
+							queueMicrotask(() => host?.querySelectorAll<HTMLElement>('[role="radio"]')[i === 0 ? 1 : 0]?.focus());
+						}}><span class={['r', branchKind === o.v && 'on']} aria-hidden="true"></span>{o.label}{#if o.code}&nbsp;<code>{o.code}</code>{/if}</button
+					>
+				{/each}
+			</div>
 			{#if branchKind === 'other'}
 				<label class="vh" for="s-branch">Branch name</label>
 				<input
@@ -760,6 +774,40 @@
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: var(--space-4);
+	}
+	.radio-list {
+		display: grid;
+		gap: 6px;
+	}
+	.radio {
+		all: unset;
+		display: flex;
+		gap: var(--space-3);
+		align-items: center;
+		font-size: var(--text-13);
+	}
+	.radio:focus-visible {
+		outline: var(--focus-width) solid var(--focus);
+		outline-offset: var(--focus-offset);
+	}
+	.r {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		border: 1px solid var(--control-edge);
+		display: grid;
+		place-items: center;
+		background: var(--sheet);
+	}
+	.r.on {
+		border-color: var(--accent-ink);
+	}
+	.r.on::after {
+		content: '';
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--accent-ink);
 	}
 	.hashline {
 		font-size: var(--text-12);
