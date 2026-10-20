@@ -2,6 +2,7 @@
 //! entry point), and later the `claude` CLI wrappers, `PtySession` and `/usr/bin/open`. No Tauri.
 #![forbid(unsafe_code)]
 
+pub mod decisions;
 pub mod git;
 pub mod lock;
 pub mod spawn;
