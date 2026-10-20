@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod git;
+pub mod lock;
 pub mod spawn;
 
 /// The core version this crate was built against.

@@ -11,6 +11,7 @@ pub mod diagnostic;
 pub mod git;
 pub mod ids;
 pub mod json;
+pub mod lock;
 pub mod packet;
 pub mod pathpolicy;
 pub mod policy;
