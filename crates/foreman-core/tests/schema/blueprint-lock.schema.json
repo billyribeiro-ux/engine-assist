@@ -1,0 +1,63 @@
+{
+  "$id": "urn:foreman:blueprint-lock.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "blueprintPath": {
+      "$ref": "urn:foreman:common#/$defs/repoPath"
+    },
+    "blueprintRepoCommit": {
+      "$ref": "urn:foreman:common#/$defs/gitOid"
+    },
+    "blueprintVersion": {
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$",
+      "type": "string"
+    },
+    "grammarVersion": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "items": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "urn:foreman:common#/$defs/itemKind"
+          },
+          "textSha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          }
+        },
+        "required": [
+          "textSha256",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/itemId"
+      },
+      "type": "object"
+    },
+    "pinnedAt": {
+      "$ref": "urn:foreman:common#/$defs/timestamp"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "sourceSha256": {
+      "$ref": "urn:foreman:common#/$defs/sha256"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "blueprintRepoCommit",
+    "blueprintPath",
+    "sourceSha256",
+    "blueprintVersion",
+    "grammarVersion",
+    "pinnedAt",
+    "items"
+  ],
+  "type": "object"
+}

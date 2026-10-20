@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "approval": {
+      "additionalProperties": false,
+      "properties": {
+        "approvedSha256": {
+          "oneOf": [
+            {
+              "$ref": "urn:foreman:common#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "committedOnOtherBranches": {
+          "additionalProperties": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          },
+          "propertyNames": {
+            "pattern": "^refs/heads/[^\\s]{1,200}$"
+          },
+          "type": "object"
+        },
+        "committedSha256": {
+          "oneOf": [
+            {
+              "$ref": "urn:foreman:common#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "approvedSha256",
+        "committedSha256",
+        "committedOnOtherBranches"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "urn:foreman:approvals.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "envApprovals": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "$ref": "urn:foreman:common#/$defs/timestamp"
+          },
+          "file": {
+            "type": "string"
+          },
+          "sha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          }
+        },
+        "required": [
+          "file",
+          "sha256",
+          "at"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "files": {
+      "additionalProperties": false,
+      "properties": {
+        "blueprintLock": {
+          "$ref": "#/$defs/approval"
+        },
+        "overlay": {
+          "$ref": "#/$defs/approval"
+        },
+        "project": {
+          "$ref": "#/$defs/approval"
+        }
+      },
+      "required": [
+        "project",
+        "overlay",
+        "blueprintLock"
+      ],
+      "type": "object"
+    },
+    "itemKinds": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "$ref": "urn:foreman:common#/$defs/timestamp"
+          },
+          "kind": {
+            "$ref": "urn:foreman:common#/$defs/itemKind"
+          },
+          "textSha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          }
+        },
+        "required": [
+          "textSha256",
+          "kind",
+          "at"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/itemId"
+      },
+      "type": "object"
+    },
+    "outsideSignatures": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "$ref": "urn:foreman:common#/$defs/timestamp"
+          },
+          "packetSha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          },
+          "signedBy": {
+            "$ref": "urn:foreman:common#/$defs/shortText"
+          },
+          "signedOn": {
+            "$ref": "urn:foreman:common#/$defs/isoDate"
+          }
+        },
+        "required": [
+          "packetSha256",
+          "signedBy",
+          "signedOn",
+          "at"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "pattern": "^[0-9]{1,2}$"
+      },
+      "type": "object"
+    },
+    "projectId": {
+      "$ref": "urn:foreman:common#/$defs/uuid"
+    },
+    "schemaVersion": {
+      "const": 1
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "files",
+    "itemKinds",
+    "envApprovals",
+    "outsideSignatures"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,553 @@
+{
+  "$id": "urn:foreman:progress.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "chains": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "cwd": {
+            "oneOf": [
+              {
+                "enum": [
+                  "project",
+                  "spec"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "forkedFrom": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "urn:foreman:common#/$defs/uuid"
+          },
+          "lastStart": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/start"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start": {
+            "$ref": "urn:foreman:common#/$defs/stepKey"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "closed",
+              "superseded",
+              "handedOff",
+              "broken"
+            ]
+          },
+          "steps": {
+            "items": {
+              "$ref": "urn:foreman:common#/$defs/stepKey"
+            },
+            "type": "array"
+          },
+          "surface": {
+            "enum": [
+              "chat",
+              "cli"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "surface",
+          "cwd",
+          "start",
+          "steps",
+          "status",
+          "forkedFrom",
+          "lastStart"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "firstLaunchDone": {
+      "type": "boolean"
+    },
+    "gateRuns": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "failures": {
+            "additionalProperties": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "items": {
+            "additionalProperties": {
+              "additionalProperties": false,
+              "properties": {
+                "at": {
+                  "$ref": "urn:foreman:common#/$defs/timestamp"
+                },
+                "link": {
+                  "maxLength": 2048,
+                  "type": "string"
+                },
+                "outcome": {
+                  "enum": [
+                    "done",
+                    "notApplicable",
+                    "pass",
+                    "fail"
+                  ]
+                },
+                "text": {
+                  "$ref": "urn:foreman:common#/$defs/note"
+                }
+              },
+              "required": [
+                "outcome",
+                "text",
+                "at"
+              ],
+              "type": "object"
+            },
+            "propertyNames": {
+              "$ref": "urn:foreman:common#/$defs/itemId"
+            },
+            "type": "object"
+          },
+          "state": {
+            "enum": [
+              "notReady",
+              "a",
+              "results",
+              "b",
+              "packetValid",
+              "c",
+              "lessonsFound",
+              "signable"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "items",
+          "failures"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "pattern": "^[0-9]{1,2}$"
+      },
+      "type": "object"
+    },
+    "indexRefreshPending": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "commit": {
+              "$ref": "urn:foreman:common#/$defs/gitOid"
+            },
+            "paths": {
+              "items": {
+                "$ref": "urn:foreman:common#/$defs/repoPath"
+              },
+              "type": "array"
+            },
+            "since": {
+              "$ref": "urn:foreman:common#/$defs/timestamp"
+            }
+          },
+          "required": [
+            "commit",
+            "paths",
+            "since"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "optionalParts": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "type": "boolean"
+        },
+        "propertyNames": {
+          "pattern": "^opt-[0-9]{1,2}$"
+        },
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/stepKey"
+      },
+      "type": "object"
+    },
+    "overrides": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "effort": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/effort"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/mode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/model"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "model",
+          "effort",
+          "mode"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/stepKey"
+      },
+      "type": "object"
+    },
+    "pendingOutside": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "detectedAt": {
+            "$ref": "urn:foreman:common#/$defs/timestamp"
+          },
+          "diff": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "before": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "change": {
+                  "enum": [
+                    "added",
+                    "removed",
+                    "valueChanged"
+                  ]
+                },
+                "keyPath": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "keyPath",
+                "change"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "file": {
+            "enum": [
+              "project",
+              "overlay",
+              "blueprintLock"
+            ]
+          },
+          "id": {
+            "$ref": "urn:foreman:common#/$defs/uuid"
+          },
+          "seenSha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          }
+        },
+        "required": [
+          "id",
+          "file",
+          "seenSha256",
+          "detectedAt",
+          "diff"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "pendingOwn": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "$ref": "urn:foreman:common#/$defs/timestamp"
+          },
+          "file": {
+            "enum": [
+              "project",
+              "overlay",
+              "blueprintLock"
+            ]
+          },
+          "sha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          }
+        },
+        "required": [
+          "file",
+          "sha256",
+          "at"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "projectId": {
+      "$ref": "urn:foreman:common#/$defs/uuid"
+    },
+    "readStamps": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "dev": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "ino": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "mtimeNs": {
+            "type": "integer"
+          },
+          "sha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          },
+          "size": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dev",
+          "ino",
+          "size",
+          "mtimeNs",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/repoPath"
+      },
+      "type": "object"
+    },
+    "remembered": {
+      "additionalProperties": {
+        "maxLength": 1048576,
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+      },
+      "type": "object"
+    },
+    "rev": {
+      "maximum": 4294967295,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "runInputs": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "maxLength": 1048576,
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/stepKey"
+      },
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "signing": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "$ref": "urn:foreman:common#/$defs/timestamp"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "commit": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/gitOid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "packetSha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          },
+          "state": {
+            "enum": [
+              "commitPending",
+              "signed",
+              "signedOtherBranch",
+              "handSigned"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "commit",
+          "branch",
+          "packetSha256",
+          "at"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "pattern": "^[0-9]{1,2}$"
+      },
+      "type": "object"
+    },
+    "steps": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "copiedAt": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastRunId": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runCount": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "startedAt": {
+            "oneOf": [
+              {
+                "$ref": "urn:foreman:common#/$defs/timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "notStarted",
+              "copied",
+              "running",
+              "done"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "runCount",
+          "lastRunId",
+          "startedAt",
+          "copiedAt"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/stepKey"
+      },
+      "type": "object"
+    },
+    "waits": {
+      "additionalProperties": {
+        "$ref": "urn:foreman:common#/$defs/isoDate"
+      },
+      "propertyNames": {
+        "$ref": "urn:foreman:common#/$defs/stepKey"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "rev",
+    "steps",
+    "chains",
+    "runInputs",
+    "remembered",
+    "optionalParts",
+    "overrides",
+    "gateRuns",
+    "pendingOutside",
+    "pendingOwn",
+    "readStamps",
+    "firstLaunchDone",
+    "signing",
+    "waits",
+    "indexRefreshPending"
+  ],
+  "type": "object"
+}

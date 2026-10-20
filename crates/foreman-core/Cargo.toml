@@ -10,15 +10,28 @@ authors.workspace = true
 [lib]
 path = "src/lib.rs"
 
-# Direct dependencies are exact-pinned (SR-61, AC-M0-06). None are needed yet: each one arrives
-# with the M1 ticket that uses it, with a line in the ADR log (SR-61).
+# Direct dependencies are exact-pinned (SR-61, AC-M0-06; design doc §3.2). Versions checked against
+# the crates.io index on 2026-10-20 (each is the newest stable release).
 [dependencies]
+comrak = { version = "=0.56.0", default-features = false }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+thiserror = "=2.0.21"
+uuid = { version = "=1.28.0", features = ["v4"] }
+semver = "=1.0.28"
+sha2 = "=0.11.1"
+jiff = "=0.2.38"
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
+icu_normalizer = "=2.3.0"
+icu_casemap = "=2.3.0"
 
 [dev-dependencies]
 # ADR-015 layer 1 tooling (M0-05: wired now; goldens, property tests and benches grow from M1).
 proptest = "=1.12.0"
 insta = { version = "=1.49.0", features = ["json"] }
 criterion = { version = "=0.8.2", default-features = false, features = ["cargo_bench_support"] }
+tempfile = "=3.27.0"
+jsonschema = { version = "=0.59.0", default-features = false }
 
 [[bench]]
 name = "core"

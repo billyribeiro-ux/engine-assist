@@ -1,0 +1,303 @@
+{
+  "$defs": {
+    "probeOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "flag": {
+          "maxLength": 64,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "flagFailure",
+            "inconclusive"
+          ]
+        }
+      },
+      "required": [
+        "result",
+        "flag"
+      ],
+      "type": "object"
+    },
+    "toolPath": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "oneOf": [
+            {
+              "pattern": "^/",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "enum": [
+            "auto",
+            "settings"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "urn:foreman:settings.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authKeyAllowlist": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "addedAt": {
+            "$ref": "urn:foreman:common#/$defs/timestamp"
+          },
+          "key": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "sha256": {
+            "$ref": "urn:foreman:common#/$defs/sha256"
+          }
+        },
+        "required": [
+          "key",
+          "sha256",
+          "addedAt"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "blueprintRepo": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "pattern": "^/",
+              "type": "string"
+            },
+            "source": {
+              "enum": [
+                "autoDetect",
+                "chosen"
+              ]
+            }
+          },
+          "required": [
+            "path",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "contract": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "outcomes": {
+              "additionalProperties": false,
+              "properties": {
+                "probeA": {
+                  "$ref": "#/$defs/probeOutcome"
+                },
+                "probeB": {
+                  "$ref": "#/$defs/probeOutcome"
+                }
+              },
+              "required": [
+                "probeA",
+                "probeB"
+              ],
+              "type": "object"
+            },
+            "verifiedAt": {
+              "$ref": "urn:foreman:common#/$defs/timestamp"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "verifiedAt",
+            "outcomes"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "driName": {
+      "oneOf": [
+        {
+          "$ref": "urn:foreman:common#/$defs/shortText"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "editorBundleId": {
+      "oneOf": [
+        {
+          "pattern": "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+){1,10}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "envPassthrough": {
+      "items": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "globalVariables": {
+      "additionalProperties": {
+        "maxLength": 4000,
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+      },
+      "type": "object"
+    },
+    "lastSeenClaudeVersion": {
+      "oneOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "loginPath": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "capturedAt": {
+              "$ref": "urn:foreman:common#/$defs/timestamp"
+            },
+            "entries": {
+              "items": {
+                "pattern": "^/",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "shell": {
+              "pattern": "^/",
+              "type": "string"
+            }
+          },
+          "required": [
+            "entries",
+            "shell",
+            "capturedAt"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "probeFolderTrusted": {
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "terminal": {
+      "additionalProperties": false,
+      "properties": {
+        "fontSize": {
+          "maximum": 32,
+          "minimum": 9,
+          "type": "integer"
+        },
+        "macOptionIsMeta": {
+          "type": "boolean"
+        },
+        "scrollback": {
+          "maximum": 100000,
+          "minimum": 1000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fontSize",
+        "scrollback",
+        "macOptionIsMeta"
+      ],
+      "type": "object"
+    },
+    "theme": {
+      "enum": [
+        "system",
+        "vellum",
+        "night"
+      ]
+    },
+    "tools": {
+      "additionalProperties": false,
+      "properties": {
+        "claude": {
+          "$ref": "#/$defs/toolPath"
+        },
+        "git": {
+          "$ref": "#/$defs/toolPath"
+        }
+      },
+      "required": [
+        "claude",
+        "git"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "blueprintRepo",
+    "driName",
+    "tools",
+    "editorBundleId",
+    "theme",
+    "terminal",
+    "envPassthrough",
+    "loginPath",
+    "globalVariables",
+    "authKeyAllowlist",
+    "contract",
+    "lastSeenClaudeVersion",
+    "probeFolderTrusted"
+  ],
+  "type": "object"
+}

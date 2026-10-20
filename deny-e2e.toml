@@ -22,6 +22,10 @@ allow = [
   "Zlib",
   "MPL-2.0",
   "CC0-1.0",
+  # M1 (ADR-016 log, 2026-10-20): comrak =0.56.0 is BSD-2-Clause; its finl_unicode dependency adds
+  # Unicode-DFS-2016 (its Unicode data tables). Both are OSI-approved permissive licenses.
+  "BSD-2-Clause",
+  "Unicode-DFS-2016",
 ]
 confidence-threshold = 0.93
 
@@ -50,6 +54,17 @@ skip = [
   { crate = "miniz_oxide@0.8.9", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
   { crate = "png@0.17.16", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
   { crate = "syn@2.0.119", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  # M1: foreman-core pins sha2 0.11.1 (design doc §3.2); tauri-codegen 2.7.3 still uses sha2 0.10 and
+  # its RustCrypto 0.10 siblings, and its html5ever path uses phf 0.13 while comrak 0.56.0 uses phf 0.14.
+  { crate = "sha2@0.10.9", reason = "older duplicate pulled by tauri-codegen 2.7.3 (core pins 0.11.1)" },
+  { crate = "digest@0.10.7", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "block-buffer@0.10.4", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "crypto-common@0.1.7", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "cpufeatures@0.2.17", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "phf@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack (comrak 0.56.0 uses 0.14)" },
+  { crate = "phf_codegen@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "phf_generator@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "phf_shared@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
   { crate = "base64@0.22.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
 ]
 deny = [

@@ -1,9 +1,15 @@
-//! Foreman's pure domain core and store (ADR-003).
+//! Foreman's pure domain core and store (ADR-003, design doc §3.2.1).
 //!
-//! The core never spawns a process, never depends on Tauri or tokio, and touches the filesystem
-//! only through `store` (arrives in M1-07; `clippy.toml` `disallowed-methods` enforces it).
+//! The core never spawns a process and never depends on Tauri or tokio. It touches the filesystem
+//! only through [`store`] (`clippy.toml` `disallowed-methods` enforces it, AC-XC-30). Facts that
+//! need processes or the clock are gathered by `foreman-sys` / `foreman-app` and passed in.
 #![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
+
+pub mod diagnostic;
+pub mod ids;
+pub mod json;
+pub mod schema;
 
 /// The crate version, as built.
 #[must_use]

@@ -1,0 +1,125 @@
+{
+  "$id": "urn:foreman:run-settings.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "disableAllHooks": {
+      "const": false
+    },
+    "effortLevel": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    "hooks": {
+      "additionalProperties": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "hooks": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8,
+                    "minItems": 8,
+                    "type": "array"
+                  },
+                  "command": {
+                    "pattern": "^/.+/bin/foreman-sensor-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "command"
+                  }
+                },
+                "required": [
+                  "type",
+                  "command",
+                  "args"
+                ],
+                "type": "object"
+              },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array"
+            },
+            "matcher": {
+              "const": "Bash"
+            }
+          },
+          "required": [
+            "hooks"
+          ],
+          "type": "object"
+        },
+        "maxItems": 1,
+        "minItems": 1,
+        "type": "array"
+      },
+      "propertyNames": {
+        "enum": [
+          "SessionStart",
+          "Stop",
+          "StopFailure",
+          "Notification",
+          "PermissionRequest",
+          "SessionEnd",
+          "SubagentStart",
+          "SubagentStop",
+          "TaskCreated",
+          "TaskCompleted",
+          "PostToolUse"
+        ]
+      },
+      "type": "object"
+    },
+    "permissions": {
+      "additionalProperties": false,
+      "properties": {
+        "deny": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "pattern": "^Read\\(//.+/\\.foreman/\\*\\*\\)$",
+              "type": "string"
+            },
+            {
+              "pattern": "^Edit\\(//.+/\\.foreman/\\*\\*\\)$",
+              "type": "string"
+            },
+            {
+              "pattern": "^Read\\(//.+/\\*\\*\\)$",
+              "type": "string"
+            },
+            {
+              "pattern": "^Edit\\(//.+/\\*\\*\\)$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "disableBypassPermissionsMode": {
+          "const": "disable"
+        }
+      },
+      "required": [
+        "disableBypassPermissionsMode",
+        "deny"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "disableAllHooks",
+    "permissions"
+  ],
+  "type": "object"
+}
