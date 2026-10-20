@@ -1,0 +1,161 @@
+# CI (M0-08; SR-61, SR-62, SR-63; ADR-015, ADR-016, ADR-024). Every action is pinned by commit SHA
+# (resolved with `git ls-remote` on 2026-10-20; the tag is in the trailing comment) and checked by
+# the `actions-pinned` job. Together, the verify/test/deny/audit/pnpm-audit/bindings-drift jobs run
+# exactly the steps of `pnpm verify` (scripts/verify.mjs), split so each gate reports on its own.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  actions-pinned:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: bash scripts/check-actions-pinned.sh
+
+  pnpm-policy:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (version from packageManager)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: '22.22.0', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/check-lockfile-sources.mjs # exact pins, registry-only sources, one TypeScript
+
+  verify:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: '22.22.0', cache: pnpm }
+      - run: rustup show active-toolchain # installs the rust-toolchain.toml channel
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/verify.mjs --only=svelte-check,eslint,prettier,tsc,rustfmt,clippy,clippy-ts,core-deps,license-check
+      - name: release graph has no devtools or webdriver (SR-21, release::no_webdriver)
+        run: |
+          ! cargo tree -p foreman-app -e features --target aarch64-apple-darwin | grep -E 'tauri feature "devtools"|tauri-plugin-wdio-webdriver|axum'
+
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: '22.22.0', cache: pnpm }
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium webkit
+      - run: node scripts/verify.mjs --only=vitest,release-bundle,cargo-test
+      - run: node scripts/lint-plants/run.mjs
+      - run: pnpm exec playwright test --project webkit
+
+  bindings-drift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: rustup show active-toolchain
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo test -p foreman-app --features ts --locked
+      - run: git diff --exit-code -- src/lib/ipc/bindings && test -z "$(git ls-files --others --exclude-standard src/lib/ipc/bindings)"
+
+  deny:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: rustup show active-toolchain
+      - run: cargo install --locked cargo-deny --version 0.20.2
+      - run: cargo deny --workspace check
+
+  audit:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: rustup show active-toolchain
+      - run: cargo install --locked cargo-audit --version 0.22.2
+      - run: cargo audit --deny warnings
+
+  pnpm-audit:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: '22.22.0', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level low
+
+  gitleaks:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      - name: install gitleaks 8.30.1 (checksum-verified release)
+        run: |
+          curl -sSfL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_darwin_arm64.tar.gz
+          echo "b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5  gitleaks.tgz" | shasum -a 256 -c
+          mkdir -p "$RUNNER_TEMP/gitleaks" && tar -xzf gitleaks.tgz -C "$RUNNER_TEMP/gitleaks" && rm gitleaks.tgz
+      - run: '"$RUNNER_TEMP/gitleaks/gitleaks" git --config .gitleaks.toml --redact --no-banner --exit-code 1 .'
+      - run: '"$RUNNER_TEMP/gitleaks/gitleaks" dir --config .gitleaks.toml --redact --no-banner --exit-code 1 .'
+
+  semgrep:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: pipx install semgrep==1.180.0
+      - run: semgrep scan --error --metrics=off --config p/rust --config p/typescript --config p/javascript --config .semgrep.yml
+
+  sbom:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: '22.22.0', cache: pnpm }
+      - run: rustup show active-toolchain
+      - run: cargo install --locked cargo-cyclonedx --version 0.5.9
+      - run: pnpm install --frozen-lockfile
+      - run: mkdir -p sbom
+      - run: cargo cyclonedx --format json --target aarch64-apple-darwin && find . -name '*.cdx.json' -not -path './node_modules/*' -not -path './target/*' -exec mv {} sbom/ \;
+      - run: pnpm sbom --sbom-format cyclonedx --out sbom/foreman-pnpm.cdx.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/
+          if-no-files-found: error
+
+  deny-e2e:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: rustup show active-toolchain
+      - run: cargo install --locked cargo-deny --version 0.20.2
+      # ADR-016 decision 2: with `e2e`, the HTTP server may enter only through the webdriver plugin.
+      - run: cargo deny --workspace --features e2e --config deny-e2e.toml check bans
