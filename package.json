@@ -32,7 +32,8 @@
 		"verify": "node scripts/verify.mjs",
 		"verify:fast": "node scripts/verify.mjs --fast",
 		"release": "scripts/build-release",
-		"test:flows": "playwright test"
+		"test:flows": "playwright test",
+		"test:e2e": "node e2e/run.mjs"
 	},
 	"dependencies": {
 		"@tauri-apps/api": "2.12.4"

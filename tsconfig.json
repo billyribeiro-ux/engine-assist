@@ -12,7 +12,7 @@
 		"skipLibCheck": true,
 		"resolveJsonModule": true
 	},
-	"include": ["src", "tests", "scripts", "*.ts", "*.js"],
+	"include": ["src", "tests", "scripts", "e2e", "*.ts", "*.js"],
 	"exclude": [
 		"node_modules",
 		"build",
