@@ -1,0 +1,4 @@
+[env]
+# ADR-004: ts-rs writes the IPC bindings here (`cargo test -p foreman-app --features ts export_bindings`).
+TS_RS_EXPORT_DIR = { value = "src/lib/ipc/bindings", relative = true }
+# IPC-R4: keep ts-rs's default (bigint) so a stray 64-bit integer shows up in the bindings.

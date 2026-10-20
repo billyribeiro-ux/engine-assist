@@ -1,0 +1,43 @@
+[package]
+name = "foreman-app"
+description = "Foreman: Tauri shell, IPC commands and DTOs (ADR-001, ADR-003, ADR-004)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+default-run = "foreman-app"
+
+[lib]
+name = "foreman_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "foreman-app"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "=2.7.3", features = [] }
+
+[dependencies]
+foreman-core = { path = "../crates/foreman-core" }
+foreman-sys = { path = "../crates/foreman-sys" }
+# No `devtools` feature (SR-21; checked by config::security_settings_snapshot).
+tauri = { version = "=2.12.4", features = [] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+# ADR-004: TS bindings are generated only with `--features ts`; release builds never compile ts-rs.
+ts-rs = { version = "=12.0.1", optional = true }
+# ADR-015: the WebDriver plugin exists only under `e2e`, never in release (release::no_webdriver).
+tauri-plugin-wdio-webdriver = { version = "=1.5.0", optional = true }
+
+[dev-dependencies]
+tauri = { version = "=2.12.4", features = ["test"] }
+
+[features]
+default = []
+ts = ["dep:ts-rs"]
+e2e = ["dep:tauri-plugin-wdio-webdriver"]
+
+[lints]
+workspace = true
