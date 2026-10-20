@@ -1,0 +1,119 @@
+{
+	"summary": {
+		"key": "4.5",
+		"number": "4.5",
+		"title": "Design system and key screens",
+		"state": "done",
+		"tag": "conditional",
+		"surface": "chat",
+		"specLine": {
+			"surface": "chat",
+			"where": "Chat, new conversation in Project",
+			"model": {
+				"value": "Opus 5.5",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"effort": {
+				"value": "adaptive",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"mode": null,
+			"agents": [],
+			"droppedAgents": [],
+			"note": "Research off"
+		},
+		"whyNotRunnable": null,
+		"stateText": "Done",
+		"conditionNote": null,
+		"kind": "prompt",
+		"run": null,
+		"next": false
+	},
+	"prompt": [
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "Using the Master Spec and the design direction, create the design system for "
+				}
+			]
+		},
+		{
+			"kind": "resolved",
+			"token": "[APP_NAME]",
+			"class": "projectVariable",
+			"text": "Foreman",
+			"note": "APP_NAME from project.json"
+		},
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": ":\ntokens, components with states, and mockups of the key screens in both themes."
+				}
+			]
+		}
+	],
+	"inputs": [],
+	"start": {
+		"value": {
+			"model": "opus",
+			"effort": "adaptive",
+			"mode": null
+		},
+		"origin": {
+			"kind": "template"
+		},
+		"from": null
+	},
+	"switches": [],
+	"chips": {
+		"chips": [
+			{
+				"id": "new-chat",
+				"label": "New conversation in the Project",
+				"strong": true
+			},
+			{
+				"id": "model",
+				"label": "Opus 5.5",
+				"strong": false
+			},
+			{
+				"id": "effort",
+				"label": "Adaptive effort",
+				"strong": false
+			},
+			{
+				"id": "research",
+				"label": "Research off",
+				"strong": false
+			}
+		],
+		"link": null,
+		"linkLabel": null
+	},
+	"argvPreview": null,
+	"envNames": [],
+	"blockers": [
+		{
+			"kind": "notRunnable",
+			"reason": "done",
+			"text": "Done. This step runs once."
+		}
+	],
+	"warnings": [],
+	"remaps": [],
+	"outs": [],
+	"override": null,
+	"parts": [],
+	"copiedAt": null
+}

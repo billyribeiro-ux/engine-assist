@@ -9,7 +9,7 @@ export function ipc(): Promise<IpcClient> {
 	client ??=
 		import.meta.env.VITE_IPC === 'mock'
 			? import('./mock.ts').then((m) => m.mockClient())
-			: import('./tauri.ts').then((m) => m.TauriIpcClient.create());
+			: import('./tauri.ts').then((m) => m.createTauriClient());
 	return client;
 }
 

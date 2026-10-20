@@ -1,0 +1,183 @@
+{
+	"previewId": "e0000000-0000-4000-8000-000000000001",
+	"kind": "packet",
+	"targets": [
+		{
+			"path": "docs/handoff/stage-01.md",
+			"exists": false,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "=== HANDOFF PACKET · Stage 1 → Stage 2 ==="
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "PROJECT: TradeLog"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "APPROVED BY: "
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "PROBLEM: Active traders keep journals in spreadsheets and stop after a losing day."
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "USERS: Members of a trading education community."
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "V1 FEATURES: Broker CSV import, setup tags, expectancy by setup."
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "OPEN ITEMS: none"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "NEXT: Stage 2 · Architect's Design Studio · Claude Code · Fable 5.1"
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": "docs/handoff/stage-01-attachments.md",
+			"exists": false,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "PRESS RELEASE"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "TradeLog shows traders which setups pay."
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "FAQ"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "Q: Which brokers? A: Any broker that exports fills as CSV."
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": "spec/01-app-brief.md",
+			"exists": false,
+			"hunks": [
+				{
+					"oldStart": 0,
+					"newStart": 1,
+					"lines": [
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "# App Brief"
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": ""
+								}
+							]
+						},
+						{
+							"op": "add",
+							"spans": [
+								{
+									"kind": "plain",
+									"text": "TradeLog"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"problems": [],
+	"notes": ["APPROVED BY <blank> becomes unsigned", "3 curly quotes straightened"],
+	"packetFields": {
+		"fromStage": 1,
+		"toStage": 2
+	}
+}

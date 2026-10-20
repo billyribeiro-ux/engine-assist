@@ -1,0 +1,31 @@
+{
+	"previewId": "e0000000-0000-4000-8000-000000000001",
+	"shell": "/bin/zsh",
+	"entries": [
+		{
+			"entry": "/opt/homebrew/bin",
+			"ok": true,
+			"why": null
+		},
+		{
+			"entry": "/Users/billy/.cargo/bin",
+			"ok": true,
+			"why": null
+		},
+		{
+			"entry": "/Users/billy/Library/pnpm",
+			"ok": true,
+			"why": null
+		},
+		{
+			"entry": ".",
+			"ok": false,
+			"why": "Relative entries are dropped."
+		},
+		{
+			"entry": "/usr/bin",
+			"ok": true,
+			"why": null
+		}
+	]
+}

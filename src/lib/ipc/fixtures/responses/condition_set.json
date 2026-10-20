@@ -1,0 +1,2164 @@
+{
+	"summary": {
+		"id": "7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11",
+		"name": "TradeLog",
+		"displayPath": "~/Code/tradelog",
+		"rev": 42,
+		"readOnly": null,
+		"currentStage": 2,
+		"pinned": 1
+	},
+	"conditions": {
+		"idea_known": {
+			"value": "yes",
+			"locked": false,
+			"lockRule": null,
+			"label": "You already know the idea",
+			"effect": "Yes skips Stage 0, Land Survey.",
+			"late": false
+		},
+		"commercial": {
+			"value": "no",
+			"locked": false,
+			"lockRule": null,
+			"label": "You'll sell it",
+			"effect": "Adds the demand test, competitor teardown, pricing and marketing pages.",
+			"late": false
+		},
+		"payments": {
+			"value": "no",
+			"locked": false,
+			"lockRule": null,
+			"label": "It takes payments",
+			"effect": "Adds Stage 10, Electrical, and live payments at launch.",
+			"late": false
+		},
+		"multi_user": {
+			"value": "yes",
+			"locked": false,
+			"lockRule": null,
+			"label": "More than one person signs in",
+			"effect": "Adds authentication, onboarding, the beta ring and analytics.",
+			"late": false
+		},
+		"public": {
+			"value": "yes",
+			"locked": false,
+			"lockRule": null,
+			"label": "Anyone on the internet can reach it",
+			"effect": "Adds authentication hardening and public-facing reviews.",
+			"late": false
+		},
+		"has_ui": {
+			"value": "yes",
+			"locked": false,
+			"lockRule": null,
+			"label": "It has a user interface",
+			"effect": "Adds 4.5 design system and Stage 13 accessibility.",
+			"late": false
+		},
+		"others_data": {
+			"value": "yes",
+			"locked": false,
+			"lockRule": null,
+			"label": "It stores other people's data",
+			"effect": "Adds the legal part of 3.2 and legal pages.",
+			"late": false
+		},
+		"server": {
+			"value": "yes",
+			"locked": false,
+			"lockRule": null,
+			"label": "It runs on a server",
+			"effect": "Adds the staging pipeline, SLOs and load tests.",
+			"late": false
+		},
+		"has_database": {
+			"value": "undecided",
+			"locked": false,
+			"lockRule": null,
+			"label": "It has a database",
+			"effect": "Adds 6.1 migrations.",
+			"late": true
+		},
+		"has_uploads": {
+			"value": "undecided",
+			"locked": false,
+			"lockRule": null,
+			"label": "It takes uploads",
+			"effect": "Adds the uploads part of Stage 9.",
+			"late": true
+		},
+		"has_email": {
+			"value": "undecided",
+			"locked": false,
+			"lockRule": null,
+			"label": "It sends email",
+			"effect": "Adds the email part of Stage 9.",
+			"late": true
+		},
+		"has_integrations": {
+			"value": "undecided",
+			"locked": false,
+			"lockRule": null,
+			"label": "It integrates other services",
+			"effect": "Adds integration tests to Stage 9.",
+			"late": true
+		}
+	},
+	"stages": [
+		{
+			"stage": 0,
+			"title": "Land Survey",
+			"applicable": {
+				"kind": "notApplicable",
+				"reason": "idea_known = yes"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "0.1",
+					"number": "0.1",
+					"title": "Opportunity scan",
+					"state": "notApplicable",
+					"tag": "optional",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": "Not applicable: you already know the idea",
+					"stateText": "Not applicable",
+					"conditionNote": "idea_known = yes",
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "0.2",
+					"number": "0.2",
+					"title": "Red-team and pick",
+					"state": "notApplicable",
+					"tag": "optional",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, same chat as 0.1",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": "Not applicable: you already know the idea",
+					"stateText": "Not applicable",
+					"conditionNote": "idea_known = yes",
+					"kind": "followup",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-00.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Find where the money is.",
+			"status": "notApplicable",
+			"statusWhy": "idea_known = yes"
+		},
+		{
+			"stage": 1,
+			"title": "Meet the Architect",
+			"applicable": {
+				"kind": "applies"
+			},
+			"signed": {
+				"date": "2026-10-12",
+				"commit": "4e1b2c7",
+				"branch": "stage/01",
+				"merged": true
+			},
+			"steps": [
+				{
+					"key": "1.1",
+					"number": "1.1",
+					"title": "The architect interview",
+					"state": "done",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Done",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "1.2",
+					"number": "1.2",
+					"title": "Brainstorm and converge",
+					"state": "done",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, same chat as 1.1",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Done",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "1.3",
+					"number": "1.3",
+					"title": "Demand validation kit",
+					"state": "notApplicable",
+					"tag": "conditional",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, same chat as 1.1",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": "Not applicable: there's no demand to test for a free tool",
+					"stateText": "Not applicable",
+					"conditionNote": "commercial = no",
+					"kind": "followup",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "1.4",
+					"number": "1.4",
+					"title": "The App Brief",
+					"state": "done",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, same chat as 1.1",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": "writes the Stage 1 packet"
+					},
+					"whyNotRunnable": null,
+					"stateText": "Done",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "1:F.2",
+					"number": "F.2",
+					"title": "Lessons capture",
+					"state": "done",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, same chat as 1.1",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": "appends docs/lessons.md"
+					},
+					"whyNotRunnable": null,
+					"stateText": "Done",
+					"conditionNote": null,
+					"kind": "lessons",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-01.md",
+				"exists": true,
+				"problems": 0,
+				"signed": true
+			},
+			"subtitle": "Interview, brainstorm, and write the App Brief in one claude.ai chat.",
+			"status": "signed",
+			"statusWhy": "2026-10-12"
+		},
+		{
+			"stage": 2,
+			"title": "Architect's Design Studio",
+			"applicable": {
+				"kind": "applies"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "council-setup",
+					"number": "2.0",
+					"title": "Council setup",
+					"state": "done",
+					"tag": "core",
+					"surface": null,
+					"specLine": {
+						"surface": "action",
+						"where": "Action",
+						"model": null,
+						"effort": null,
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": "Foreman writes spec/.claude/agents/"
+					},
+					"whyNotRunnable": null,
+					"stateText": "Done, wrote 4 agents",
+					"conditionNote": null,
+					"kind": "action",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "2.1",
+					"number": "2.1",
+					"title": "Competitor teardown",
+					"state": "notApplicable",
+					"tag": "conditional",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, Research on",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": "Not applicable: TradeLog isn't sold, so there's no market to tear down",
+					"stateText": "Not applicable",
+					"conditionNote": "commercial = no",
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "2.2",
+					"number": "2.2",
+					"title": "Convene the council",
+					"state": "done",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI in spec/",
+						"model": {
+							"value": "Fable 5.1",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Plan, then Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [
+							"principal-engineer",
+							"security-architect",
+							"user-advocate",
+							"product-strategist"
+						],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Done, 8 files",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "2.3",
+					"number": "2.3",
+					"title": "Feature specifications",
+					"state": "running",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI, continues 2.2",
+						"model": {
+							"value": "Fable 5.1",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Running in fm-tradelog-s02-2-3",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": "a0000000-0000-4000-8000-000000000023",
+					"next": false
+				},
+				{
+					"key": "2.4",
+					"number": "2.4",
+					"title": "Stack decision, evidence first",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI, continues 2.2",
+						"model": {
+							"value": "Fable 5.1",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": ["principal-engineer"],
+						"droppedAgents": ["market-analyst"],
+						"note": null
+					},
+					"whyNotRunnable": "Waits for 2.3: Claude is still working in this session. Run re-arms it with Accept edits when it's idle.",
+					"stateText": "Next, waits for 2.3",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": null,
+					"next": true
+				},
+				{
+					"key": "x-2-1",
+					"number": "x‑2‑1",
+					"title": "Re-rank pain with interview notes",
+					"state": "notStarted",
+					"tag": "added",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI, continues 2.2",
+						"model": {
+							"value": "Fable 5.1",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": ["user-advocate"],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": "Added steps always confirm before running.",
+					"stateText": "Not started, optional",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "2.5",
+					"number": "2.5",
+					"title": "Non-functional requirements",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI, continues 2.2",
+						"model": {
+							"value": "Fable 5.1",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "2.6",
+					"number": "2.6",
+					"title": "Freeze the Master Spec",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI, continues 2.2",
+						"model": {
+							"value": "Fable 5.1",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Manual",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started, writes the packet",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "2:F.2",
+					"number": "F.2",
+					"title": "Lessons capture",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI, continues 2.2",
+						"model": {
+							"value": "Fable 5.1",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": "writes docs/lessons.md"
+					},
+					"whyNotRunnable": null,
+					"stateText": "After the inspection items",
+					"conditionNote": null,
+					"kind": "lessons",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-02.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Design the entire product. Council in Claude Code, then freeze the Master Spec.",
+			"status": "inProgress",
+			"statusWhy": null
+		},
+		{
+			"stage": 3,
+			"title": "Permits & Zoning",
+			"applicable": {
+				"kind": "applies"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "3.1",
+					"number": "3.1",
+					"title": "Business model and pricing",
+					"state": "notApplicable",
+					"tag": "conditional",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": "Not applicable: its condition is false",
+					"stateText": "Not applicable",
+					"conditionNote": "commercial = no, payments = no",
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "3.2",
+					"number": "3.2",
+					"title": "Security, privacy, and compliance requirements",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "3:F.2",
+					"number": "F.2",
+					"title": "Lessons capture",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, same chat as 3.2",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "After the inspection items",
+					"conditionNote": null,
+					"kind": "lessons",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-03.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Business, security, privacy, legal.",
+			"status": "locked",
+			"statusWhy": "until Stage 2 is signed"
+		},
+		{
+			"stage": 4,
+			"title": "Construction Drawings",
+			"applicable": {
+				"kind": "applies"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "4.1",
+					"number": "4.1",
+					"title": "Scope, milestones, and acceptance criteria",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4.2",
+					"number": "4.2",
+					"title": "Design doc and ADRs",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4.3",
+					"number": "4.3",
+					"title": "Threat model",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4.4",
+					"number": "4.4",
+					"title": "Data model, API contract, domain rules",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4.5",
+					"number": "4.5",
+					"title": "Design system and key screens",
+					"state": "notStarted",
+					"tag": "conditional",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": "Research off"
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4.6",
+					"number": "4.6",
+					"title": "Tickets",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4.7",
+					"number": "4.7",
+					"title": "Independent design review",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4.8",
+					"number": "4.8",
+					"title": "CLAUDE.md and the Build Package",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, new conversation in Project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": "writes the Stage 4 packet"
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "4:F.2",
+					"number": "F.2",
+					"title": "Lessons capture",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "chat",
+					"specLine": {
+						"surface": "chat",
+						"where": "Chat, same chat as 4.8",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "adaptive",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": null,
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "After the inspection items",
+					"conditionNote": null,
+					"kind": "lessons",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-04.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "The complete build package.",
+			"status": "locked",
+			"statusWhy": null
+		},
+		{
+			"stage": 5,
+			"title": "Site Prep & Excavation",
+			"applicable": {
+				"kind": "applies"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "5.1",
+					"number": "5.1",
+					"title": "Scaffold",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI in project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Plan",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "5.2",
+					"number": "5.2",
+					"title": "CI with security gates",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI, continues 5.1",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "followup",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "5.3",
+					"number": "5.3",
+					"title": "ADR reality check",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI in project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Plan",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "5.4",
+					"number": "5.4",
+					"title": "Automation and preview config",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI in project",
+						"model": {
+							"value": "Sonnet 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "medium",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "5.5",
+					"number": "5.5",
+					"title": "Staging pipeline",
+					"state": "notStarted",
+					"tag": "conditional",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI in project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Accept edits",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": [],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "5:gate.A",
+					"number": "A",
+					"title": "Gate A: inspection",
+					"state": "notStarted",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": {
+						"surface": "cli",
+						"where": "CLI in project",
+						"model": {
+							"value": "Opus 5.5",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"effort": {
+							"value": "high",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"mode": {
+							"value": "Plan",
+							"origin": {
+								"kind": "template"
+							},
+							"from": null
+						},
+						"agents": ["test-runner", "security-reviewer"],
+						"droppedAgents": [],
+						"note": null
+					},
+					"whyNotRunnable": null,
+					"stateText": "Not started",
+					"conditionNote": null,
+					"kind": "gate",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-05.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Repo, CI, environments.",
+			"status": "locked",
+			"statusWhy": null
+		},
+		{
+			"stage": 6,
+			"title": "Foundation",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "6.1",
+					"number": "6.1",
+					"title": "Migrations",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "6.2",
+					"number": "6.2",
+					"title": "Authentication",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "6.3",
+					"number": "6.3",
+					"title": "Domain core",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-06.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Database, auth, domain core.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 7,
+			"title": "Framing",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "7.1",
+					"number": "7.1",
+					"title": "Skeleton plan",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-07.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "The walking skeleton.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 8,
+			"title": "Roofing",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "8.1",
+					"number": "8.1",
+					"title": "Security envelope",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-08.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Security controls from the threat model.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 9,
+			"title": "Plumbing",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "9.1",
+					"number": "9.1",
+					"title": "Data flows",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-09.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Data flows and integrations.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 10,
+			"title": "Electrical",
+			"applicable": {
+				"kind": "notApplicable",
+				"reason": "payments = no"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "10.1",
+					"number": "10.1",
+					"title": "Billing",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-10.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Payments and entitlements.",
+			"status": "notApplicable",
+			"statusWhy": "payments = no"
+		},
+		{
+			"stage": 11,
+			"title": "HVAC",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "11.1",
+					"number": "11.1",
+					"title": "Observability",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-11.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Observability, SLOs, and error budgets.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 12,
+			"title": "Insulation & Drywall",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "12.1",
+					"number": "12.1",
+					"title": "Milestone sweep",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-12.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Complete every feature.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 13,
+			"title": "Siding & Exterior",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "13.1",
+					"number": "13.1",
+					"title": "Apply the design system",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "13.2",
+					"number": "13.2",
+					"title": "Accessibility",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-13.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Design system, polish, accessibility.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 14,
+			"title": "Inspections",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "14.1",
+					"number": "14.1",
+					"title": "Final security review and penetration test",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "14.2",
+					"number": "14.2",
+					"title": "Load, capacity, and failure modes",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "14.3",
+					"number": "14.3",
+					"title": "Architecture audit",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-14.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Independent audits.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 15,
+			"title": "Paint & Trim",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "15.1",
+					"number": "15.1",
+					"title": "Copy and onboarding",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "15.2",
+					"number": "15.2",
+					"title": "Implementation",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-15.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Copy, onboarding, growth surfaces.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 16,
+			"title": "Final Walkthrough",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "16.1",
+					"number": "16.1",
+					"title": "Production Readiness Review and launch review",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "16.2",
+					"number": "16.2",
+					"title": "Drills",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-16.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Readiness review, drills, dogfood, beta.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 17,
+			"title": "Certificate of Occupancy",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "17.1",
+					"number": "17.1",
+					"title": "Production rollout plan",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "17.2",
+					"number": "17.2",
+					"title": "Ring health review",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": {
+				"path": "docs/handoff/stage-17.md",
+				"exists": false,
+				"problems": 0,
+				"signed": false
+			},
+			"subtitle": "Ring-based launch and revenue.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		},
+		{
+			"stage": 18,
+			"title": "Homeowner Maintenance",
+			"applicable": {
+				"kind": "needsAnnotation"
+			},
+			"signed": null,
+			"steps": [
+				{
+					"key": "18.1",
+					"number": "18.1",
+					"title": "Production incident",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "18.2",
+					"number": "18.2",
+					"title": "Blameless postmortem",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "18.3",
+					"number": "18.3",
+					"title": "Change Request",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				},
+				{
+					"key": "18.4",
+					"number": "18.4",
+					"title": "Monthly ADR hygiene",
+					"state": "needsAnnotation",
+					"tag": "core",
+					"surface": "cli",
+					"specLine": null,
+					"whyNotRunnable": "Not runnable: needs annotation. Blueprint 2.2 annotates stages 0 to 5.",
+					"stateText": "Needs annotation",
+					"conditionNote": null,
+					"kind": "prompt",
+					"run": null,
+					"next": false
+				}
+			],
+			"packet": null,
+			"subtitle": "Operate and grow.",
+			"status": "needsAnnotation",
+			"statusWhy": "blueprint 2.2 annotates stages 0 to 5"
+		}
+	],
+	"pendingChanges": 1,
+	"readOnly": null,
+	"branch": "stage/02-design",
+	"blueprint": {
+		"version": "2.2",
+		"commit": "a3f9c1"
+	},
+	"dri": "Billy Ribeiro",
+	"chatProjectUrl": "https://claude.ai/project/01a7c4e2",
+	"configChanged": {
+		"cwd": "spec",
+		"fingerprint": "abababababababababababababababababababababababababababababababab",
+		"blocking": false,
+		"title": "Claude Code configuration in spec/ changed.",
+		"detail": "principal-engineer.md was edited at 13:52. Review it before 2.4 launches.",
+		"diffs": [
+			{
+				"source": "spec/.claude/agents/principal-engineer.md",
+				"entries": [
+					{
+						"keyPath": "tools",
+						"change": "valueChanged",
+						"before": "\"Read, Grep, Glob\"",
+						"after": "\"Read, Grep, Glob, Bash\""
+					},
+					{
+						"keyPath": "model",
+						"change": "valueChanged",
+						"before": "\"fable\"",
+						"after": "\"opus\""
+					}
+				]
+			}
+		]
+	}
+}

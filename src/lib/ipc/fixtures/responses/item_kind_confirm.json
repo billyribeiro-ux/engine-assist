@@ -1,0 +1,116 @@
+{
+	"stage": 2,
+	"state": "inProgress",
+	"items": [
+		{
+			"id": "feature-matrix",
+			"text": "The feature matrix covers every serious competitor, with sources",
+			"kind": "attest",
+			"how": null,
+			"status": "notApplicable",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Not applicable: 2.1 didn't run (commercial = no)",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null
+		},
+		{
+			"id": "beats-competitor",
+			"text": "Every v1 feature beats a named competitor's version or is table stakes",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.6",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null
+		},
+		{
+			"id": "red-team",
+			"text": "Every fatal or serious red-team objection is resolved in writing",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.6",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null
+		},
+		{
+			"id": "stack",
+			"text": "The stack recommendation exists for every layer, plus your recorded final choice",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.4",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null
+		},
+		{
+			"id": "frozen",
+			"text": "Open questions: zero. Status: FROZEN v1.0",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.6",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null
+		}
+	],
+	"closeout": [
+		{
+			"key": "gateA",
+			"label": "Gate A inspection",
+			"state": "now",
+			"note": null
+		},
+		{
+			"key": "results",
+			"label": "Results: 4 waiting",
+			"state": "now",
+			"note": null
+		},
+		{
+			"key": "gateB",
+			"label": "Gate B packet",
+			"state": "pending",
+			"note": "Runs after every item passes. Writes docs/handoff/stage-0N.md."
+		},
+		{
+			"key": "gateC",
+			"label": "Gate C lessons",
+			"state": "pending",
+			"note": "Continues the gate session. Needs an entry headed \"Stage 2\" in docs/lessons.md."
+		},
+		{
+			"key": "sign",
+			"label": "Sign",
+			"state": "locked",
+			"note": null
+		}
+	],
+	"signable": false,
+	"whyNot": ["4 wait for your note", "Then Gate B and Gate C"],
+	"importedFrom": null
+}

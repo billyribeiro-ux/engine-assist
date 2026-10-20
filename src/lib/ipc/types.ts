@@ -84,13 +84,7 @@ export type StepState =
 	| 'needsAnnotation'
 	| 'needsNewerForeman';
 export type RunStatus =
-	| 'starting'
-	| 'running'
-	| 'idle'
-	| 'blocked'
-	| 'exited'
-	| 'errored'
-	| 'interrupted';
+	'starting' | 'running' | 'idle' | 'blocked' | 'exited' | 'errored' | 'interrupted';
 export type PasteKind = 'auto' | 'packet' | 'output' | 'adrSet' | 'lessons';
 export type CopyTarget = 'prompt' | 'command' | 'sessionId' | 'fileContents' | 'fixRequest';
 export type Theme = 'system' | 'vellum' | 'night';
@@ -133,12 +127,7 @@ export type DocNode =
 	| { kind: 'rule' };
 
 export type TokenClass =
-	| 'projectVariable'
-	| 'packetMarker'
-	| 'pathAlias'
-	| 'runInput'
-	| 'optionalPart'
-	| 'literal';
+	'projectVariable' | 'packetMarker' | 'pathAlias' | 'runInput' | 'optionalPart' | 'literal';
 export type PromptSegment =
 	| { kind: 'text'; spans: TextSpan[] }
 	| { kind: 'resolved'; token: string; class: TokenClass; text: string; note: string | null }
@@ -191,11 +180,7 @@ export type NotRunnableReason =
 	| 'waiting'
 	| 'running';
 export type ToolPathProblem =
-	| 'relative'
-	| 'missing'
-	| 'notExecutable'
-	| 'inProject'
-	| 'symlinkIntoProject';
+	'relative' | 'missing' | 'notExecutable' | 'inProject' | 'symlinkIntoProject';
 export type AuthProblem =
 	| { kind: 'wrongMethod'; method: string }
 	| { kind: 'unknownMethod' }
@@ -388,14 +373,7 @@ export interface InboxItem {
 /** GAP: `Tag`. `added` = a project-only step (F-025). */
 export type Tag = 'core' | 'conditional' | 'optional' | 'added';
 export type StepKind =
-	| 'prompt'
-	| 'followup'
-	| 'action'
-	| 'manual'
-	| 'wait'
-	| 'repeatable'
-	| 'gate'
-	| 'lessons';
+	'prompt' | 'followup' | 'action' | 'manual' | 'wait' | 'repeatable' | 'gate' | 'lessons';
 /** GAP: `SpecLine`: the run config as display text, each edited value explained (F-005). */
 export interface SpecLine {
 	surface: Surface | 'action';
@@ -777,8 +755,7 @@ export interface PasteText {
 	removedControls: number;
 }
 export type RearmOutcome =
-	| ({ kind: 'relaunched' } & RunStarted)
-	| { kind: 'endYourself'; chain: ChainId };
+	({ kind: 'relaunched' } & RunStarted) | { kind: 'endYourself'; chain: ChainId };
 export type LinkOutcome = 'opened' | 'refused' | 'cancelled';
 
 // §4.9 decisions

@@ -1,0 +1,13 @@
+{
+	"chips": {
+		"chips": [
+			{
+				"id": "model",
+				"label": "Opus 5.5",
+				"strong": false
+			}
+		],
+		"link": null,
+		"linkLabel": null
+	}
+}

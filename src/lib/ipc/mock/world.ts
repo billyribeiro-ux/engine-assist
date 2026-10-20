@@ -25,6 +25,22 @@ import type {
 import { CONDITIONS, STAGE_TITLES, TEMPLATE, UNANNOTATED, type TemplateStep } from './template.ts';
 
 export const NOW = '2026-10-19T09:00:00Z';
+
+/** What Billy copies from claude.ai after 1.4: the Stage 1 packet, then the press release. */
+export const PASTE_STAGE1 = [
+	'=== HANDOFF PACKET · Stage 1 → Stage 2 ===',
+	'PROJECT: TradeLog',
+	'APPROVED BY: ',
+	'PROBLEM: Active traders keep journals in spreadsheets and stop after a losing day.',
+	'USERS: Members of a trading education community.',
+	'V1 FEATURES: Broker CSV import, setup tags, expectancy by setup.',
+	'OPEN ITEMS: none',
+	"NEXT: Stage 2 · Architect's Design Studio · Claude Code · Fable 5.1",
+	'PRESS RELEASE',
+	'TradeLog shows traders which setups pay.',
+	'FAQ',
+	'Q: Which brokers? A: Any broker that exports fills as CSV.'
+].join('\n');
 export const IDS = {
 	tradelog: '7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11',
 	foreman: 'f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f',
@@ -135,7 +151,12 @@ export interface World {
 	scenario: Scenario;
 	firstRun: boolean;
 	settings: SettingsView;
-	doctor: { level: DoctorLevel; checks: DoctorCheck[]; capabilities: CapabilityRow[]; probes: ProbeOutcome[] };
+	doctor: {
+		level: DoctorLevel;
+		checks: DoctorCheck[];
+		capabilities: CapabilityRow[];
+		probes: ProbeOutcome[];
+	};
 	projects: MProject[];
 	runs: MRun[];
 	inbox: InboxItem[];
@@ -152,7 +173,12 @@ function settings(firstRun: boolean): SettingsView {
 		rev: firstRun ? 0 : 7,
 		driName: firstRun ? null : 'Billy Ribeiro',
 		tools: {
-			claude: { path: '/opt/homebrew/bin/claude', version: '2.1.293', autoDetected: true, problem: null },
+			claude: {
+				path: '/opt/homebrew/bin/claude',
+				version: '2.1.293',
+				autoDetected: true,
+				problem: null
+			},
 			git: { path: '/usr/bin/git', version: '2.51.0', autoDetected: true, problem: null }
 		},
 		editorBundleId: firstRun ? null : 'com.microsoft.VSCode',
@@ -175,7 +201,13 @@ function settings(firstRun: boolean): SettingsView {
 			? null
 			: {
 					capturedAt: '2026-10-12T10:20:00Z',
-					entries: ['/opt/homebrew/bin', '/Users/billy/.cargo/bin', '/Users/billy/Library/pnpm', '/usr/bin', '/bin']
+					entries: [
+						'/opt/homebrew/bin',
+						'/Users/billy/.cargo/bin',
+						'/Users/billy/Library/pnpm',
+						'/usr/bin',
+						'/bin'
+					]
 				},
 		globalVariables: {
 			PREFERRED_STACK: 'SvelteKit + Rust/Axum + Postgres',
@@ -213,7 +245,9 @@ export function doctorFor(version: string, firstRun: boolean): World['doctor'] {
 			below ? 'failing' : 'ok',
 			below
 				? [
-						strong(`Claude Code ${version} found. Haiku 5.5 in the Stage 5 test-runner agent needs 2.1.293 or later.`),
+						strong(
+							`Claude Code ${version} found. Haiku 5.5 in the Stage 5 test-runner agent needs 2.1.293 or later.`
+						),
 						plain(' Run '),
 						code('claude update'),
 						plain(', then check again.')
@@ -221,7 +255,14 @@ export function doctorFor(version: string, firstRun: boolean): World['doctor'] {
 				: [plain('Meets every model and flag the blueprint uses.')],
 			version
 		),
-		check('path', 'claude', 'Found at an allowed path', 'ok', [plain('Foreman only launches this exact file.')], '/opt/homebrew/bin/claude'),
+		check(
+			'path',
+			'claude',
+			'Found at an allowed path',
+			'ok',
+			[plain('Foreman only launches this exact file.')],
+			'/opt/homebrew/bin/claude'
+		),
 		check(
 			'auth',
 			'claude',
@@ -251,13 +292,24 @@ export function doctorFor(version: string, firstRun: boolean): World['doctor'] {
 				],
 				'30 days'
 			),
-			check('hooks', 'claude', 'Hooks enabled', 'ok', [plain("disableAllHooks isn't set, so the session sensor can run.")], 'on', false),
+			check(
+				'hooks',
+				'claude',
+				'Hooks enabled',
+				'ok',
+				[plain("disableAllHooks isn't set, so the session sensor can run.")],
+				'on',
+				false
+			),
 			check(
 				'allow',
 				'claude',
 				'Broad allow rules',
 				'warning',
-				[code('Bash(*)'), plain(' in user settings. No effect in v1; it matters for headless gates in v1.1.')],
+				[
+					code('Bash(*)'),
+					plain(' in user settings. No effect in v1; it matters for headless gates in v1.1.')
+				],
 				'1 rule',
 				false
 			),
@@ -286,7 +338,17 @@ export function doctorFor(version: string, firstRun: boolean): World['doctor'] {
 			}
 		);
 	} else {
-		checks.push(check('git', 'toolchain', 'git', 'ok', [plain('Found at a fixed path.')], '2.51.0 at /usr/bin/git', false));
+		checks.push(
+			check(
+				'git',
+				'toolchain',
+				'git',
+				'ok',
+				[plain('Found at a fixed path.')],
+				'2.51.0 at /usr/bin/git',
+				false
+			)
+		);
 	}
 	const caps: CapabilityRow[] = [
 		['Fable 5.1', false, '2.1.257', null],
@@ -301,7 +363,8 @@ export function doctorFor(version: string, firstRun: boolean): World['doctor'] {
 		code: codeF as boolean,
 		minimum: minimum as string,
 		found: version >= (minimum as string),
-		blocks: version >= (minimum as string) ? null : (blocks as string | null) ?? 'Steps that use it'
+		blocks:
+			version >= (minimum as string) ? null : ((blocks as string | null) ?? 'Steps that use it')
 	}));
 	const probes: ProbeOutcome[] = [
 		{
@@ -336,7 +399,10 @@ const NA_REASON: Record<string, string> = {
 	'5.5': "it doesn't run on a server"
 };
 
-function applies(tpl: TemplateStep, c: Record<ConditionId, TriState>): { v: TriState; note: string | null } {
+function applies(
+	tpl: TemplateStep,
+	c: Record<ConditionId, TriState>
+): { v: TriState; note: string | null } {
 	if (tpl.key.startsWith('0.')) {
 		const v = c.idea_known === 'yes' ? 'no' : c.idea_known === 'no' ? 'yes' : 'undecided';
 		return { v, note: `idea_known = ${c.idea_known}` };
@@ -349,11 +415,20 @@ function applies(tpl: TemplateStep, c: Record<ConditionId, TriState>): { v: TriS
 	return { v: 'no', note };
 }
 
-function input(name: string, label: string, token: string, value: string, remember: boolean): RunInputView {
+function input(
+	name: string,
+	label: string,
+	token: string,
+	value: string,
+	remember: boolean
+): RunInputView {
 	return { name, label, token, multiline: true, remember, required: true, value, warning: null };
 }
 
-function makeStep(tpl: TemplateStep, p: { name: string; conditions: Record<ConditionId, TriState> }): MStep {
+function makeStep(
+	tpl: TemplateStep,
+	p: { name: string; conditions: Record<ConditionId, TriState> }
+): MStep {
 	const a = applies(tpl, p.conditions);
 	const st: MStep = {
 		tpl,
@@ -382,7 +457,14 @@ function makeStep(tpl: TemplateStep, p: { name: string; conditions: Record<Condi
 				true
 			)
 		];
-		st.parts = [{ partId: 'rerank', label: 'ask user-advocate to re-rank the pain map', included: true, locked: false }];
+		st.parts = [
+			{
+				partId: 'rerank',
+				label: 'ask user-advocate to re-rank the pain map',
+				included: true,
+				locked: false
+			}
+		];
 	}
 	if (tpl.key === '1.4') {
 		st.inputs = [
@@ -394,7 +476,14 @@ function makeStep(tpl: TemplateStep, p: { name: string; conditions: Record<Condi
 				false
 			)
 		];
-		st.parts = [{ partId: 'press-release', label: 'launch-day press release and FAQ', included: true, locked: false }];
+		st.parts = [
+			{
+				partId: 'press-release',
+				label: 'launch-day press release and FAQ',
+				included: true,
+				locked: false
+			}
+		];
 	}
 	if (a.v === 'no') {
 		st.state = 'notApplicable';
@@ -402,7 +491,8 @@ function makeStep(tpl: TemplateStep, p: { name: string; conditions: Record<Condi
 		st.why = `Not applicable: ${(NA_REASON[tpl.key] ?? 'its condition is false').replace('{name}', p.name)}`;
 		st.conditionNote = a.note;
 	} else if (a.v === 'undecided') {
-		const cond = (tpl.when ?? ['idea_known']).find((id) => p.conditions[id] === 'undecided') ?? 'idea_known';
+		const cond =
+			(tpl.when ?? ['idea_known']).find((id) => p.conditions[id] === 'undecided') ?? 'idea_known';
 		st.state = 'undecided';
 		st.stateText = 'Undecided';
 		st.why = `Decide ${cond} to continue`;
@@ -459,14 +549,18 @@ function buildStages(
 		let status: SheetStatus;
 		let why: string | null = null;
 		const stageNa =
-			(n === 0 && p.conditions.idea_known === 'yes') || (n === 10 && p.conditions.payments === 'no');
+			(n === 0 && p.conditions.idea_known === 'yes') ||
+			(n === 10 && p.conditions.payments === 'no');
 		if (stageNa) {
 			status = 'notApplicable';
 			why = n === 0 ? 'idea_known = yes' : 'payments = no';
 			for (const s of steps) {
 				s.state = 'notApplicable';
 				s.stateText = 'Not applicable';
-				s.why = n === 0 ? 'Not applicable: you already know the idea' : "Not applicable: this app doesn't take payments";
+				s.why =
+					n === 0
+						? 'Not applicable: you already know the idea'
+						: "Not applicable: this app doesn't take payments";
 				s.conditionNote = why;
 			}
 		} else if (n === 10 && p.conditions.payments === 'undecided') {
@@ -487,9 +581,22 @@ function buildStages(
 		}
 		const signed: SignedInfo | null =
 			status === 'signed'
-				? { date: signedDates[n] ?? '2026-10-12', commit: '4e1b2c7', branch: `stage/0${n}`, merged: true }
+				? {
+						date: signedDates[n] ?? '2026-10-12',
+						commit: '4e1b2c7',
+						branch: `stage/0${n}`,
+						merged: true
+					}
 				: null;
-		out.push({ stage: n, status, statusWhy: why, signed, steps, packetExists: status === 'signed', packetProblems: 0 });
+		out.push({
+			stage: n,
+			status,
+			statusWhy: why,
+			signed,
+			steps,
+			packetExists: status === 'signed',
+			packetProblems: 0
+		});
 	}
 	return out;
 }
@@ -507,7 +614,12 @@ function setStep(p: MProject, key: string, patch: Partial<MStep>): void {
 }
 
 // ---------------------------------------------------------------- packets
-function field(key: string, label: string, value: string, extra: Partial<PacketFieldView> = {}): PacketFieldView {
+function field(
+	key: string,
+	label: string,
+	value: string,
+	extra: Partial<PacketFieldView> = {}
+): PacketFieldView {
 	return {
 		key,
 		label,
@@ -526,8 +638,16 @@ function stage1Packet(name: string): MPacket {
 		fields: [
 			field('PROJECT', 'Project', name),
 			field('APPROVED BY', 'Approved by', 'Billy Ribeiro on 2026-10-12'),
-			field('PROBLEM', 'Problem', 'Active traders keep journals in spreadsheets and stop after a losing day, so they never learn which setups pay.'),
-			field('USERS', 'Users', 'Members of a trading education community who trade US equities and options.'),
+			field(
+				'PROBLEM',
+				'Problem',
+				'Active traders keep journals in spreadsheets and stop after a losing day, so they never learn which setups pay.'
+			),
+			field(
+				'USERS',
+				'Users',
+				'Members of a trading education community who trade US equities and options.'
+			),
 			field('V1 FEATURES', 'V1 features', 'Broker CSV import, setup tags, expectancy by setup.'),
 			field('OPEN ITEMS', 'Open items', 'none'),
 			field('NEXT', 'Next', "Stage 2 · Architect's Design Studio · Claude Code · Fable 5.1")
@@ -582,7 +702,9 @@ function stage2Packet(): MPacket {
 						items: [
 							[{ kind: 'paragraph', spans: sp('F-001 Broker CSV import with fill matching') }],
 							[{ kind: 'paragraph', spans: sp('F-002 Setup tags and playbooks') }],
-							[{ kind: 'paragraph', spans: sp('F-003 Expectancy by setup, time of day, and size') }],
+							[
+								{ kind: 'paragraph', spans: sp('F-003 Expectancy by setup, time of day, and size') }
+							],
 							[{ kind: 'paragraph', spans: [{ kind: 'emph', children: [plain('and 11 more')] }] }]
 						]
 					}
@@ -602,7 +724,13 @@ function stage2Packet(): MPacket {
 			}),
 			{
 				...field('OPEN ITEMS', 'Open items', ''),
-				value: [{ kind: 'codeBlock', info: '', text: 'Confirm the tier names with the trading room before Stage 3' }],
+				value: [
+					{
+						kind: 'codeBlock',
+						info: '',
+						text: 'Confirm the tier names with the trading room before Stage 3'
+					}
+				],
 				problems: [
 					problem(
 						'OPEN ITEMS must be exactly "none". Resolve this item, or move it to KNOWN LIMITS with a ticket ID.',
@@ -636,7 +764,8 @@ function stage2Packet(): MPacket {
 			[29, 'FILES: MASTER-SPEC.md, council/r1…r8']
 		].map(([line, text]) => ({ line: line as number, text: text as string, bad: line === 27 })),
 		signedBy: null,
-		writtenBy: 'Written by 2.6 at 15:41. Foreman checks it every time the file changes; nothing here edits it.',
+		writtenBy:
+			'Written by 2.6 at 15:41. Foreman checks it every time the file changes; nothing here edits it.',
 		sha: 'b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1',
 		tampered: false
 	};
@@ -668,14 +797,26 @@ function stage2Gate(): GateItemView[] {
 			status: 'notApplicable',
 			waitsFor: "Not applicable: 2.1 didn't run (commercial = no)"
 		}),
-		gateItem('beats-competitor', "Every v1 feature beats a named competitor's version or is table stakes", {
+		gateItem(
+			'beats-competitor',
+			"Every v1 feature beats a named competitor's version or is table stakes",
+			{
+				waitsFor: 'Attest, waits for 2.6'
+			}
+		),
+		gateItem('red-team', 'Every fatal or serious red-team objection is resolved in writing', {
 			waitsFor: 'Attest, waits for 2.6'
 		}),
-		gateItem('red-team', 'Every fatal or serious red-team objection is resolved in writing', { waitsFor: 'Attest, waits for 2.6' }),
-		gateItem('stack', 'The stack recommendation exists for every layer, plus your recorded final choice', {
-			waitsFor: 'Attest, waits for 2.4'
-		}),
-		gateItem('frozen', 'Open questions: zero. Status: FROZEN v1.0', { waitsFor: 'Attest, waits for 2.6' })
+		gateItem(
+			'stack',
+			'The stack recommendation exists for every layer, plus your recorded final choice',
+			{
+				waitsFor: 'Attest, waits for 2.4'
+			}
+		),
+		gateItem('frozen', 'Open questions: zero. Status: FROZEN v1.0', {
+			waitsFor: 'Attest, waits for 2.6'
+		})
 	];
 }
 
@@ -704,11 +845,17 @@ function stage5Gate(): GateItemView[] {
 				]
 			}
 		),
-		gateItem('staging', 'Staging deploys automatically, and a rollback has actually been run once', {
-			proposed: 'pass',
-			evidence: sp('Import proposes PASS: deploy run #48 green on main; rollback to v0.1.2 at 14:20 in the deploy log.'),
-			note: 'Rolled staging back from v0.1.3 to v0.1.2 with `pnpm deploy:rollback`; steps in docs/runbook-deploy.md §4.'
-		}),
+		gateItem(
+			'staging',
+			'Staging deploys automatically, and a rollback has actually been run once',
+			{
+				proposed: 'pass',
+				evidence: sp(
+					'Import proposes PASS: deploy run #48 green on main; rollback to v0.1.2 at 14:20 in the deploy log.'
+				),
+				note: 'Rolled staging back from v0.1.3 to v0.1.2 with `pnpm deploy:rollback`; steps in docs/runbook-deploy.md §4.'
+			}
+		),
 		gateItem('adr-check', 'The ADR reality check has no CONTRADICTED left open', {
 			proposed: 'pass',
 			evidence: sp('Import proposes PASS: 9 VALID, 1 NEEDS AMENDMENT (ADR-004, amended 18 Oct).'),
@@ -722,7 +869,10 @@ function stage5Gate(): GateItemView[] {
 }
 
 // ---------------------------------------------------------------- projects
-const ALL_YES = Object.fromEntries(CONDITIONS.map((c) => [c.id, 'yes'])) as Record<ConditionId, TriState>;
+const ALL_YES = Object.fromEntries(CONDITIONS.map((c) => [c.id, 'yes'])) as Record<
+	ConditionId,
+	TriState
+>;
 
 function baseProject(
 	id: string,
@@ -748,7 +898,8 @@ function baseProject(
 		lockedConditions: signedUpTo >= 2,
 		variables: {
 			APP_NAME: name,
-			ROUGH_IDEA: 'A trading journal that imports fills from my broker and shows which setups actually make money.',
+			ROUGH_IDEA:
+				'A trading journal that imports fills from my broker and shows which setups actually make money.',
 			TARGET_USERS: 'Active traders in my trading room',
 			PREFERRED_STACK: 'SvelteKit + Rust/Axum + Postgres',
 			QUALITY_BAR: 'Principal-engineer strict'
@@ -785,7 +936,13 @@ function tradelog(snap: Snap): MProject {
 		4: '2026-10-18'
 	});
 	p.pinned = 1;
-	p.branch = { s1: 'main', s2: 'stage/02-design', s2p: 'stage/02-design', s4: 'stage/04-drawings', s5: 'stage/05-site-prep' }[snap];
+	p.branch = {
+		s1: 'main',
+		s2: 'stage/02-design',
+		s2p: 'stage/02-design',
+		s4: 'stage/04-drawings',
+		s5: 'stage/05-site-prep'
+	}[snap];
 	p.packets[1] = stage1Packet('TradeLog');
 	p.gates[2] = stage2Gate();
 	p.gates[5] = stage5Gate();
@@ -822,7 +979,8 @@ function tradelog(snap: Snap): MProject {
 		p.pending = [pendingChange()];
 		if (snap === 's2p') {
 			setStep(p, '2.3', { state: 'done', stateText: 'Done, 412 lines', run: null });
-			for (const k of ['2.4', 'x-2-1', '2.5', '2.6']) setStep(p, k, { state: 'done', stateText: 'Done', next: false, why: null });
+			for (const k of ['2.4', 'x-2-1', '2.5', '2.6'])
+				setStep(p, k, { state: 'done', stateText: 'Done', next: false, why: null });
 			setStep(p, '2.6', { stateText: 'Done, wrote the packet' });
 			p.packets[2] = stage2Packet();
 			const s2 = p.stages[2];
@@ -858,10 +1016,9 @@ function tradelog(snap: Snap): MProject {
 }
 
 function foreman(): MProject {
-	const c: Record<ConditionId, TriState> = Object.fromEntries(CONDITIONS.map((x) => [x.id, 'no'])) as Record<
-		ConditionId,
-		TriState
-	>;
+	const c: Record<ConditionId, TriState> = Object.fromEntries(
+		CONDITIONS.map((x) => [x.id, 'no'])
+	) as Record<ConditionId, TriState>;
 	c.idea_known = 'yes';
 	c.has_ui = 'yes';
 	const p = baseProject(IDS.foreman, 'Foreman', '~/Code/engine-assist', c, 3, 4, {
@@ -882,13 +1039,26 @@ function foreman(): MProject {
 }
 
 function swings(): MProject {
-	const p = baseProject(IDS.swings, 'Swings', '~/Code/swings-platform', { ...ALL_YES, commercial: 'yes' }, 6, 7, {});
+	const p = baseProject(
+		IDS.swings,
+		'Swings',
+		'~/Code/swings-platform',
+		{ ...ALL_YES, commercial: 'yes' },
+		6,
+		7,
+		{}
+	);
 	p.slug = 'swings';
 	p.branch = 'stage/07-framing';
 	for (const s of p.stages) {
 		if (s.stage <= 6 && s.stage > 0) {
 			s.status = 'signed';
-			s.signed = { date: '2026-09-28', commit: '1b2c3d4', branch: `stage/0${s.stage}`, merged: true };
+			s.signed = {
+				date: '2026-09-28',
+				commit: '1b2c3d4',
+				branch: `stage/0${s.stage}`,
+				merged: true
+			};
 		}
 		if (s.stage === 7) {
 			s.status = 'waiting';
@@ -946,7 +1116,12 @@ export function projectFilePending(): PendingChange {
 		diff: {
 			source: '.foreman/project.json',
 			entries: [
-				{ keyPath: 'conditions.payments', change: 'valueChanged', before: '"undecided"', after: '"no"' },
+				{
+					keyPath: 'conditions.payments',
+					change: 'valueChanged',
+					before: '"undecided"',
+					after: '"no"'
+				},
 				{
 					keyPath: 'variables.QUALITY_BAR',
 					change: 'valueChanged',
@@ -1048,36 +1223,94 @@ function run(
 }
 
 function runsFor(tl: MProject, fm: MProject, sw: MProject): MRun[] {
-	const r = (summary: RunSummary, script: string[] = [], live = false): MRun => ({ summary, script, live, written: 0 });
+	const r = (summary: RunSummary, script: string[] = [], live = false): MRun => ({
+		summary,
+		script,
+		live,
+		written: 0
+	});
 	return [
 		r(
-			run(IDS.run23, tl, '2.3', 'Feature specifications', 'fm-tradelog-s02-2-3', 'Fable 5.1, high, Accept edits', 'running', '2026-10-19T14:06:00Z', 4100),
+			run(
+				IDS.run23,
+				tl,
+				'2.3',
+				'Feature specifications',
+				'fm-tradelog-s02-2-3',
+				'Fable 5.1, high, Accept edits',
+				'running',
+				'2026-10-19T14:06:00Z',
+				4100
+			),
 			TRANSCRIPT_23,
 			true
 		),
 		r(
-			run('a0000000-0000-4000-8000-000000000022', tl, '2.2', 'Convene the council', 'fm-tradelog-s02-2-2', 'Fable 5.1, high, Plan', 'exited', '2026-10-19T11:20:00Z', 7800)
+			run(
+				'a0000000-0000-4000-8000-000000000022',
+				tl,
+				'2.2',
+				'Convene the council',
+				'fm-tradelog-s02-2-2',
+				'Fable 5.1, high, Plan',
+				'exited',
+				'2026-10-19T11:20:00Z',
+				7800
+			)
 		),
 		r(
-			run('a0000000-0000-4000-8000-000000000122', fm, '2.2', 'Convene the council', 'fm-foreman-s02-2-2', 'Opus 5.5, xhigh, Plan', 'exited', '2026-10-16T09:12:00Z', 5300, {
-				substituted: 'substituted for Fable',
-				chain: '8a4b0d3f-62e5-4c9f-8f1b-3d72a1c5e982'
-			})
+			run(
+				'a0000000-0000-4000-8000-000000000122',
+				fm,
+				'2.2',
+				'Convene the council',
+				'fm-foreman-s02-2-2',
+				'Opus 5.5, xhigh, Plan',
+				'exited',
+				'2026-10-16T09:12:00Z',
+				5300,
+				{
+					substituted: 'substituted for Fable',
+					chain: '8a4b0d3f-62e5-4c9f-8f1b-3d72a1c5e982'
+				}
+			)
 		),
 		r(
-			run('a0000000-0000-4000-8000-000000000071', sw, '7.1', 'Skeleton plan', 'fm-swings-s07-7-1', 'Opus 5.5, high, Plan', 'interrupted', '2026-09-02T15:40:00Z', 6000, {
-				resumable: false,
-				whyNotResumable: 'Transcript removed after 30 days',
-				chain: '9b5c1e4a-73f6-4d0a-9a2c-4e83b2d6f093'
-			})
+			run(
+				'a0000000-0000-4000-8000-000000000071',
+				sw,
+				'7.1',
+				'Skeleton plan',
+				'fm-swings-s07-7-1',
+				'Opus 5.5, high, Plan',
+				'interrupted',
+				'2026-09-02T15:40:00Z',
+				6000,
+				{
+					resumable: false,
+					whyNotResumable: 'Transcript removed after 30 days',
+					chain: '9b5c1e4a-73f6-4d0a-9a2c-4e83b2d6f093'
+				}
+			)
 		),
 		r(
-			run(IDS.runSwingsGate, sw, '6:gate.A', 'Gate A', 'fm-swings-s06-6-gate-a', 'Opus 5.5, high, Plan', 'errored', '2026-09-01T10:02:00Z', 3200, {
-				error: 'Child exited during spawn: unknown option --agents',
-				exitCode: 2,
-				resumable: false,
-				chain: '0c6d2f5b-8407-4e1b-8b3d-5f94c3e7a104'
-			}),
+			run(
+				IDS.runSwingsGate,
+				sw,
+				'6:gate.A',
+				'Gate A',
+				'fm-swings-s06-6-gate-a',
+				'Opus 5.5, high, Plan',
+				'errored',
+				'2026-09-01T10:02:00Z',
+				3200,
+				{
+					error: 'Child exited during spawn: unknown option --agents',
+					exitCode: 2,
+					resumable: false,
+					chain: '0c6d2f5b-8407-4e1b-8b3d-5f94c3e7a104'
+				}
+			),
 			['\x1b[2mfm-swings-s06-6-gate-a\x1b[0m\r\n', 'error: unknown option --agents\r\n'],
 			false
 		)
@@ -1112,12 +1345,24 @@ function inboxFor(tl: MProject, fm: MProject, sw: MProject): InboxItem[] {
 			'Bash(pnpm view @sveltejs/kit version) in fm-tradelog-s02-2-3, 2 min ago',
 			{ step: '2.3', stage: 2, run: IDS.run23 }
 		),
-		item('packetInvalid', fm, 'Stage 4 packet has 2 problems', 'OPEN ITEMS isn\'t "none"; BLUEPRINT VERSION says 2.1, the lock says 2.2', {
-			stage: 4
-		}),
-		item('gateSignable', sw, 'Stage 7 packet is valid and ready to sign', 'docs/handoff/stage-07.md, gate passed 4 of 4, lessons found (L-031)', {
-			stage: 7
-		}),
+		item(
+			'packetInvalid',
+			fm,
+			'Stage 4 packet has 2 problems',
+			'OPEN ITEMS isn\'t "none"; BLUEPRINT VERSION says 2.1, the lock says 2.2',
+			{
+				stage: 4
+			}
+		),
+		item(
+			'gateSignable',
+			sw,
+			'Stage 7 packet is valid and ready to sign',
+			'docs/handoff/stage-07.md, gate passed 4 of 4, lessons found (L-031)',
+			{
+				stage: 7
+			}
+		),
 		item(
 			'outsideChange',
 			tl,

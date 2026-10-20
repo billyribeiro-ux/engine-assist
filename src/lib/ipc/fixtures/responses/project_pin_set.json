@@ -1,0 +1,29 @@
+[
+	{
+		"id": "7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11",
+		"name": "TradeLog",
+		"displayPath": "~/Code/tradelog",
+		"rev": 41,
+		"readOnly": null,
+		"currentStage": 2,
+		"pinned": 1
+	},
+	{
+		"id": "f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f",
+		"name": "Foreman",
+		"displayPath": "~/Code/engine-assist",
+		"rev": 41,
+		"readOnly": null,
+		"currentStage": 4,
+		"pinned": 2
+	},
+	{
+		"id": "5e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+		"name": "Swings",
+		"displayPath": "~/Code/swings-platform",
+		"rev": 41,
+		"readOnly": null,
+		"currentStage": 7,
+		"pinned": null
+	}
+]

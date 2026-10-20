@@ -1,0 +1,247 @@
+{
+	"rows": [
+		{
+			"project": {
+				"id": "7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11",
+				"name": "TradeLog",
+				"displayPath": "~/Code/tradelog",
+				"rev": 41,
+				"readOnly": null,
+				"currentStage": 2,
+				"pinned": 1
+			},
+			"next": {
+				"key": "2.4",
+				"number": "2.4",
+				"title": "Stack decision, evidence first",
+				"state": "notStarted",
+				"tag": "core",
+				"surface": "cli",
+				"specLine": {
+					"surface": "cli",
+					"where": "CLI, continues 2.2",
+					"model": {
+						"value": "Fable 5.1",
+						"origin": {
+							"kind": "template"
+						},
+						"from": null
+					},
+					"effort": {
+						"value": "high",
+						"origin": {
+							"kind": "template"
+						},
+						"from": null
+					},
+					"mode": {
+						"value": "Accept edits",
+						"origin": {
+							"kind": "template"
+						},
+						"from": null
+					},
+					"agents": ["principal-engineer"],
+					"droppedAgents": ["market-analyst"],
+					"note": null
+				},
+				"whyNotRunnable": "Waits for 2.3: Claude is still working in this session. Run re-arms it with Accept edits when it's idle.",
+				"stateText": "Next, waits for 2.3",
+				"conditionNote": null,
+				"kind": "followup",
+				"run": null,
+				"next": true
+			},
+			"whyNone": null,
+			"strip": [
+				"notApplicable",
+				"signed",
+				"inProgress",
+				"locked",
+				"locked",
+				"locked",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"undecided",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation"
+			],
+			"stageTitle": "Architect's Design Studio"
+		},
+		{
+			"project": {
+				"id": "f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f",
+				"name": "Foreman",
+				"displayPath": "~/Code/engine-assist",
+				"rev": 41,
+				"readOnly": null,
+				"currentStage": 4,
+				"pinned": 2
+			},
+			"next": {
+				"key": "4.5",
+				"number": "4.5",
+				"title": "Design system and key screens",
+				"state": "notStarted",
+				"tag": "conditional",
+				"surface": "chat",
+				"specLine": {
+					"surface": "chat",
+					"where": "Chat, new conversation in Project",
+					"model": {
+						"value": "Opus 5.5",
+						"origin": {
+							"kind": "template"
+						},
+						"from": null
+					},
+					"effort": {
+						"value": "adaptive",
+						"origin": {
+							"kind": "template"
+						},
+						"from": null
+					},
+					"mode": null,
+					"agents": [],
+					"droppedAgents": [],
+					"note": "Research off"
+				},
+				"whyNotRunnable": null,
+				"stateText": "Not started",
+				"conditionNote": null,
+				"kind": "prompt",
+				"run": null,
+				"next": true
+			},
+			"whyNone": null,
+			"strip": [
+				"notApplicable",
+				"signed",
+				"signed",
+				"signed",
+				"inProgress",
+				"locked",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"notApplicable",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation",
+				"needsAnnotation"
+			],
+			"stageTitle": "Construction Drawings"
+		},
+		{
+			"project": {
+				"id": "5e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+				"name": "Swings",
+				"displayPath": "~/Code/swings-platform",
+				"rev": 41,
+				"readOnly": null,
+				"currentStage": 7,
+				"pinned": null
+			},
+			"next": null,
+			"whyNone": "Gate A passed, Gate B wrote the packet, Gate C found lessons.",
+			"strip": [
+				"signed",
+				"signed",
+				"signed",
+				"signed",
+				"signed",
+				"signed",
+				"signed",
+				"waiting",
+				"locked",
+				"locked",
+				"locked",
+				"locked",
+				"locked",
+				"locked",
+				"locked",
+				"locked",
+				"locked",
+				"locked",
+				"locked"
+			],
+			"stageTitle": "Framing"
+		}
+	],
+	"inbox": [
+		{
+			"kind": "sessionBlocked",
+			"project": "7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11",
+			"step": "2.3",
+			"stage": 2,
+			"at": "2026-10-19T09:00:00Z",
+			"projectName": "TradeLog",
+			"title": "Claude is asking for permission in 2.3 Feature specifications",
+			"detail": "Bash(pnpm view @sveltejs/kit version) in fm-tradelog-s02-2-3, 2 min ago",
+			"chain": null,
+			"run": "a0000000-0000-4000-8000-000000000023"
+		},
+		{
+			"kind": "packetInvalid",
+			"project": "f0e1d2c3-b4a5-4697-8879-6a5b4c3d2e1f",
+			"step": null,
+			"stage": 4,
+			"at": "2026-10-19T09:00:00Z",
+			"projectName": "Foreman",
+			"title": "Stage 4 packet has 2 problems",
+			"detail": "OPEN ITEMS isn't \"none\"; BLUEPRINT VERSION says 2.1, the lock says 2.2",
+			"chain": null,
+			"run": null
+		},
+		{
+			"kind": "gateSignable",
+			"project": "5e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+			"step": null,
+			"stage": 7,
+			"at": "2026-10-19T09:00:00Z",
+			"projectName": "Swings",
+			"title": "Stage 7 packet is valid and ready to sign",
+			"detail": "docs/handoff/stage-07.md, gate passed 4 of 4, lessons found (L-031)",
+			"chain": null,
+			"run": null
+		},
+		{
+			"kind": "outsideChange",
+			"project": "7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11",
+			"step": null,
+			"stage": null,
+			"at": "2026-10-19T09:00:00Z",
+			"projectName": "TradeLog",
+			"title": ".foreman/overlay.json changed outside Foreman",
+			"detail": "1 skip added while fm-tradelog-s02-2-3 was running. It has no effect until you accept it.",
+			"chain": null,
+			"run": null
+		},
+		{
+			"kind": "interruptedSession",
+			"project": "5e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+			"step": "7.1",
+			"stage": 7,
+			"at": "2026-10-19T09:00:00Z",
+			"projectName": "Swings",
+			"title": "7.1 Skeleton plan can't resume",
+			"detail": "Its conversation no longer exists: Claude Code removes transcripts after 30 days (cleanupPeriodDays)",
+			"chain": "9b5c1e4a-73f6-4d0a-9a2c-4e83b2d6f093",
+			"run": null
+		}
+	]
+}

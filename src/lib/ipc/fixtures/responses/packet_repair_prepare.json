@@ -1,0 +1,32 @@
+{
+	"kind": "ready",
+	"planId": "f0000000-0000-4000-8000-000000000001",
+	"expiresInMs": 60000,
+	"prompt": [
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "Fix only these problems in docs/handoff/stage-02.md:\n- The field DATA WE HANDLE is required for Stage 2 and isn't in the file. Stage 3's security and privacy requirements read it.\n- OPEN ITEMS must be exactly \"none\". Resolve this item, or move it to KNOWN LIMITS with a ticket ID.\nDo not change anything else."
+				}
+			]
+		}
+	],
+	"argv": [
+		"/opt/homebrew/bin/claude",
+		"--resume",
+		"7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871",
+		"--permission-mode",
+		"acceptEdits"
+	],
+	"envNames": ["HOME", "LANG", "PATH", "SHELL", "TERM", "USER"],
+	"runSettingsSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+	"confirm": [],
+	"rearm": {
+		"kind": "exited",
+		"chain": "7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871"
+	},
+	"warnings": [],
+	"remaps": []
+}

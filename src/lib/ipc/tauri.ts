@@ -63,8 +63,7 @@ function build(): IpcClient {
 	return client as unknown as IpcClient;
 }
 
-export class TauriIpcClient {
-	static create(): IpcClient {
-		return build();
-	}
+/** The real client: every contract method invokes its Rust command. */
+export function createTauriClient(): IpcClient {
+	return build();
 }

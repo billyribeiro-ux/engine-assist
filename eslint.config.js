@@ -90,7 +90,9 @@ export default defineConfig(
 				{ name: 'WebSocket', message: 'SR-60: no network.' },
 				{ name: 'EventSource', message: 'SR-60: no network.' }
 			],
-			'@typescript-eslint/consistent-type-imports': 'error'
+			'@typescript-eslint/consistent-type-imports': 'error',
+			// Numbers in template literals are routine in UI text ("Stage 2 of 19").
+			'@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }]
 		}
 	},
 	{

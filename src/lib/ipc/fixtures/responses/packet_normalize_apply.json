@@ -1,0 +1,231 @@
+{
+	"path": "docs/handoff/stage-01.md",
+	"exists": true,
+	"sha256": "9c41e07a3b5d6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6e07a",
+	"header": {
+		"line": "=== HANDOFF PACKET · Stage 1 → Stage 2 ===",
+		"fromStage": 1,
+		"toStage": 2
+	},
+	"fields": [
+		{
+			"key": "PROJECT",
+			"label": "Project",
+			"value": [
+				{
+					"kind": "paragraph",
+					"spans": [
+						{
+							"kind": "plain",
+							"text": "TradeLog"
+						}
+					]
+				}
+			],
+			"missing": false,
+			"problems": [],
+			"note": null
+		},
+		{
+			"key": "APPROVED BY",
+			"label": "Approved by",
+			"value": [
+				{
+					"kind": "paragraph",
+					"spans": [
+						{
+							"kind": "plain",
+							"text": "Billy Ribeiro on 2026-10-12"
+						}
+					]
+				}
+			],
+			"missing": false,
+			"problems": [],
+			"note": null
+		},
+		{
+			"key": "PROBLEM",
+			"label": "Problem",
+			"value": [
+				{
+					"kind": "paragraph",
+					"spans": [
+						{
+							"kind": "plain",
+							"text": "Active traders keep journals in spreadsheets and stop after a losing day, so they never learn which setups pay."
+						}
+					]
+				}
+			],
+			"missing": false,
+			"problems": [],
+			"note": null
+		},
+		{
+			"key": "USERS",
+			"label": "Users",
+			"value": [
+				{
+					"kind": "paragraph",
+					"spans": [
+						{
+							"kind": "plain",
+							"text": "Members of a trading education community who trade US equities and options."
+						}
+					]
+				}
+			],
+			"missing": false,
+			"problems": [],
+			"note": null
+		},
+		{
+			"key": "V1 FEATURES",
+			"label": "V1 features",
+			"value": [
+				{
+					"kind": "paragraph",
+					"spans": [
+						{
+							"kind": "plain",
+							"text": "Broker CSV import, setup tags, expectancy by setup."
+						}
+					]
+				}
+			],
+			"missing": false,
+			"problems": [],
+			"note": null
+		},
+		{
+			"key": "OPEN ITEMS",
+			"label": "Open items",
+			"value": [
+				{
+					"kind": "paragraph",
+					"spans": [
+						{
+							"kind": "plain",
+							"text": "none"
+						}
+					]
+				}
+			],
+			"missing": false,
+			"problems": [],
+			"note": null
+		},
+		{
+			"key": "NEXT",
+			"label": "Next",
+			"value": [
+				{
+					"kind": "paragraph",
+					"spans": [
+						{
+							"kind": "plain",
+							"text": "Stage 2 · Architect's Design Studio · Claude Code · Fable 5.1"
+						}
+					]
+				}
+			],
+			"missing": false,
+			"problems": [],
+			"note": null
+		}
+	],
+	"problems": [],
+	"normalization": [],
+	"signed": {
+		"name": "Billy Ribeiro",
+		"date": "2026-10-12",
+		"byForeman": false,
+		"confirmed": true
+	},
+	"tamper": null,
+	"raw": [
+		{
+			"line": 1,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "=== HANDOFF PACKET · Stage 1 → Stage 2 ==="
+				}
+			],
+			"bad": false
+		},
+		{
+			"line": 2,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "PROJECT: TradeLog"
+				}
+			],
+			"bad": false
+		},
+		{
+			"line": 3,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "APPROVED BY: Billy Ribeiro on 2026-10-12"
+				}
+			],
+			"bad": false
+		},
+		{
+			"line": 4,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "PROBLEM: Active traders keep journals in spreadsheets…"
+				}
+			],
+			"bad": false
+		},
+		{
+			"line": 5,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "USERS: Members of a trading education community…"
+				}
+			],
+			"bad": false
+		},
+		{
+			"line": 6,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "V1 FEATURES: Broker CSV import, setup tags, expectancy…"
+				}
+			],
+			"bad": false
+		},
+		{
+			"line": 7,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "OPEN ITEMS: none"
+				}
+			],
+			"bad": false
+		},
+		{
+			"line": 8,
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "NEXT: Stage 2 · Architect's Design Studio · …"
+				}
+			],
+			"bad": false
+		}
+	],
+	"writtenBy": "Written by 1.4 on 12 Oct; pasted back from the chat.",
+	"summary": "Valid and signed."
+}

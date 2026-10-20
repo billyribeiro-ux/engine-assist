@@ -1,0 +1,15 @@
+{
+	"pickId": "d0000000-0000-4000-8000-000000000001",
+	"name": "TradeLog",
+	"slug": "tradelog",
+	"variables": {
+		"ROUGH_IDEA": "A trading journal that imports fills from my broker.",
+		"TARGET_USERS": "Active traders"
+	},
+	"conditions": {
+		"idea_known": "yes",
+		"commercial": "no",
+		"payments": "undecided"
+	},
+	"chatProjectUrl": "https://claude.ai/project/01a7c4e2"
+}

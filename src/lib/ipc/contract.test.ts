@@ -23,14 +23,15 @@ function contractCommands(): string[] {
 }
 
 describe('ipc contract', () => {
-	it('COMMAND_MAP keys equal bindings/commands.json', () => {
-		expect(Object.keys(COMMAND_MAP).sort()).toEqual(commands);
-	});
-
-	it('every implemented command is in the contract (§4.15)', () => {
+	it('COMMAND_MAP keys equal the 91 commands of §4.15', () => {
 		const contract = contractCommands();
 		expect(contract).toHaveLength(91);
-		for (const c of commands) expect(contract).toContain(c);
+		expect(Object.keys(COMMAND_MAP).sort()).toEqual(contract);
+	});
+
+	it('every command Rust registers (bindings/commands.json) is in COMMAND_MAP', () => {
+		// Rust adds commands ticket by ticket (M2-01 ff.); the TS contract carries all 91 already.
+		for (const c of commands) expect(Object.keys(COMMAND_MAP)).toContain(c);
 	});
 
 	it('MockIpcClient has a method for every command', () => {
@@ -38,6 +39,7 @@ describe('ipc contract', () => {
 		for (const method of Object.values(COMMAND_MAP)) {
 			expect(typeof mock[method]).toBe('function');
 		}
+		expect(new Set(Object.values(COMMAND_MAP)).size).toBe(91);
 	});
 
 	it('ipc::error_codes_closed: the TS union equals the Rust enum', () => {
@@ -50,6 +52,13 @@ describe('ipc contract', () => {
 		for (const f of readdirSync(bindingsDir).filter((n) => n.endsWith('.ts'))) {
 			expect(readFileSync(join(bindingsDir, f), 'utf8'), f).not.toMatch(/\bbigint\b/);
 		}
+	});
+
+	it('ipc::security_confirmations_are_native (static part over the TS contract too)', () => {
+		const src = readFileSync(join(import.meta.dirname, 'contract.ts'), 'utf8');
+		const reqs =
+			src.split('export interface Requests')[1]?.split('export interface Responses')[0] ?? '';
+		expect(reqs).not.toMatch(/\b(confirm\w*|ack\w*|consent\w*|approved\w*|\w*Confirmed)\s*:/);
 	});
 
 	it('ipc::security_confirmations_are_native (static part, IPC-R11)', () => {

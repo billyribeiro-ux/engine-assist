@@ -1,0 +1,30 @@
+{
+	"kind": "blocked",
+	"blockers": [
+		{
+			"kind": "configChanged",
+			"cwd": "spec",
+			"fingerprint": "abababababababababababababababababababababababababababababababab",
+			"diffs": [
+				{
+					"source": "spec/.claude/agents/principal-engineer.md",
+					"entries": [
+						{
+							"keyPath": "tools",
+							"change": "valueChanged",
+							"before": "\"Read, Grep, Glob\"",
+							"after": "\"Read, Grep, Glob, Bash\""
+						},
+						{
+							"keyPath": "model",
+							"change": "valueChanged",
+							"before": "\"fable\"",
+							"after": "\"opus\""
+						}
+					]
+				}
+			]
+		}
+	],
+	"warnings": []
+}
