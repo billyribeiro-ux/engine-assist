@@ -136,7 +136,7 @@ rust-toolchain.toml     channel = "1.99.1" (newest rust-lang tag 2026-10-19; flo
 deny.toml               graph targets = aarch64-apple-darwin; bans (ADR-016)
 crates/foreman-core/    pure domain + store (path policy, atomic I/O, SR-31a reader); no tauri/tokio/spawn
 crates/foreman-sys/     spawn (sole Command/CommandBuilder site), git::run, PtySession, claude CLI, open
-crates/foreman-sensor/  hook helper (P2): std + serde_json + rustix
+crates/foreman-sensor/  hook helper (P2): std + serde_json + rustix (`fs`, `event`)
 crates/fake-claude/     test-only double (never bundled)
 src-tauri/              foreman-app: Tauri shell, IPC, watcher, sensor ingest, plugin wrappers, logging
 ```
