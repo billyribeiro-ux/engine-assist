@@ -8,4 +8,6 @@ pub enum Preview {
     Setup(Box<crate::ipc::commands::projects::SetupPlan>),
     /// `action_preview` → `action_apply`.
     Action(Box<crate::ipc::commands::steps::HeldAction>),
+    /// `paste_back_preview` → `paste_back_apply`.
+    Paste(Box<crate::ipc::commands::chat::HeldPaste>),
 }

@@ -180,6 +180,7 @@ Stage 4 left types that §2–§4 name but never define, and fields the screens 
 - `LaunchProgress`: `Version.found` and `Exited.code` are `string | null` and `number | null`; `Contract.outcome` is `ContractOutcome` (`pass`, `flagFailure`, `inconclusive`, `skipped`), the probe result without its output.
 - (CR-003) A pin refused for annotation errors is `code: notAllowed` with `detail: { kind: "annotationErrors", errors }` instead of the `notAllowed` detail, so the rule name `p1-annotation-errors` isn't on the wire; the UI branches on `detail.kind` and lists each error (stage, step ID, line, rule, message). `setup_preview` runs the same check before anything is written (`foreman_core::pin_check`), and `setup_apply` pins the same blob (its oid is compared).
 - A decision-file write that meets an outside change still pending review returns `Conflict` with the file's path (the pending change is reviewed first; DR-148).
+- (M3-25) `StageView.closeoutChecklist` is the P1 close-out checklist step (AC-F015-01): the stage type's close-out sequence (MASTER-SPEC §8, `foreman_core::steps::closeout`) while the stage's packet exists with no problems and the stage isn't signed; empty otherwise. P2 replaces it with `GateView.closeout`.
 - `AppBootstrap.interrupted` lists runs whose `run.json` says `running` at startup (SR-57: listed, never relaunched); `capabilities` gates Desktop (`--desktop` ≥ 2.1.285), the P2 sensor and the verified probes.
 
 **Nested request objects.** A tagged object inside a request (`EditorSetting`, `LinkSource`, `AttestOutcome`, `SignBranch`) is an enum whose variants hold a struct with `deny_unknown_fields`, so an extra field inside it is `Invalid` too (IPC-R1). The wire form is unchanged (`{ kind: "set", bundleId }`); ts-rs writes it as `{ "kind": "set" } & EditorSet`.
@@ -280,7 +281,7 @@ export type BlueprintRepoInfo = { displayPath: string, commit: string, version: 
 export type SettingsView = { rev: Rev, driName: string | null, tools: ToolPaths, editorBundleId: BundleId | null, blueprintRepo: BlueprintRepoInfo | null, theme: Theme, terminal: TerminalPrefs, envPassthrough: Array<EnvName>, loginPath: LoginPathView | null, globalVariables: Record<string, string>, authKeyAllowlist: Array<AllowlistEntry>, screenReaderMode: boolean, runHistory: RunHistorySize, };
 export type InboxItem = { kind: InboxKind, project: ProjectId, step: StepKey | null, stage: Stage | null, at: Timestamp, projectName: string, title: string, detail: string, chain: ChainId | null, run: RunId | null, };
 export type StepSummary = { key: StepKey, number: string, title: string, state: StepState, tag: Tag, surface: Surface | null, specLine: SpecLine | null, whyNotRunnable: string | null, stateText: string, conditionNote: string | null, kind: StepKind, run: RunId | null, next: boolean, };
-export type StageView = { stage: Stage, title: string, applicable: Applicability, signed: SignedInfo | null, steps: Array<StepSummary>, packet: PacketSummary | null, subtitle: string, status: SheetStatus, statusWhy: string | null, };
+export type StageView = { stage: Stage, title: string, applicable: Applicability, signed: SignedInfo | null, steps: Array<StepSummary>, packet: PacketSummary | null, subtitle: string, status: SheetStatus, statusWhy: string | null, closeoutChecklist: Array<string>, };
 export type ProjectView = { summary: ProjectSummary, conditions: { [key in ConditionId]?: ConditionView }, stages: Array<StageView>, pendingChanges: number, readOnly: ReadOnly | null, branch: string, blueprint: BlueprintPin, dri: string | null, chatProjectUrl: string | null, configChanged: ConfigChangedNotice | null, };
 export type NextStepRow = { project: ProjectSummary, next: StepSummary | null, whyNone: string | null, strip: Array<SheetStatus>, stageTitle: string | null, };
 export type DoctorReport = { level: DoctorLevel, checks: Array<DoctorCheck>, capabilities: Array<CapabilityRow>, probes: Array<ProbeOutcome>, probeNote: string | null, ranAt: Timestamp, };
@@ -713,7 +714,7 @@ TS    { projectId: string; target: "prompt" | "command" | "sessionId" | "fileCon
 Res   CopyResult { removed_controls: u32, focus_run: Option<RunId> }   // focus_run: followup → focus its chain's tab
 Err   NotFound · Invalid (the target needs a field that is null) · NotAllowed ("unresolved-tokens", "prompt-control-char")
 ```
-F-005, F-007, F-009, F-023, F-026 · AC-F007-07, AC-F009-05, -16, AC-F026-01, AC-F023-01, AC-F013-12 · SR-22, SR-28 (text sanitized before it reaches the clipboard), SR-56. Covers Copy prompt (⌘⇧C), Copy command (⌘⌥C), Copy session ID, `followup` Copy-and-focus, manifest Copy contents and the fix request. One typed command covers them all; the fix request is `clipboard_copy { target: "fixRequest" }`.
+F-005, F-007, F-009, F-023, F-026 · AC-F007-07, AC-F009-05, -16, AC-F026-01, AC-F023-01, AC-F013-12 · SR-22, SR-28 (text sanitized before it reaches the clipboard), SR-56. Covers Copy prompt (⌘⇧C), Copy command (⌘⌥C), Copy session ID, `followup` Copy-and-focus, manifest Copy contents and the fix request. One typed command covers them all; the fix request is `clipboard_copy { target: "fixRequest" }`. As built (M2-06, M3-17): `command` runs the same preparation as `launch_prepare` (the UI never builds argv) and copies the program and argv, POSIX shell-quoted; a blocked step answers `NotAllowed("not-runnable")`. A `followup`'s `prompt` copy returns `focusRun`, the live run of its chain, or `null` when the chain's process has exited (the UI then relaunches it, DR-068).
 
 ### 4.5 Chat
 
@@ -725,7 +726,7 @@ Res   ChatCopyResult { run_id: RunId, opened: bool, missing_link: Option<"projec
                        removed_controls: u32 }
 Err   NotFound · ReadOnly · NotAllowed ("unresolved-tokens", "prompt-control-char") · Io
 ```
-F-012, F-026 · AC-F012-03, -04, AC-F026-02, AC-F017-06 · SR-25, SR-28, SR-52.
+F-012, F-026 · AC-F012-03, -04, AC-F026-02, AC-F017-06 · SR-25, SR-28, SR-52. As built (M3-23): `NotAllowed` also carries `not-a-chat-step` and `not-runnable` (the step refuses a copy: not applicable, undecided, waiting, with the reason). The URL opens through `foreman-sys` (`/usr/bin/open -u <url>`, CR-006) only after the stored link passes the SR-25 allowlist again; a stored link that fails it counts as missing (`missingLink`). If `open` itself fails, the prompt stays copied and the result is `opened: false, missingLink: null`. The run record is `kind: chatCopy`, `status: copied`, prompt hash only; a per-run override is consumed by the copy (DR-103).
 
 **`chat_link_set`** · P1 · M3 · **repo** (`project.json` `chatUrls`, variable field), reads the clipboard when asked
 ```text
@@ -735,7 +736,7 @@ TS    { projectId: string; chainStart: string; source: { kind: "clipboard" } | {
 Res   Rev
 Err   Clipboard · Invalid (not https://claude.ai/…) · Conflict
 ```
-F-012 · AC-F012-02 · SR-25, SR-56, PR-02 (g).
+F-012 · AC-F012-02 · SR-25, SR-56, PR-02 (g). As built (M3-23): `chainStart` may name any chat step of the chain; the link is stored under the chain's start step. `Invalid { field: "chainStart", rule: "chatChainStart" }` when it isn't a chat chain; the clipboard text is trimmed before the check.
 
 **`paste_back_preview`** · P1 (packet, output) + P2 (ADR set, lessons) · M3/M4 · reads the clipboard, **mem**
 ```text
@@ -746,7 +747,7 @@ Res   PastePreview { preview_id: PreviewId, kind: PasteKind, targets: Vec<Diff>,
                      notes: Vec<String>, packet_fields: Option<PacketFields> }
 Err   Clipboard · Unsupported (`sensor` with no sensor, or no `last_assistant_message` for the step's run) · NotAllowed ("wrong-stage-packet", "two-packets", "appends-in-p1") · PolicyViolation · ReadOnly
 ```
-F-012, F-013, F-016 · AC-F012-05…-11, -13, -14, -15, AC-F013-14, AC-F016-02 · SR-18, SR-26, SR-35, SR-56. Diffs show bidi, zero-width and control characters as visible escapes. `source: "sensor"` (P2, M4) reads the text the sensor recorded for the step's last run; it goes through the same normalize, split, `check_write` and preview as a clipboard paste, and only Billy's Apply writes it (SR-18). Mock fixtures: one request per source (`requests/paste_back_preview.json`, `requests/paste_back_preview.sensor.json`).
+F-012, F-013, F-016 · AC-F012-05…-11, -13, -14, -15, AC-F013-14, AC-F016-02 · SR-18, SR-26, SR-35, SR-56. Diffs show bidi, zero-width and control characters as visible escapes. `source: "sensor"` (P2, M4) reads the text the sensor recorded for the step's last run; it goes through the same normalize, split, `check_write` and preview as a clipboard paste, and only Billy's Apply writes it (SR-18). Mock fixtures: one request per source (`requests/paste_back_preview.json`, `requests/paste_back_preview.sensor.json`). As built (M3-24): `NotAllowed` also carries `no-packet` (a packet step's paste has no header), `not-a-packet-step` (`kind: packet` on a step without a packet `out`) and `no-output` (the step declares nowhere to write); `adrSet` and `lessons` answer `Unsupported` (`notYetAvailable:M4-24` / `M4-18`), `sensor` answers `Unsupported { feature: "sensor", why: "noSensor" }`. Each other declared `out` of a packet step receives the whole paste (packet, then attachments). Problems carry `fix: ["openInEditor", "copyFixRequest"]`.
 
 **`paste_back_apply`** · P1 · M3 · **repo**
 ```text
@@ -755,7 +756,7 @@ TS    { previewId: string }
 Res   PasteApplyResult { written: Vec<RepoPath>, step_done: bool }
 Err   Expired · Conflict (lists `written`) · PolicyViolation
 ```
-F-012, F-016 · AC-F012-06…-08, -12, AC-F016-02, -03, -04 · SR-33, SR-35.
+F-012, F-016 · AC-F012-06…-08, -12, AC-F016-02, -03, -04 · SR-33, SR-35. As built (M3-24): every target's stamp is re-checked before the first write, so a file changed since the preview writes nothing (`Conflict` with `written: []`); a change racing the writes reports what was written. A valid packet or output makes the step `done` (a step never copied counts the paste-back as its copy) and emits `packet:changed` for a packet.
 
 ### 4.6 Launch
 
@@ -909,7 +910,7 @@ TS    { runId: string; url: string }
 Res   LinkOutcome     // "opened" | "refused" | "cancelled"
 Err   NotFound
 ```
-F-009 · AC-F009-17 · SR-29, SR-26 (the dialog shows the URL with visible escapes).
+F-009 · AC-F009-17 · SR-29, SR-26 (the dialog shows the URL with visible escapes). As built (M3-12): a refused URL answers `refused` without a dialog; `Invalid { field: "url", rule: "tooLong" }` over 8 KB; `ToolFailed` when `open` fails. The URL opens through `foreman-sys` (`/usr/bin/open -u`, CR-006), never in the webview.
 
 ### 4.8 Files
 

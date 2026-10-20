@@ -377,13 +377,40 @@ pub fn rearm_continue(
     drive(app, &held, req.chain.as_str(), output, &progress, false)
 }
 
-/// `terminal_link_open`: not built yet (M3-12; IPC-R12): opening a URL needs the opener, which
-/// lands with the chat commands (M3-23).
+/// `terminal_link_open` (P1, M3-12): a link clicked in a terminal (OSC 8 or a detected URL) is
+/// parsed in Rust (`foreman_core::urls::terminal_url`: `https:`, or `http:` to localhost or
+/// 127.0.0.1, no userinfo); any other link is refused without a dialog. An allowed link opens in
+/// the default browser through `foreman-sys`'s `open` only after Billy confirms a native dialog
+/// showing the full URL with hidden characters made visible (SR-29, SR-26, SR-24a). Nothing opens
+/// in the webview.
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M3-12`).
-pub fn terminal_link_open(_app: &App, _req: TerminalLinkOpenReq) -> Result<LinkOutcome, IpcError> {
-    Err(IpcError::not_yet_available("terminal_link_open", "M3-12"))
+/// `NotFound` (unknown run), `Invalid` (over 8 KB), `ToolFailed` (`open` failed).
+pub fn terminal_link_open(app: &App, req: TerminalLinkOpenReq) -> Result<LinkOutcome, IpcError> {
+    let r = live(app, req.run_id.as_str())?;
+    if req.url.len() > foreman_core::urls::MAX_URL {
+        return Err(IpcError::invalid("url", "tooLong"));
+    }
+    let Ok(url) = foreman_core::urls::terminal_url(&req.url) else {
+        return Ok(LinkOutcome::Refused);
+    };
+    let ok = app.os().confirm(&Confirm::new(
+        "Open this link in your browser?",
+        format!(
+            "A link in {} wants to open:\n\n{}\n\nOpen it only if you expected this address.",
+            crate::render::escape_visible(&r.tab_name),
+            crate::render::escape_visible(url.as_str())
+        ),
+        "Open link",
+    ));
+    if !ok {
+        return Ok(LinkOutcome::Cancelled);
+    }
+    let ctx = app.spawn_ctx_now()?;
+    app.os()
+        .open_url(&url, &ctx)
+        .map_err(|_| IpcError::tool_failed("open", None, false, String::new()))?;
+    Ok(LinkOutcome::Opened)
 }
 
 #[allow(dead_code, reason = "used by the quit guard (M3-13)")]

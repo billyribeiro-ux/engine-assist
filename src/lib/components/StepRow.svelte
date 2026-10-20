@@ -27,6 +27,7 @@
 	import { terminal } from '#lib/stores/terminal.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
 
+	import ChatChips from './ChatChips.svelte';
 	import Dialog from './Dialog.svelte';
 	import Icon from './Icon.svelte';
 	import PasteBack from './PasteBack.svelte';
@@ -107,6 +108,19 @@
 					: { label: 'Run in terminal', icon: 'play' as const }
 	);
 	const inputId = (name: string) => `in-${sid}-${name}`;
+	// AC-F012-04: which link Copy and open needs before it can open claude.ai for this step.
+	const continuing = $derived(v?.chips?.chips[0]?.label.startsWith('Same chat') ?? false);
+	const linkHint = $derived(
+		!v?.chips
+			? null
+			: continuing
+				? v.chips.link
+					? null
+					: 'Link this chat: copy the conversation’s address from claude.ai, then press Link this chat. Until then, Copy and open copies the prompt only.'
+				: project.chatProjectUrl
+					? null
+					: 'Set this project’s claude.ai Project link (Project settings) so Copy and open opens a new conversation there. Until then it copies the prompt only.'
+	);
 
 	let pasteTrigger: (() => Promise<true | string>) | null = null;
 	let action = $state<ActionPreview | null>(null);
@@ -125,6 +139,30 @@
 		if (project.readOnly) return `Open read-only: ${project.readOnly.detail}`;
 		if (v.blockers[0]) return blockerText(v.blockers[0]);
 		if (step.kind === 'action') return preview();
+		if (step.kind === 'followup' && step.surface === 'cli') {
+			// DR-068 / AC-F007-07: with its chain live, a followup is copied and its tab focused;
+			// nothing is typed. Otherwise it relaunches as a continuing launch (below).
+			const c = await ipc();
+			try {
+				const r = await c.clipboardCopy({
+					projectId: pid,
+					target: 'prompt',
+					step: step.key,
+					chain: null,
+					path: null,
+					stage: null
+				});
+				if (r.focusRun) {
+					terminal.active = r.focusRun;
+					if (!ui.drawerOpen) ui.toggleDrawer();
+					ui.toast('Prompt copied. Paste it into the session and press Return.', 'pass', 'copy');
+					refresh(`project:${pid}`);
+					return true;
+				}
+			} catch (e: unknown) {
+				return failureText(toIpcFailure(e));
+			}
+		}
 		busy = true;
 		const r = await runStep({
 			projectId: pid,
@@ -242,6 +280,21 @@
 			ui.say(failureText(toIpcFailure(e)));
 		}
 	}
+	let projectLink = $state('');
+	let projectLinkError = $state<string | null>(null);
+	async function saveProjectLink(): Promise<void> {
+		const c = await ipc();
+		try {
+			await c.projectUrlSet({ projectId: pid, url: projectLink.trim() });
+			projectLinkError = null;
+			ui.toast('Project link saved');
+			refresh(`project:${pid}`);
+		} catch (e: unknown) {
+			const f = toIpcFailure(e);
+			projectLinkError =
+				f.code === 'invalid' ? 'Only a https://claude.ai/ link works here.' : failureText(f);
+		}
+	}
 	async function override(field: 'model' | 'effort' | 'mode', value: string): Promise<void> {
 		if (!v) return;
 		const c = await ipc();
@@ -261,7 +314,6 @@
 			ui.say(failureText(toIpcFailure(e)));
 		}
 	}
-	const chipsOn = $state<Record<string, boolean>>({ 'same-chat': true, model: true });
 	const argvText = $derived(
 		(v?.argvPreview ?? [])
 			.map((a, i, all) =>
@@ -340,21 +392,36 @@
 				<p class="reason" role="status">Loading…</p>
 			{:else}
 				{#if full && v.chips}
-					<div class="chips" role="group" aria-label="Chat setup: check each before you send">
-						{#each v.chips.chips as ch (ch.id)}
-							<button
-								type="button"
-								class={['chip', ch.strong && 'strong']}
-								role="checkbox"
-								aria-checked={chipsOn[ch.id] ?? false}
-								onclick={() => (chipsOn[ch.id] = !(chipsOn[ch.id] ?? false))}
-								><span class={['box', chipsOn[ch.id] && 'on']} aria-hidden="true"
-									>{#if chipsOn[ch.id]}<Icon name="check" size="none" />{/if}</span
-								>{ch.label}</button
+					<ChatChips chips={v.chips} />
+					{#if linkHint}<p class="reason attention" id="link-{sid}">
+							<Icon name="link" size="glyph" />{linkHint}
+						</p>
+						{#if !continuing && !project.readOnly}
+							<form
+								class="project-link"
+								onsubmit={(e) => {
+									e.preventDefault();
+									void saveProjectLink();
+								}}
 							>
-						{/each}
-						<span class="chips-note">Reminders only; Foreman can't set these in claude.ai.</span>
-					</div>
+								<label for="plink-{sid}">claude.ai Project link</label>
+								<div class="input-row">
+									<input
+										class="input"
+										id="plink-{sid}"
+										placeholder="https://claude.ai/project/…"
+										bind:value={projectLink}
+										aria-invalid={projectLinkError ? 'true' : undefined}
+										aria-describedby={projectLinkError ? `plink-${sid}-err` : `link-${sid}`}
+									/>
+									<button class="btn" type="submit">Save link</button>
+								</div>
+								{#if projectLinkError}<p class="err" id="plink-{sid}-err">
+										<Icon name="cross" size="glyph" />{projectLinkError}
+									</p>{/if}
+							</form>
+						{/if}
+					{/if}
 				{/if}
 
 				{#if v.inputs.length || v.parts.length}
@@ -767,8 +834,14 @@
 		display: grid;
 		gap: var(--space-2);
 	}
-	.skip {
+	.skip,
+	.project-link {
 		max-width: 560px;
+	}
+	.project-link {
+		display: grid;
+		gap: var(--space-2);
+		font-size: var(--text-12);
 	}
 	@media (prefers-contrast: more) {
 		.step.is-na {

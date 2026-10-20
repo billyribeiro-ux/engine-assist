@@ -312,6 +312,7 @@ response!(
         subtitle: String,
         status: SheetStatus,
         status_why: Option<String>,
+        closeout_checklist: Vec<String>,
     }
 );
 

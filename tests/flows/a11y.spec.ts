@@ -16,6 +16,7 @@ const ROUTES: [string, string, string][] = [
 	['Stage workspace (CLI)', `/projects/${TL}/stages/2`, "Architect's Design Studio"],
 	['Stage workspace (chat)', `/projects/${TL}/stages/1?scenario=stage1`, 'Meet the Architect'],
 	['Step', `/projects/${TL}/stages/2/steps/2.4`, "Architect's Design Studio"],
+	['Stage workspace (close-out checklist)', `/projects/${SW}/stages/7`, ''],
 	['Gate', `/projects/${TL}/stages/5/gate?scenario=stage5`, ''],
 	['Gate, signable', `/projects/${SW}/stages/7/gate`, ''],
 	['Packet, invalid', `/projects/${TL}/stages/2/packet?scenario=invalidPacket`, 'Stage 2 packet'],

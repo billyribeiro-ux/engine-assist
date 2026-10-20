@@ -65,9 +65,13 @@ export async function runStep(t: RunTarget): Promise<true | string> {
 			});
 			refresh(`project:${t.projectId}`, 'today');
 			ui.toast(
-				r.missingLink
-					? 'Prompt copied. Link the claude.ai Project to open it in one step.'
-					: 'Prompt copied and claude.ai opened. Paste it into the chat.',
+				r.missingLink === 'project'
+					? 'Prompt copied. Set the claude.ai Project link to open a new conversation in one step.'
+					: r.missingLink === 'conversation'
+						? 'Prompt copied. Link this chat to open the conversation in one step.'
+						: r.opened
+							? 'Prompt copied and claude.ai opened. Paste it into the chat.'
+							: "Prompt copied. The browser didn't open; paste it into the chat.",
 				'pass',
 				'copy'
 			);

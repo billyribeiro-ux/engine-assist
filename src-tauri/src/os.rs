@@ -10,6 +10,9 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use foreman_core::urls::OpenUrl;
+use foreman_sys::spawn::SpawnCtx;
+
 use crate::ipc::dto::events::Event;
 use crate::ipc::error::ClipboardProblem;
 
@@ -75,6 +78,12 @@ pub trait Os: Send + Sync {
     fn clipboard_write(&self, text: &str) -> Result<(), String>;
     /// Emits a §6 event to the webview (identifiers and revisions only).
     fn emit(&self, e: &Event);
+    /// Opens a checked URL in the default browser through `foreman-sys`'s `/usr/bin/open -u`
+    /// (SR-25, SR-29). Never in the webview.
+    ///
+    /// # Errors
+    /// The spawn's failure, as text.
+    fn open_url(&self, url: &OpenUrl, ctx: &SpawnCtx) -> Result<(), String>;
     /// Now, UTC.
     fn now(&self) -> jiff::Timestamp;
     /// Today's local date (wait steps, DR-067).
@@ -177,8 +186,37 @@ impl<R: tauri::Runtime> Os for TauriOs<R> {
         let _ = self.app.emit(e.name(), e.payload());
     }
 
+    fn open_url(&self, url: &OpenUrl, ctx: &SpawnCtx) -> Result<(), String> {
+        sys_open_url(url, ctx)
+    }
+
     fn now(&self) -> jiff::Timestamp {
         jiff::Timestamp::now()
+    }
+}
+
+/// `/usr/bin/open -u <url>` through `foreman-sys::spawn`: cwd in app data, a minimal environment,
+/// a 10 s timeout (SR-01, SR-25).
+///
+/// # Errors
+/// The spawn failure or a non-zero exit, as text.
+pub fn sys_open_url(url: &OpenUrl, ctx: &SpawnCtx) -> Result<(), String> {
+    use foreman_sys::spawn::{self, Cwd, RunOpts, SpawnRequest};
+    let opts = RunOpts {
+        env: vec![
+            ("HOME".to_owned(), ctx.home.display().to_string()),
+            ("PATH".to_owned(), "/usr/bin:/bin".to_owned()),
+        ],
+        timeout: std::time::Duration::from_secs(10),
+        output_cap: 64 * 1024,
+        cwd: Cwd::AppData,
+    };
+    let out =
+        spawn::run(&SpawnRequest::OpenUrl(url.clone()), &opts, ctx).map_err(|e| e.to_string())?;
+    if out.code == Some(0) {
+        Ok(())
+    } else {
+        Err(format!("open exited with {:?}", out.code))
     }
 }
 
@@ -208,6 +246,8 @@ pub struct ScriptedOs {
     saves: Mutex<VecDeque<Option<PathBuf>>>,
     clipboard: Mutex<Option<String>>,
     events: Mutex<Vec<Event>>,
+    opened: Mutex<Vec<String>>,
+    open_fails: Mutex<bool>,
     now: Mutex<jiff::Timestamp>,
 }
 
@@ -221,6 +261,8 @@ impl Default for ScriptedOs {
             saves: Mutex::new(VecDeque::new()),
             clipboard: Mutex::new(None),
             events: Mutex::new(Vec::new()),
+            opened: Mutex::new(Vec::new()),
+            open_fails: Mutex::new(false),
             // ipc.md §7.2: the mock's fixed clock.
             now: Mutex::new(jiff::Timestamp::from_second(1_792_400_400).unwrap_or_default()),
         }
@@ -271,6 +313,15 @@ impl ScriptedOs {
     pub fn set_now(&self, t: jiff::Timestamp) {
         *lock(&self.now) = t;
     }
+    /// Every URL opened so far.
+    #[must_use]
+    pub fn opened(&self) -> Vec<String> {
+        lock(&self.opened).clone()
+    }
+    /// Makes the next opens fail (as `open` exiting non-zero would).
+    pub fn fail_opens(&self, fail: bool) {
+        *lock(&self.open_fails) = fail;
+    }
 }
 
 impl Os for ScriptedOs {
@@ -299,6 +350,14 @@ impl Os for ScriptedOs {
 
     fn emit(&self, e: &Event) {
         lock(&self.events).push(e.clone());
+    }
+
+    fn open_url(&self, url: &OpenUrl, _ctx: &SpawnCtx) -> Result<(), String> {
+        if *lock(&self.open_fails) {
+            return Err("open exited with Some(1)".to_owned());
+        }
+        lock(&self.opened).push(url.as_str().to_owned());
+        Ok(())
     }
 
     fn now(&self) -> jiff::Timestamp {

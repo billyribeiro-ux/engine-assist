@@ -123,6 +123,9 @@ pub enum SpawnRequest {
         /// Path.
         path: PathBuf,
     },
+    /// `/usr/bin/open -u <url>`: a URL that passed `foreman_core::urls` (SR-25, SR-29). `-u`
+    /// opens it with the app that claims its scheme, even if the text also names a file path.
+    OpenUrl(foreman_core::urls::OpenUrl),
 }
 
 /// How to run it.
@@ -310,6 +313,14 @@ fn program_and_args(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnE
                 Program::Open,
                 vec!["-b".into(), bundle.clone(), path.display().to_string()],
             )
+        }
+        SpawnRequest::OpenUrl(url) => {
+            // Only `https:`/`http:` URLs are constructible, so the argument can't start with `-`;
+            // re-checked here anyway, as every request kind is.
+            if url.as_str().starts_with('-') || !url.as_str().starts_with("http") {
+                return Err(SpawnError::InvalidRequest("open -u needs a URL".into()));
+            }
+            (Program::Open, vec!["-u".into(), url.as_str().to_owned()])
         }
     })
 }
@@ -546,5 +557,19 @@ pub fn path_dir_facts(p: &Path) -> foreman_core::launch::env::DirFacts {
     foreman_core::launch::env::DirFacts {
         is_dir,
         world_writable: is_dir && p.ancestors().any(world),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// SR-25/SR-29: a URL opens as `/usr/bin/open -u <url>` and nothing else.
+    #[test]
+    fn open_url_argv() {
+        let url = foreman_core::urls::foreman_url("https://claude.ai/chat/abc").unwrap();
+        let (p, args) = program_and_args(&SpawnRequest::OpenUrl(url)).unwrap();
+        assert_eq!(p, Program::Open);
+        assert_eq!(args, ["-u", "https://claude.ai/chat/abc"]);
     }
 }

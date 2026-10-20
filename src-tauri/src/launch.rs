@@ -571,6 +571,10 @@ pub fn start(
         p.progress.steps.insert(s.key.clone(), next);
     }
     p.progress.first_launch_done = true;
+    // DR-103: an override is for the next run only; this run used it (logged in `run.json`).
+    if held.over {
+        p.progress.overrides.remove(&s.key);
+    }
     p.save_progress(app)?;
     if let Ok((mut st, sstamp, _)) = app.settings()
         && st.last_seen_claude_version.as_deref() != Some(held.plan.claude_version.as_str())
