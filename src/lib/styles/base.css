@@ -1178,3 +1178,17 @@ details.argv pre {
 		background: var(--sidebar);
 	}
 }
+
+.window > .main,
+.window > .body {
+	flex: 1;
+}
+.skip-link {
+	position: absolute;
+	left: var(--space-3);
+	top: -40px;
+	z-index: 50;
+}
+.skip-link:focus {
+	top: var(--space-3);
+}

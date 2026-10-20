@@ -640,7 +640,12 @@ export class MockIpcClient implements IpcClient {
 			blockers: this.blockers(p, st, false),
 			warnings: st.inputs.filter((i) => i.warning).map((i) => i.warning ?? ''),
 			remaps: st.tpl.key === '2.4' ? [] : [],
-			outs: st.tpl.key === '2.4' ? [{ path: 'spec/council/r7-stack.md', exists: false }] : [],
+			outs:
+				st.tpl.key === '2.4'
+					? [{ path: 'spec/council/r7-stack.md', exists: false }]
+					: st.tpl.key === '2.3'
+						? [{ path: 'spec/council/r6-feature-specs.md', exists: true }]
+						: [],
 			override: this.overrides.get(`${p.id}/${st.tpl.key}`) ?? null,
 			parts: st.parts,
 			copiedAt: st.copiedAt
@@ -703,8 +708,11 @@ export class MockIpcClient implements IpcClient {
 			if (pt.screenReaderMode !== null) s.screenReaderMode = pt.screenReaderMode;
 			if (pt.resetTool)
 				s.tools[pt.resetTool] = { ...s.tools[pt.resetTool], autoDetected: true, problem: null };
-			s.rev += 1;
-			this.emit('settings:changed', { rev: s.rev });
+			const onlyOs = Object.entries(pt).every(([k, v]) => k === 'osDisplay' || v === null);
+			if (!onlyOs) {
+				s.rev += 1;
+				this.emit('settings:changed', { rev: s.rev });
+			}
 			return this.settingsView();
 		});
 	}
