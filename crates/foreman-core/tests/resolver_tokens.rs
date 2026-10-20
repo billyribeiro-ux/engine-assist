@@ -127,6 +127,38 @@ mod resolver {
         ] {
             assert!(resolve(&f.ctx(k)).is_ok() || k == "1.2", "{k}");
         }
+        // M4-05 (AC-F006-15): Stages 3–5 have tokens of their own, each classified above, and
+        // every runnable step there resolves with zero unresolved tokens once its declared run
+        // inputs are filled.
+        let mut f = Fixture::tradelog();
+        let mut by_stage: BTreeMap<u8, usize> = BTreeMap::new();
+        let keys: Vec<(u8, String, Vec<String>)> = f
+            .template
+            .steps
+            .iter()
+            .filter(|s| (3..=5).contains(&s.stage) && s.runnable() && s.prompt.is_some())
+            .map(|s| {
+                (
+                    s.stage,
+                    s.key.to_string(),
+                    s.inputs().iter().map(|i| i.name.clone()).collect(),
+                )
+            })
+            .collect();
+        for (stage, key, declared) in &keys {
+            let step = f.template.step(key).unwrap();
+            let (toks, _) = scan(&step.prompt.as_ref().unwrap().joined(), declared);
+            *by_stage.entry(*stage).or_default() += toks.len();
+            f.inputs = declared
+                .iter()
+                .map(|n| (n.clone(), format!("value of {n}")))
+                .collect();
+            let r = resolve(&f.ctx(key));
+            assert!(r.is_ok(), "{key}: {r:?}");
+        }
+        for n in 3..=5 {
+            assert!(by_stage.get(&n).copied().unwrap_or(0) > 0, "Stage {n}: {by_stage:?}");
+        }
     }
 
     /// AC-F006-03 / DR-083: empty, whitespace, the token itself, or a bracketed placeholder.
