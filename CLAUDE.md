@@ -12,6 +12,7 @@ Read the latest `docs/handoff/stage-NN.md` and `docs/lessons.md`. A stage starts
 - portable-pty 0.9.0, @xterm/xterm 6.0.0, notify 8.2.0, comrak =0.56.0, bits-ui 2.19.5, ts-rs 12.0.1
 - Claude Code ≥ 2.1.293 on the machine; subscription login only (`authMethod` `claude.ai` or `oauth_token`)
 - Full pinned list: `docs/design-doc.md` §3.2, `spec/council/r7-stack.md`
+- Dev tools may lag the newest patch by up to 7 days (pnpm minimumReleaseAge); see docs/dev-notes.md.
 
 ## Layout
 ```

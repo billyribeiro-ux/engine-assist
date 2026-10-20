@@ -95,3 +95,15 @@ Every other planned pin was already old enough and is used as planned. Re-pin to
 - **`trustPolicyExclude: [undici-types@6.21.0]`**: `trustPolicy: no-downgrade` rejected `undici-types@6.21.0` (published 2024-11-13, before that line had provenance). It is type declarations only, has no scripts, and is required by `@types/node` 22.x. Exact-version exclusion; re-check when `@types/node` moves to a newer `undici-types`.
 - **Policy keys** live in `pnpm-workspace.yaml` (`saveExact`, `engineStrict` too); `.npmrc` keeps only the registry.
 - **Proofs run on 2026-10-20** (`scripts/plants/run.sh`): a dependency with a `postinstall` script (`esbuild@0.25.0`) fails `pnpm add` with `ERR_PNPM_IGNORED_BUILDS`; a git-sourced package in the lockfile fails `scripts/check-lockfile-sources.mjs`; a known-vulnerable package (`minimist@1.2.5`) fails `pnpm audit`.
+
+**2026-10-20 · Release-age exceptions (`minimumReleaseAgeExclude`).** Billy requires the latest SvelteKit and Tauri releases, and they are younger than the 7-day gate. `pnpm-workspace.yaml` therefore exempts these exact versions:
+
+- `@sveltejs/kit@3.1.0` (published 2026-10-14 22:35 UTC; removable from 2026-10-21);
+- `@tauri-apps/api@2.12.4` (published 2026-10-14 18:47 UTC; removable from 2026-10-21);
+- `@tauri-apps/cli@2.12.3` (published 2026-10-14 19:50 UTC; removable from 2026-10-21), plus its 11 platform binaries `@tauri-apps/cli-<platform>@2.12.3`, published in the same release.
+
+Scope: these four packages only, each a first-party release from the framework's own npm scope (`@sveltejs`, `@tauri-apps`), reviewed 2026-10-20. Every other package keeps the 7-day gate. The exemption relaxes SR-61's 7-day minimum for these entries only, and only until the expiry date.
+
+Rule: pnpm 12.14.0 does not allow name patterns with versions in `minimumReleaseAgeExclude`, so the platform binaries are listed one by one. Verified 2026-10-20: `'@tauri-apps/cli-*@2.12.3'` fails with "Name patterns are not allowed with version unions".
+
+Expiry: on or after 2026-10-21, confirm each version's age with `npm view <pkg> time --json`, delete the 14 entries, run `pnpm verify`, and add a log line here. The pinned versions stay; only the exemptions go.
