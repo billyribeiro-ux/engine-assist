@@ -246,12 +246,49 @@ mod argv {
         }
     }
 
-    /// SR-04 / DR-122: the prompt is last; every harness CLI step's argv is pinned (M3-27).
+    /// SR-04 / DR-122, AC-F003-02: the prompt is last; every harness CLI step's argv is pinned
+    /// (M3-27). No step is left out silently: the snapshot covers exactly the runnable CLI prompt
+    /// and followup steps on the harness path, each with its resolved prompt.
     #[test]
     fn positional_prompt_snapshot() {
         let fx = Fixture::tradelog();
+        let expected: Vec<String> = fx
+            .template
+            .steps
+            .iter()
+            .filter(|s| {
+                s.runnable()
+                    && s.surface == Some(Surface::Cli)
+                    && matches!(s.kind, StepKind::Prompt | StepKind::Followup)
+                    && fx.path.step(s.key.as_str()).is_some()
+            })
+            .map(|s| s.key.to_string())
+            .collect();
+        let steps = cli_steps(&fx);
+        let covered: Vec<String> = steps.iter().map(|(k, _)| k.clone()).collect();
+        assert_eq!(covered, expected, "a harness CLI step has no argv snapshot");
+        for stage_two in ["2.2", "2.3", "2.4", "2.5", "2.6", "2:F.2"] {
+            assert!(covered.iter().any(|k| k == stage_two), "{stage_two}");
+        }
         let mut lines = Vec::new();
-        for (key, li) in cli_steps(&fx) {
+        for (key, li) in steps {
+            assert!(li.prompt.is_some(), "{key}: the prompt didn't resolve");
+            let argv = fargv::build_argv(&li).unwrap();
+            for banned in [
+                "--bare",
+                "-p",
+                "--print",
+                "--dangerously-skip-permissions",
+                "--allow-dangerously-skip-permissions",
+                "bypassPermissions",
+            ] {
+                assert!(
+                    !argv.as_slice()[..argv.as_slice().len() - 1]
+                        .iter()
+                        .any(|a| a == banned),
+                    "{key}: {banned}"
+                );
+            }
             match fargv::build_argv(&li) {
                 Ok(a) => {
                     if let Some(p) = &li.prompt {
