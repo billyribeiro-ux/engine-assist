@@ -528,12 +528,13 @@ Out-of-order transitions are rejected. In P1 the same sequence is a `manual` che
 **DR-152 · `decisions` · Accept and reject.** Accept (native dialog) re-reads and re-hashes; if the file changed again the review refreshes. Reject writes the approved content back by compare-and-swap; a newer edit is a conflict and the review repeats.
 *Test:* `decisions::reject_restores_via_cas` (AC-F022-02, -05).
 
-**DR-153 · `decisions` · Foreman's own changes.** Written to the approved copy first, then the repo file (rolled back on conflict). Before Stage 5 is signed: committed immediately (DR-143). From Stage 5 on: pending until the next signing commit, and drift is checked against `committedSha256`.
+**DR-153 · `decisions` · Foreman's own changes.** Before Stage 5 is signed: written to the approved copy first, then to the repo file by compare-and-swap (the copy is rolled back on a conflict), and committed immediately (DR-143). From Stage 5 on: written to the approved copy only and held as pending in `progress.json`; the repo file is not touched until the next signing commit writes it, so it keeps the last committed version and drift is checked against `committedSha256` (ADR-022 §5). In both cases an own change is refused (`OutsidePending`) while the repo file holds an outside edit that Billy hasn't accepted or rejected (SR-33, ADR-022 §4); he resolves the pending change first.
+*Reconciled 2026-10-20: the earlier text ("approved copy first, then the repo file" for every stage) contradicted its own drift rule and ADR-022 §5; see progress.md, Known deviations.*
 *Test:* `decisions::pending_from_stage5_not_flagged` (AC-F020-08, -09, AC-F014-14).
 
 ## 13. Lock (`lock`)
 
-**DR-155 · `lock` · Pin.** Pinning writes `.foreman/blueprint.lock.json` (commit, path, normalized `sourceSha256`, blueprint and grammar versions, time, and `{textSha256, kind}` per item) and stores the text in `templates/<sourceSha256>.md`. Re-pinning is allowed only before Stage 1 is signed ("upgrading the pin is v1.1").
+**DR-155 · `lock` · Pin.** Pinning writes `.foreman/blueprint.lock.json` (commit, path, normalized `sourceSha256`, blueprint and grammar versions, time, and `{textSha256, kind}` per item) and stores the text in `templates/<sourceSha256>.md`. Re-pinning is allowed only before Stage 1 is signed ("upgrading the pin is v1.1"). A pin is refused only for a file that differs from HEAD (DR-142) or after Stage 1 is signed; annotation errors do not refuse it (as built in M1): they are listed (AC-F001-15) and make the affected steps not runnable. Whether a pin should also refuse errors in the stages P1 uses is open (progress.md, Known deviations).
 *Test:* `lock::pin_contents`, `lock::repin_window` (AC-F002-01, -03).
 
 **DR-156 · `lock` · Restore and verify.** On open, the template comes from app data by hash; if missing, from `cat-file blob <commit>:<path>` in the blueprint repo, re-hashed. A mismatch, a missing repo or commit, or a missing git opens the project read-only with the reason.
