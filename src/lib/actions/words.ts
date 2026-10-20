@@ -160,6 +160,9 @@ const RULES: Record<string, string> = {
 	'cli-finishes-by-exit': 'CLI steps finish when Claude Code exits, not by marking them done.',
 	'pty-not-live': 'That session has ended.',
 	'needs-rearm': 'This step continues a live session. Run re-arms it.',
+	'background-tasks-running':
+		'Background tasks are still running in the session. Press Run again when Claude is idle.',
+	'shell-not-listed': "Your login shell isn't listed in /etc/shells, so Foreman won't run it.",
 	'no-editor-set': 'Set an editor in Settings to open files.',
 	'not-signable': 'Sign is locked until the gate passes and the packet is valid.',
 	'note-too-short': 'Write at least 15 characters on how you checked.',

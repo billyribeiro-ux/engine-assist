@@ -20,6 +20,8 @@ pub enum CheckGroup {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum CheckAction {
     CaptureLoginPath,
+    /// P2 (M3-18): open `claude` in the probe folder so Billy can trust it.
+    OpenProbeFolder,
 }
 
 response!(

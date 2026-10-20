@@ -100,6 +100,54 @@
 			"action": null
 		},
 		{
+			"id": "sensor",
+			"group": "claude",
+			"name": "Session sensor",
+			"level": "ok",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "plain",
+					"text": "Installed in Foreman's app data and checked before every run. Its events only update what Foreman shows."
+				}
+			],
+			"found": "installed",
+			"foundMono": false,
+			"action": null
+		},
+		{
+			"id": "probeFolder",
+			"group": "claude",
+			"name": "Probe folder trusted",
+			"level": "ok",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "plain",
+					"text": "Contract probes run in Foreman's own folder, never in a project."
+				}
+			],
+			"found": "yes",
+			"foundMono": false,
+			"action": "openProbeFolder"
+		},
+		{
+			"id": "appendixA",
+			"group": "claude",
+			"name": "One-time setup",
+			"level": "ok",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "plain",
+					"text": "The blueprint's one-time setup (Appendix A: user settings, global agents, CLAUDE.md) is in place."
+				}
+			],
+			"found": "10 of 10",
+			"foundMono": false,
+			"action": null
+		},
+		{
 			"id": "hooks",
 			"group": "claude",
 			"name": "Hooks enabled",
@@ -133,6 +181,22 @@
 			],
 			"found": "1 rule",
 			"foundMono": false,
+			"action": null
+		},
+		{
+			"id": "git",
+			"group": "toolchain",
+			"name": "git",
+			"level": "ok",
+			"summary": null,
+			"detail": [
+				{
+					"kind": "plain",
+					"text": "At /usr/bin/git. No version floor: Foreman only shows it."
+				}
+			],
+			"found": "git version 2.51.0",
+			"foundMono": true,
 			"action": null
 		}
 	],

@@ -707,3 +707,34 @@ mod fs_policy {
         assert!(!q.t.home().join(".claude/settings.json").exists());
     }
 }
+
+mod capture {
+    use super::*;
+
+    /// AC-F013-14 end to end (M4-23 with M4-08/M4-09): a real run gets a sensor token, the fake
+    /// session's reply reaches `last_assistant_message` through the hooks and the real sensor,
+    /// and paste-back "Capture from session" previews exactly that reply (nothing written).
+    #[test]
+    fn reply_captured_end_to_end() {
+        let p = with_sensor(json!({}));
+        let (r, _) = start(&p, "2.2");
+        let id = r.run_id.as_str().to_owned();
+        assert!(run_json(&p, &id)["sensorToken"].is_string());
+        say(&p, &id, "the council is done");
+        wait_until("idle", || statuses(&p, &id).contains(&RunStatus::Idle));
+        let root = foreman_core::store::Root::open_app_data(&p.t.app_data()).unwrap();
+        assert_eq!(
+            foreman_app::sensor_ingest::last_assistant_message(&root, &id).as_deref(),
+            Some("ECHO: the council is done")
+        );
+        let pv = foreman_app::ipc::commands::chat::paste_back_preview(
+            &p.t.app,
+            req(json!({ "projectId": p.id, "step": "2.2", "kind": "output", "source": "sensor" })),
+        )
+        .map(|v| serde_json::to_value(v).unwrap());
+        let pv = pv.unwrap_or_else(|e| panic!("{e:?}"));
+        assert!(pv.to_string().contains("ECHO: the council is done"), "{pv}");
+        assert!(!p.project.join("spec/council/r1-market.md").exists());
+        p.t.app.runs().hangup_all();
+    }
+}

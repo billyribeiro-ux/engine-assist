@@ -297,6 +297,44 @@ export function doctorFor(version: string, firstRun: boolean): World['doctor'] {
 				'30 days'
 			),
 			check(
+				'sensor',
+				'claude',
+				'Session sensor',
+				'ok',
+				[
+					plain(
+						"Installed in Foreman's app data and checked before every run. Its events only update what Foreman shows."
+					)
+				],
+				'installed',
+				false
+			),
+			{
+				...check(
+					'probeFolder',
+					'claude',
+					'Probe folder trusted',
+					'ok',
+					[plain("Contract probes run in Foreman's own folder, never in a project.")],
+					'yes',
+					false
+				),
+				action: 'openProbeFolder'
+			},
+			check(
+				'appendixA',
+				'claude',
+				'One-time setup',
+				'ok',
+				[
+					plain(
+						"The blueprint's one-time setup (Appendix A: user settings, global agents, CLAUDE.md) is in place."
+					)
+				],
+				'10 of 10',
+				false
+			),
+			check(
 				'hooks',
 				'claude',
 				'Hooks enabled',
@@ -318,12 +356,48 @@ export function doctorFor(version: string, firstRun: boolean): World['doctor'] {
 				false
 			),
 			check(
+				'git',
 				'toolchain',
-				'toolchain',
-				'git, node, pnpm, cargo',
+				'git',
 				'ok',
-				[plain('Found at fixed paths with '), code('--version'), plain(' only.')],
-				'2.51.0 · 22.17.1 · 12.14.0 · 1.90.0'
+				[plain('At /usr/bin/git. No version floor: Foreman only shows it.')],
+				'git version 2.51.0'
+			),
+			check(
+				'node',
+				'toolchain',
+				'node',
+				'ok',
+				[plain('At /opt/homebrew/bin/node, run with '), code('--version'), plain(' only.')],
+				'v22.17.1'
+			),
+			check(
+				'pnpm',
+				'toolchain',
+				'pnpm',
+				'ok',
+				[plain('At /opt/homebrew/bin/pnpm, run with '), code('--version'), plain(' only.')],
+				'12.14.0'
+			),
+			check(
+				'cargo',
+				'toolchain',
+				'cargo',
+				'ok',
+				[plain('At ~/.cargo/bin/cargo, run with '), code('--version'), plain(' only.')],
+				'cargo 1.99.1'
+			),
+			check(
+				'launchPath',
+				'toolchain',
+				'PATH for launches',
+				'ok',
+				[
+					plain(
+						'What every launch gets: /etc/paths, Homebrew, ~/.cargo/bin, pnpm, then your login PATH. Missing, relative, world-writable and in-project folders are dropped.'
+					)
+				],
+				'/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/Users/billy/.cargo/bin'
 			),
 			{
 				...check(

@@ -81,9 +81,8 @@ const BROAD_RULES: [&str; 6] = [
     "Bash(bunx *)",
 ];
 /// Interpreters: an allow rule that starts one runs any program (AC-F019-10).
-const INTERPRETERS: [&str; 10] = [
-    "python", "python3", "node", "ruby", "perl", "bash", "sh", "zsh", "deno", "bun",
-];
+/// (One string, matched word by word: these are rule text to flag, never programs Foreman runs.)
+const INTERPRETERS: &str = "python python3 node ruby perl bash sh zsh deno bun";
 
 /// The Claude Code floor (CLAUDE.md: ≥ 2.1.293; the highest minimum in the compat table).
 fn floor() -> String {
@@ -336,7 +335,7 @@ fn is_broad(rule: &str) -> bool {
         return false;
     };
     let first = inner.split([' ', ':']).next().unwrap_or_default();
-    INTERPRETERS.contains(&first) || first == "*"
+    INTERPRETERS.split_whitespace().any(|i| i == first) || first == "*"
 }
 
 fn appendix_a(app: &App, settings_found: bool) -> DoctorCheck {
@@ -445,6 +444,7 @@ fn sensor_row(app: &App) -> DoctorCheck {
 fn probe_folder_row(s: &SettingsFile) -> DoctorCheck {
     DoctorCheck {
         found_mono: false,
+        action: Some(CheckAction::OpenProbeFolder),
         ..check(
             "probeFolder",
             "Probe folder trusted",
@@ -576,7 +576,7 @@ fn path_rows(app: &App, s: &SettingsFile, ctx: &spawn::SpawnCtx) -> Vec<DoctorCh
             ),
         ]),
         ..check(
-            "path",
+            "launchPath",
             "PATH for launches",
             if built.entries.is_empty() {
                 DoctorLevel::Failing

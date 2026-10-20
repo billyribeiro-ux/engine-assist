@@ -162,7 +162,7 @@ mod doctor_rows {
             Some(CheckAction::CaptureLoginPath)
         );
         // The PATH launches get is shown (AC-F019-14).
-        assert!(row(&r, "path").found.is_some());
+        assert!(row(&r, "launchPath").found.is_some());
         // No sensor in this build: said so, and probes are off with the reason.
         assert_eq!(row(&r, "sensor").level, DoctorLevel::Unknown);
         assert!(

@@ -10,6 +10,7 @@
 	import type { DoctorCheck, LoginPathPreview } from '#lib/ipc/types.ts';
 	import { refresh } from '#lib/stores/bus.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
+	import { pendingOutput, terminal } from '#lib/stores/terminal.svelte.ts';
 	import { ui } from '#lib/stores/ui.svelte.ts';
 	import Text from '#lib/render/Text.svelte';
 
@@ -44,6 +45,36 @@
 			ui.say(f.code === 'cancelled' ? 'Cancelled. No shell was started.' : failureText(f));
 		}
 	}
+	// M3-18: Claude Code in the probe folder, in a terminal tab, to answer the trust question.
+	async function openProbe(): Promise<void> {
+		const c = await ipc();
+		const out = pendingOutput();
+		try {
+			const r = await c.probeFolderOpen({}, out.cb);
+			out.bind(r.runId);
+			terminal.add(r, null);
+			if (!ui.drawerOpen) ui.toggleDrawer();
+			ui.toast('Probe folder opened in a terminal tab. Answer Claude Code there.');
+			void report.reload();
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
+		}
+	}
+	// M4-12: the contract probes now (zero tokens, in the probe folder).
+	let probing = $state(false);
+	async function runProbes(): Promise<void> {
+		const c = await ipc();
+		probing = true;
+		try {
+			const r = await c.probeRun({});
+			ui.toast(`Contract probes ran on ${r.version}`);
+			void report.reload();
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
+		} finally {
+			probing = false;
+		}
+	}
 	async function apply(): Promise<void> {
 		if (!preview) return;
 		const c = await ipc();
@@ -72,6 +103,8 @@
 				<span class="detail"><Text spans={c.detail} /></span>
 				{#if c.action === 'captureLoginPath'}
 					<button class="btn" type="button" onclick={capture}>Capture my login shell PATH</button>
+				{:else if c.action === 'openProbeFolder'}
+					<button class="btn" type="button" onclick={openProbe}>Open probe folder</button>
 				{:else}
 					<span class={['found', c.foundMono && 'mono']}>{c.found ?? '—'}</span>
 				{/if}
@@ -141,6 +174,9 @@
 				<section class="section" aria-labelledby="probe-h">
 					<div class="section-head">
 						<h2 class="section-title" id="probe-h">Contract probes</h2>
+						<button class="btn" type="button" onclick={runProbes} disabled={probing}
+							>{probing ? 'Running probes…' : 'Run probes now'}</button
+						>
 					</div>
 					<p class="page-sub small">
 						Run in the trusted probe folder when the version changes. They cost no tokens.
