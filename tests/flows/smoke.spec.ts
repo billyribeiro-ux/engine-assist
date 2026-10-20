@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 test('Today renders against the mock with no axe violations', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
-	await expect(page.getByText('Welcome to Foreman.')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Next step in each project' })).toBeVisible();
 
 	const axe = await new AxeBuilder({ page }).analyze();
 	expect(axe.violations).toEqual([]);

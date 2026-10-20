@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
+import { failing, fresh, said } from '#lib/test/screen.ts';
 
 import Today from './Today.svelte';
 
@@ -34,7 +34,9 @@ describe('Today', () => {
 	it('empty: no projects offers the first project', async () => {
 		fresh('empty');
 		const s = await render(Today);
-		await expect.element(s.getByRole('heading', { name: 'Start your first project' })).toBeVisible();
+		await expect
+			.element(s.getByRole('heading', { name: 'Start your first project' }))
+			.toBeVisible();
 		await expect.element(s.getByRole('link', { name: /Start your first project/ })).toBeVisible();
 	});
 
@@ -48,6 +50,8 @@ describe('Today', () => {
 	it('not applicable: a read-only project with its folder missing has nothing to run', async () => {
 		fresh('readOnly');
 		const s = await render(Today);
-		await expect.element(s.getByText('Nothing here runs until the folder is back.').first()).toBeVisible();
+		await expect
+			.element(s.getByText('Nothing here runs until the folder is back.').first())
+			.toBeVisible();
 	});
 });

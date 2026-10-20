@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
+import { failing, fresh, IDS, project } from '#lib/test/screen.ts';
 
 import Assembler from './Assembler.svelte';
 
@@ -19,7 +19,13 @@ describe('Assembler', () => {
 		const p = await project(m, IDS.tradelog);
 		const s = await render(Assembler, { project: p });
 		await expect.element(s.getByText('No build package yet')).toBeVisible();
-		await expect.element(s.getByRole('link', { name: 'Open Stage 4' }).or(s.getByRole('button', { name: 'Open Stage 4' }))).toBeVisible();
+		await expect
+			.element(
+				s
+					.getByRole('link', { name: 'Open Stage 4' })
+					.or(s.getByRole('button', { name: 'Open Stage 4' }))
+			)
+			.toBeVisible();
 	});
 
 	it('error: a failed load is shown', async () => {

@@ -43,7 +43,9 @@ const RULES: { name: string; re: RegExp }[] = [
 
 describe('design tokens', () => {
 	it('src/lib/styles/tokens.css is the design token file, byte for byte', () => {
-		expect(readFileSync(tokensPath, 'utf8')).toBe(readFileSync(join(root, 'docs/design/tokens.css'), 'utf8'));
+		expect(readFileSync(tokensPath, 'utf8')).toBe(
+			readFileSync(join(root, 'docs/design/tokens.css'), 'utf8')
+		);
 	});
 
 	it('no hard-coded design values outside tokens.css (AC-XC-26 lint)', () => {
@@ -51,17 +53,39 @@ describe('design tokens', () => {
 		for (const f of files(join(root, 'src'))) {
 			const lines = css(f).split('\n');
 			lines.forEach((line, i) => {
-				for (const r of RULES) if (r.re.test(line)) problems.push(`${relative(root, f)}:${i + 1} ${r.name}: ${line.trim()}`);
+				for (const r of RULES)
+					if (r.re.test(line))
+						problems.push(`${relative(root, f)}:${i + 1} ${r.name}: ${line.trim()}`);
 			});
 		}
 		expect(problems).toEqual([]);
 	});
 
 	it('the lint catches planted violations', () => {
-		const planted = ['color: #ff0000;', 'background: rgba(0, 0, 0, 0.5);', 'font-size: 13px;', 'font-family: Arial;', 'transition: opacity 200ms;', 'border-radius: 6px;', 'padding: 8px 12px;'];
-		for (const p of planted) expect(RULES.some((r) => r.re.test(p)), p).toBe(true);
-		for (const ok of ['color: var(--ink);', 'padding: 6px var(--space-3);', 'border-radius: 50%;', 'gap: 7px;'])
-			expect(RULES.some((r) => r.re.test(ok)), ok).toBe(false);
+		const planted = [
+			'color: #ff0000;',
+			'background: rgba(0, 0, 0, 0.5);',
+			'font-size: 13px;',
+			'font-family: Arial;',
+			'transition: opacity 200ms;',
+			'border-radius: 6px;',
+			'padding: 8px 12px;'
+		];
+		for (const p of planted)
+			expect(
+				RULES.some((r) => r.re.test(p)),
+				p
+			).toBe(true);
+		for (const ok of [
+			'color: var(--ink);',
+			'padding: 6px var(--space-3);',
+			'border-radius: 50%;',
+			'gap: 7px;'
+		])
+			expect(
+				RULES.some((r) => r.re.test(ok)),
+				ok
+			).toBe(false);
 	});
 });
 
@@ -73,7 +97,8 @@ function block(text: string, selector: RegExp): Theme {
 	if (!m) return out;
 	const start = text.indexOf('{', m.index) + 1;
 	const end = text.indexOf('}', start);
-	for (const d of text.slice(start, end).matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) if (d[1] && d[2]) out[d[1]] = d[2].trim();
+	for (const d of text.slice(start, end).matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g))
+		if (d[1] && d[2]) out[d[1]] = d[2].trim();
 	return out;
 }
 function themes(): { night: Theme; vellum: Theme } {
@@ -90,7 +115,11 @@ function resolve(t: Theme, v: string, depth = 0): string {
 function lum(hex: string): number {
 	const h = hex.replace('#', '');
 	const c = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-	const [r, g, b] = c.map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)) as [number, number, number];
+	const [r, g, b] = c.map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)) as [
+		number,
+		number,
+		number
+	];
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 function ratio(a: string, b: string): number {

@@ -11,15 +11,23 @@ import { visibleText } from './escape.ts';
 import Text from './Text.svelte';
 
 const cp = (...c: number[]) => String.fromCodePoint(...c);
-const HOSTILE = '<script>window.__pwned=1</script><img src=x onerror="window.__pwned=2"><b>bold</b>';
+const HOSTILE =
+	'<script>window.__pwned=1</script><img src=x onerror="window.__pwned=2"><b>bold</b>';
 
 describe('render', () => {
 	it('render::escapes_html_in_packet', async () => {
 		const nodes: DocNode[] = [
 			{ kind: 'heading', level: 2, spans: [{ kind: 'plain', text: HOSTILE }] },
-			{ kind: 'paragraph', spans: [{ kind: 'strong', children: [{ kind: 'plain', text: HOSTILE }] }] },
+			{
+				kind: 'paragraph',
+				spans: [{ kind: 'strong', children: [{ kind: 'plain', text: HOSTILE }] }]
+			},
 			{ kind: 'codeBlock', info: 'html', text: HOSTILE },
-			{ kind: 'list', ordered: false, items: [[{ kind: 'paragraph', spans: [{ kind: 'code', text: HOSTILE }] }]] }
+			{
+				kind: 'list',
+				ordered: false,
+				items: [[{ kind: 'paragraph', spans: [{ kind: 'code', text: HOSTILE }] }]]
+			}
 		];
 		const s = await render(Doc, { nodes });
 		const el = s.container;
@@ -44,7 +52,7 @@ describe('render', () => {
 		const offenders = Object.entries(sources)
 			.filter(([, text]) =>
 				/\{@html|\.innerHTML\b|\.outerHTML\b|insertAdjacentHTML/.test(
-					String(text).replace(/\/\/.*$|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/gm, '')
+					text.replace(/\/\/.*$|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/gm, '')
 				)
 			)
 			.map(([p]) => p);
@@ -57,7 +65,13 @@ describe('render', () => {
 		const diff: DiffT = {
 			path: 'src/auth.rs',
 			exists: true,
-			hunks: [{ oldStart: 1, newStart: 1, lines: [{ op: 'add', spans: [{ kind: 'plain', text: sneaky }] }] }]
+			hunks: [
+				{
+					oldStart: 1,
+					newStart: 1,
+					lines: [{ op: 'add', spans: [{ kind: 'plain', text: sneaky }] }]
+				}
+			]
 		};
 		const s = await render(Diff, { diff, label: 'Diff of auth.rs' });
 		const text = s.container.textContent;
@@ -65,7 +79,9 @@ describe('render', () => {
 		expect(text).toContain('<LRI U+2066>');
 		expect(text).toContain('<PDI U+2069>');
 		for (const c of [0x202e, 0x2066, 0x2069]) expect(text.includes(cp(c))).toBe(false);
-		await expect.element(s.getByRole('img', { name: 'hidden character <RLO U+202E>' })).toBeVisible();
+		await expect
+			.element(s.getByRole('img', { name: 'hidden character <RLO U+202E>' }))
+			.toBeVisible();
 		// The + sign is a character, not just color.
 		expect(s.container.querySelector('.add .sign')?.textContent).toBe('+');
 	});

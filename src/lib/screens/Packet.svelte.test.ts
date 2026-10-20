@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
+import { failing, fresh, IDS, project } from '#lib/test/screen.ts';
 
 import Packet from './Packet.svelte';
 

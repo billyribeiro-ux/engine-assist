@@ -600,7 +600,10 @@ export class MockIpcClient implements IpcClient {
 	private viewOfStep(p: MProject, st: MStep): T.StepView {
 		const chatStarted =
 			st.tpl.key.startsWith('1.') &&
-			(p.stages[1]?.steps.some((x) => ['done', 'copied', 'running'].includes(x.state) || x.copiedAt !== null) ?? false);
+			(p.stages[1]?.steps.some(
+				(x) => ['done', 'copied', 'running'].includes(x.state) || x.copiedAt !== null
+			) ??
+				false);
 		const isChat = st.tpl.surface === 'chat';
 		const chips: T.ChatChips | null = isChat
 			? {
@@ -620,9 +623,7 @@ export class MockIpcClient implements IpcClient {
 							? [{ id: 'research', label: 'Research off', strong: false }]
 							: [])
 					],
-					link: chatStarted
-						? 'https://claude.ai/chat/7c1e9a4b-2d3f-4e5a-8b6c-7d8e9f0a1f04'
-						: null,
+					link: chatStarted ? 'https://claude.ai/chat/7c1e9a4b-2d3f-4e5a-8b6c-7d8e9f0a1f04' : null,
 					linkLabel: chatStarted ? 'claude.ai/chat/7c1e…f04' : null
 				}
 			: null;

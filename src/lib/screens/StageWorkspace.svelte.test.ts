@@ -12,14 +12,18 @@ describe('StageWorkspace', () => {
 		const p = await project(m, IDS.tradelog);
 		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
 		await s.getByRole('button', { name: 'Copy prompt' }).click();
-		await vi.waitFor(() => expect(m.getClipboard()).toContain('Recommend the best stack for TradeLog'));
+		await vi.waitFor(() =>
+			expect(m.getClipboard()).toContain('Recommend the best stack for TradeLog')
+		);
 	});
 
 	it('locked: a step that waits for a running step says why next to Run', async () => {
 		const m = fresh('happy');
 		const p = await project(m, IDS.tradelog);
 		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
-		await expect.element(s.getByText(/Waits for 2\.3: Claude is still working in this session/)).toBeVisible();
+		await expect
+			.element(s.getByText(/Waits for 2\.3: Claude is still working in this session/))
+			.toBeVisible();
 	});
 
 	it('not applicable: the step says why, with the condition', async () => {

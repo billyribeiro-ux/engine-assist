@@ -101,6 +101,8 @@
 			macOptionIsMeta: true,
 			disableStdin: !live,
 			cursorBlink: false,
+			// WCAG 2.2 AA for terminal text too, dim (SGR 2) included: xterm adjusts the foreground.
+			minimumContrastRatio: 4.5,
 			allowProposedApi: false,
 			theme: theme(),
 			linkHandler: {
@@ -180,6 +182,11 @@
 		min-width: 0;
 		overflow: hidden;
 		padding: 0 var(--space-3);
+	}
+	/* SGR 2 (dim) text: xterm's DOM renderer draws it at 50% alpha, which fails AA on --term-bg.
+	   Dim maps to the muted terminal ink instead, which passes in both themes (AC-XC-24). */
+	.term-host :global(.xterm .xterm-rows .xterm-dim) {
+		color: var(--term-muted);
 	}
 	.term-host :global(.xterm) {
 		height: 100%;

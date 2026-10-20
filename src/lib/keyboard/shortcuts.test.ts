@@ -1,7 +1,14 @@
 // M2-26 / M4-33 (AC-F028-01, AC-F028-03): one shortcut table, one matcher, layered handlers.
 import { describe, expect, it } from 'vitest';
 
-import { type KeyLike, handlerFor, match, NOT_HERE, registerShortcuts, SHORTCUTS } from './registry.ts';
+import {
+	type KeyLike,
+	handlerFor,
+	match,
+	NOT_HERE,
+	registerShortcuts,
+	SHORTCUTS
+} from './registry.ts';
 
 const key = (k: string, mods: Partial<KeyLike> = {}): KeyLike => ({
 	key: k,
@@ -36,7 +43,8 @@ describe('shortcuts', () => {
 			[cmd('3'), 'pinned', 3],
 			[cmd('9'), 'pinned', 9]
 		];
-		for (const [e, id, arg] of cases) expect(match(e, true), `${id}`).toEqual(arg === undefined ? { id } : { id, arg });
+		for (const [e, id, arg] of cases)
+			expect(match(e, true), id).toEqual(arg === undefined ? { id } : { id, arg });
 		const listed = new Set(SHORTCUTS.map((s) => s.id));
 		for (const [, id] of cases) expect(listed.has(id as never), id).toBe(true);
 	});
@@ -53,7 +61,7 @@ describe('shortcuts', () => {
 	it('the newest layer wins and unregistering restores the one below', () => {
 		const app = () => 'app' as const;
 		const screen = () => true as const;
-		const offApp = registerShortcuts({ run: app as never, markDone: app as never });
+		const offApp = registerShortcuts({ run: app, markDone: app });
 		const offScreen = registerShortcuts({ run: screen });
 		expect(handlerFor('run')).toBe(screen);
 		expect(handlerFor('markDone')).toBe(app);
@@ -64,7 +72,15 @@ describe('shortcuts', () => {
 	});
 
 	it('every action that can be unavailable has a one-line reason (AC-F028-03)', () => {
-		for (const id of ['run', 'copyPrompt', 'copyCommand', 'pasteBack', 'markDone', 'focusMode', 'pinned'] as const) {
+		for (const id of [
+			'run',
+			'copyPrompt',
+			'copyCommand',
+			'pasteBack',
+			'markDone',
+			'focusMode',
+			'pinned'
+		] as const) {
 			expect(NOT_HERE[id]).toMatch(/^[A-Z].+\.$/);
 		}
 	});

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
+import { fresh } from '#lib/test/screen.ts';
 
 import { userEvent } from 'vitest/browser';
 
@@ -20,7 +20,9 @@ describe('Setup', () => {
 		await s.getByRole('button', { name: 'Choose…' }).click();
 		await s.getByRole('textbox', { name: /Rough idea/ }).fill('A ledger for my receipts.');
 		await s.getByRole('textbox', { name: /Who it's for/ }).fill('Me and my accountant.');
-		await vi.waitFor(() => expect(s.container.textContent.match(/Fix \d+ fields? first[^.]*\./)?.[0]).toBeUndefined());
+		await vi.waitFor(() =>
+			expect(/Fix \d+ fields? first[^.]*\./.exec(s.container.textContent)?.[0]).toBeUndefined()
+		);
 		await s.getByRole('button', { name: 'Create project' }).click();
 		await vi.waitFor(() => expect(apply).toHaveBeenCalled());
 	});
@@ -28,7 +30,9 @@ describe('Setup', () => {
 	it('locked: Create names the fields to fix first', async () => {
 		fresh('happy');
 		const s = await render(Setup);
-		await expect.element(s.getByText("Fix 4 fields first: Name, Folder, Rough idea, Who it's for.")).toBeVisible();
+		await expect
+			.element(s.getByText("Fix 4 fields first: Name, Folder, Rough idea, Who it's for."))
+			.toBeVisible();
 	});
 
 	it('empty: no folder yet, so no file preview', async () => {

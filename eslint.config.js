@@ -90,7 +90,13 @@ export default defineConfig(
 				{ name: 'WebSocket', message: 'SR-60: no network.' },
 				{ name: 'EventSource', message: 'SR-60: no network.' }
 			],
-			'@typescript-eslint/consistent-type-imports': 'error',
+			'@typescript-eslint/consistent-type-imports': 'error'
+		}
+	},
+	{
+		// Typed rules: only for files with type information (not the plain .js configs).
+		files: ['**/*.ts', '**/*.svelte'],
+		rules: {
 			// Numbers in template literals are routine in UI text ("Stage 2 of 19").
 			'@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
 			// `onclick={() => ui.toggleDrawer()}` is the idiomatic Svelte handler shape.

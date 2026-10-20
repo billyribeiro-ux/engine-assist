@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
+import { failing, fresh } from '#lib/test/screen.ts';
 
 import Doctor from './Doctor.svelte';
 
@@ -26,7 +26,9 @@ describe('Doctor', () => {
 	it('empty: an uncaptured login PATH offers the capture', async () => {
 		fresh('happy');
 		const s = await render(Doctor);
-		await expect.element(s.getByRole('button', { name: 'Capture my login shell PATH' })).toBeVisible();
+		await expect
+			.element(s.getByRole('button', { name: 'Capture my login shell PATH' }))
+			.toBeVisible();
 	});
 
 	it('error: a failed run is announced', async () => {

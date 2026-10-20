@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
-import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
+import { failing, fresh } from '#lib/test/screen.ts';
 
 import RunLog from './RunLog.svelte';
 
@@ -12,7 +12,9 @@ describe('RunLog', () => {
 		const s = await render(RunLog);
 		const show = s.getByRole('button', { name: 'Show command' }).first();
 		await show.click();
-		await expect.element(s.getByRole('button', { name: 'Hide command' })).toHaveAttribute('aria-expanded', 'true');
+		await expect
+			.element(s.getByRole('button', { name: 'Hide command' }))
+			.toHaveAttribute('aria-expanded', 'true');
 		expect(s.container.querySelector('.argv-row pre')?.textContent).toMatch(/claude/);
 	});
 
@@ -34,7 +36,9 @@ describe('RunLog', () => {
 		const s = await render(RunLog);
 		await s.getByRole('radio', { name: 'Interrupted' }).click();
 		await expect.element(s.getByText('Transcript removed after 30 days')).toBeVisible();
-		await expect.element(s.getByRole('button', { name: 'Start a fresh chain with context' })).toBeVisible();
+		await expect
+			.element(s.getByRole('button', { name: 'Start a fresh chain with context' }))
+			.toBeVisible();
 		expect(s.container.querySelectorAll('tbody tr').length).toBe(1);
 	});
 
