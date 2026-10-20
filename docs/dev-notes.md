@@ -77,7 +77,7 @@ Rust ran with `RUSTUP_TOOLCHAIN=1.97.0`: rust 1.99.1 can't be downloaded here (s
 | bindings-drift | regenerating the bindings changes nothing |
 | core-deps | foreman-core has no tauri/tokio/portable-pty/notify/reqwest/hyper; foreman-sys no tauri |
 | cargo-deny (graph `aarch64-apple-darwin`) | advisories, bans, licenses, sources ok; also `deny-e2e.toml` with `--features e2e` |
-| cargo-audit `--deny warnings` | ok (two Linux-only GTK advisories ignored with reasons in `.cargo/audit.toml`) |
+| cargo-audit `--deny warnings` | ok (five Linux-only advisories ignored with reasons in `.cargo/audit.toml`; RUSTSEC-2026-0370, -0371 and -0372 (the zbus family) arrived with the notification plugin, M4-25) |
 | pnpm audit `--audit-level low` | no known vulnerabilities |
 | secret-scan (gitleaks 8.30.1, `dir`) | no leaks |
 | license-check | 193 JS packages, all allowed; Rust licenses via cargo-deny |

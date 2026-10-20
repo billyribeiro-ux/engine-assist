@@ -1,12 +1,16 @@
 # cargo-audit (SR-61). cargo-audit scans every lockfile entry regardless of target; cargo-deny
 # (deny.toml, graph target aarch64-apple-darwin) is the target-filtered advisory gate.
-# Each ignore below is for a crate that is ONLY in the Linux GTK graph of tauri/wry/tao/muda and
+# Each ignore below is for a crate that is ONLY in the Linux graph (GTK of tauri/wry/tao/muda, or
+# the D-Bus notification path of tauri-plugin-notification) and
 # absent from `cargo tree --target aarch64-apple-darwin` (checked 2026-10-20). Re-check each
 # Stage Gate; remove an entry when upstream moves off the crate.
 [advisories]
 ignore = [
   "RUSTSEC-2024-0370", # proc-macro-error unmaintained: via glib-macros 0.18 (Linux GTK only)
   "RUSTSEC-2024-0429", # glib 0.18 VariantStrIter unsound: via gtk 0.18 (Linux GTK only)
+  "RUSTSEC-2026-0370", # zvariant unmaintained: same zbus path as RUSTSEC-2026-0371 (Linux D-Bus only)
+  "RUSTSEC-2026-0372", # zvariant_derive unmaintained: same zbus path as RUSTSEC-2026-0371 (Linux D-Bus only)
+  "RUSTSEC-2026-0371", # zbus_names unmaintained: via zbus 5 <- notify-rust <- tauri-plugin-notification (Linux D-Bus only; `cargo tree -i zbus_names --target aarch64-apple-darwin` is empty, checked 2026-10-20)
 ]
 informational_warnings = ["unmaintained", "unsound", "yanked"]
 

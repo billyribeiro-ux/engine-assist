@@ -605,8 +605,8 @@
 					"next": true
 				},
 				{
-					"key": "x-2-3",
-					"number": "x‑2‑3",
+					"key": "x-2-2",
+					"number": "x‑2‑2",
 					"title": "Check the stack against the NFRs",
 					"state": "notStarted",
 					"tag": "added",
@@ -640,7 +640,7 @@
 						"note": null
 					},
 					"whyNotRunnable": "Added steps always confirm before running.",
-					"stateText": "Not started, added",
+					"stateText": "Not started, optional",
 					"conditionNote": null,
 					"kind": "followup",
 					"run": null,
