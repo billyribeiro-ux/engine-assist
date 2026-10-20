@@ -34,7 +34,13 @@
 {/snippet}
 
 <svg
-	class={[size !== 'none' && 'icon', size === 'sm' && 'sm', size === 'glyph' && 'glyph', tone && `glyph-${tone}`, cls]}
+	class={[
+		size !== 'none' && 'icon',
+		size === 'sm' && 'sm',
+		size === 'glyph' && 'glyph',
+		tone && `glyph-${tone}`,
+		cls
+	]}
 	viewBox="0 0 16 16"
 	aria-hidden="true"
 	focusable="false"

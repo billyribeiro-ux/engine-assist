@@ -56,7 +56,11 @@
 		if (returnTo instanceof HTMLElement) returnTo.focus();
 	}
 
-	const SURFACE_ICON: Record<Surface, IconName> = { cli: 'terminal', chat: 'chat', desktop: 'desktop' };
+	const SURFACE_ICON: Record<Surface, IconName> = {
+		cli: 'terminal',
+		chat: 'chat',
+		desktop: 'desktop'
+	};
 
 	const items: Item[] = $derived.by(() => {
 		const out: Item[] = [];
@@ -70,7 +74,7 @@
 						st.state === 'done'
 							? 'done'
 							: st.next && st.whyNotRunnable
-								? st.whyNotRunnable.split(':')[0]?.toLowerCase() ?? ''
+								? (st.whyNotRunnable.split(':')[0]?.toLowerCase() ?? '')
 								: st.stateText.toLowerCase();
 					out.push({
 						id: `step-${v.summary.id}-${st.key}`,
@@ -80,7 +84,13 @@
 						sub: `${v.summary.name}, Stage ${s.stage}, ${state}`,
 						hint: '↵ open',
 						open: () => goto(to.step(v.summary.id, s.stage, st.key)),
-						run: () => runStep({ projectId: v.summary.id, step: st.key, surface: st.surface, entry: 'palette' }).then(report)
+						run: () =>
+							runStep({
+								projectId: v.summary.id,
+								step: st.key,
+								surface: st.surface,
+								entry: 'palette'
+							}).then(report)
 					});
 				}
 		}
@@ -94,19 +104,82 @@
 				hint: '⌘⇧C',
 				open: async () => {
 					const c = await ipc();
-					await c.clipboardCopy({ projectId: proj.summary.id, target: 'prompt', step: sel.key, chain: null, path: null, stage: null });
+					await c.clipboardCopy({
+						projectId: proj.summary.id,
+						target: 'prompt',
+						step: sel.key,
+						chain: null,
+						path: null,
+						stage: null
+					});
 					ui.toast('Prompt copied', 'pass', 'copy');
 				}
 			});
 		}
 		out.push(
-			{ id: 'do-next', group: 'Actions', icon: 'play', title: 'Do next', sub: 'the top project’s next step', hint: '⌘⇧↵', open: () => doNext().then(report) },
-			{ id: 'new', group: 'Actions', icon: 'plus', title: 'New project', sub: '', hint: '⌘N', open: () => goto(to.setup()) },
-			{ id: 'drawer', group: 'Actions', icon: 'drawer', title: 'Toggle terminal drawer', sub: '', hint: '⌃`', open: () => ui.toggleDrawer() },
-			{ id: 'run-log', group: 'Actions', icon: 'log', title: 'Open the run log', sub: '', hint: '', open: () => goto(to.runLog()) },
-			{ id: 'doctor', group: 'Actions', icon: 'pulse', title: 'Run Doctor', sub: '', hint: '', open: () => goto(to.doctor()) },
-			{ id: 'health', group: 'Actions', icon: 'file', title: 'Template health', sub: '', hint: '', open: () => goto(to.templateHealth()) },
-			{ id: 'settings', group: 'Actions', icon: 'sliders', title: 'Settings', sub: '', hint: '⌘,', open: () => goto(to.settings()) }
+			{
+				id: 'do-next',
+				group: 'Actions',
+				icon: 'play',
+				title: 'Do next',
+				sub: 'the top project’s next step',
+				hint: '⌘⇧↵',
+				open: () => doNext().then(report)
+			},
+			{
+				id: 'new',
+				group: 'Actions',
+				icon: 'plus',
+				title: 'New project',
+				sub: '',
+				hint: '⌘N',
+				open: () => goto(to.setup())
+			},
+			{
+				id: 'drawer',
+				group: 'Actions',
+				icon: 'drawer',
+				title: 'Toggle terminal drawer',
+				sub: '',
+				hint: '⌃`',
+				open: () => ui.toggleDrawer()
+			},
+			{
+				id: 'run-log',
+				group: 'Actions',
+				icon: 'log',
+				title: 'Open the run log',
+				sub: '',
+				hint: '',
+				open: () => goto(to.runLog())
+			},
+			{
+				id: 'doctor',
+				group: 'Actions',
+				icon: 'pulse',
+				title: 'Run Doctor',
+				sub: '',
+				hint: '',
+				open: () => goto(to.doctor())
+			},
+			{
+				id: 'health',
+				group: 'Actions',
+				icon: 'file',
+				title: 'Template health',
+				sub: '',
+				hint: '',
+				open: () => goto(to.templateHealth())
+			},
+			{
+				id: 'settings',
+				group: 'Actions',
+				icon: 'sliders',
+				title: 'Settings',
+				sub: '',
+				hint: '⌘,',
+				open: () => goto(to.settings())
+			}
 		);
 		for (const v of views)
 			out.push({
@@ -136,7 +209,9 @@
 		const q = query.trim().toLowerCase();
 		const list = q
 			? items.filter((i) => `${i.title} ${i.sub}`.toLowerCase().includes(q))
-			: items.filter((i) => i.group !== 'Steps' || i.sub.includes(current.project?.summary.name ?? '\u0000'));
+			: items.filter(
+					(i) => i.group !== 'Steps' || i.sub.includes(current.project?.summary.name ?? '\u0000')
+				);
 		return list.slice(0, 40);
 	});
 	const groups = $derived(
@@ -146,11 +221,6 @@
 	);
 	const flat = $derived(groups.flatMap((x) => x.list));
 	const activeId = $derived(flat[active]?.id ?? '');
-
-	$effect(() => {
-		void query;
-		active = 0;
-	});
 
 	async function choose(i: Item | undefined, run: boolean): Promise<void> {
 		if (!i) return;
@@ -177,7 +247,6 @@
 </script>
 
 {#if ui.paletteOpen}
-	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions (Esc closes from the field) -->
 	<div class="scrim" aria-hidden="true" onclick={close}></div>
 	<div class="palette" role="dialog" aria-modal="true" aria-label="Commands">
 		<div class="palette-input">
@@ -194,6 +263,7 @@
 				aria-autocomplete="list"
 				autocomplete="off"
 				spellcheck="false"
+				oninput={() => (active = 0)}
 				onkeydown={onKey}
 			/>
 			<kbd>esc</kbd>
@@ -213,7 +283,10 @@
 							onclick={() => choose(i, false)}
 						>
 							<Icon name={i.icon} />
-							<span>{i.title} {#if i.sub}<span class="sub">{i.sub}</span>{/if}</span>
+							<span
+								>{i.title}
+								{#if i.sub}<span class="sub">{i.sub}</span>{/if}</span
+							>
 							{#if i.hint}<kbd>{i.hint}</kbd>{:else}<span></span>{/if}
 						</div>
 					{/each}

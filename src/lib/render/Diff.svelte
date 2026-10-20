@@ -11,7 +11,12 @@
 		label
 	}: { diff?: Diff | null; redacted?: RedactedDiff | null; label: string } = $props();
 
-	type Line = { cls: 'hunk' | 'add' | 'del' | 'ctx'; sign: string; text: string | null; spans: Diff['hunks'][number]['lines'][number]['spans'] | null };
+	interface Line {
+		cls: 'hunk' | 'add' | 'del' | 'ctx';
+		sign: string;
+		text: string | null;
+		spans: Diff['hunks'][number]['lines'][number]['spans'] | null;
+	}
 
 	const lines: Line[] = $derived.by(() => {
 		const out: Line[] = [];
@@ -19,7 +24,12 @@
 			for (const h of diff.hunks) {
 				out.push({ cls: 'hunk', sign: '', text: `@@ ${diff.path} @@`, spans: null });
 				for (const l of h.lines)
-					out.push({ cls: l.op, sign: l.op === 'add' ? '+' : l.op === 'del' ? '-' : ' ', text: null, spans: l.spans });
+					out.push({
+						cls: l.op,
+						sign: l.op === 'add' ? '+' : l.op === 'del' ? '-' : ' ',
+						text: null,
+						spans: l.spans
+					});
 			}
 		}
 		if (redacted) {
@@ -29,8 +39,10 @@
 				if (head !== last) out.push({ cls: 'hunk', sign: '', text: `@@ ${head} @@`, spans: null });
 				last = head;
 				const key = e.keyPath.includes('.') ? `"${e.keyPath.split('.').slice(1).join('.')}": ` : '';
-				if (e.before !== null) out.push({ cls: 'del', sign: '-', text: `    ${key}${e.before}`, spans: null });
-				if (e.after !== null) out.push({ cls: 'add', sign: '+', text: `    ${key}${e.after}`, spans: null });
+				if (e.before !== null)
+					out.push({ cls: 'del', sign: '-', text: `    ${key}${e.before}`, spans: null });
+				if (e.after !== null)
+					out.push({ cls: 'add', sign: '+', text: `    ${key}${e.after}`, spans: null });
 			}
 		}
 		return out;

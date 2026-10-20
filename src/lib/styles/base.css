@@ -1149,7 +1149,7 @@ details.argv pre {
 	.body {
 		grid-template-columns: minmax(0, 1fr);
 	}
-	.body > .inspector:not(.overlay) {
+	.body > .inspector:not(.forced) {
 		display: none;
 	}
 	.page {

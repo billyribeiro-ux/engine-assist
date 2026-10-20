@@ -5,7 +5,7 @@ import type { IpcClient } from '#lib/ipc/contract.ts';
 import { toIpcFailure } from '#lib/ipc/errors.ts';
 import { ipc } from '#lib/ipc/index.ts';
 import type { EntryPoint, PrepareMode, PrepareOutcome, Surface } from '#lib/ipc/types.ts';
-import { refresh } from '#lib/stores/bus.svelte.ts';
+import { refresh } from '#lib/stores/bus.ts';
 import { pendingOutput, terminal } from '#lib/stores/terminal.svelte.ts';
 import { ui } from '#lib/stores/ui.svelte.ts';
 
@@ -19,7 +19,11 @@ export interface RunTarget {
 	mode?: PrepareMode;
 }
 
-async function start(client: IpcClient, t: RunTarget, prep: PrepareOutcome): Promise<true | string> {
+async function start(
+	client: IpcClient,
+	t: RunTarget,
+	prep: PrepareOutcome
+): Promise<true | string> {
 	if (prep.kind === 'blocked') {
 		const first = prep.blockers[0];
 		return first ? blockerText(first) : 'This step is blocked.';
@@ -29,10 +33,16 @@ async function start(client: IpcClient, t: RunTarget, prep: PrepareOutcome): Pro
 		const chain = prep.rearm.chain;
 		const old = terminal.tabs.find((x) => x.chain === chain && x.status === 'running');
 		const res = await client.rearmStart({ planId: prep.planId }, out.cb);
-		if (res.kind === 'endYourself') return "Claude didn't exit. End it yourself, then press Continue.";
+		if (res.kind === 'endYourself')
+			return "Claude didn't exit. End it yourself, then press Continue.";
 		out.bind(res.runId);
 		if (old) terminal.setStatus(old.runId, 'exited', 0);
-		terminal.add(res, t.projectId, null, old ? { label: old.tabName, lines: terminal.lines(old.runId) } : null);
+		terminal.add(
+			res,
+			t.projectId,
+			null,
+			old ? { label: old.tabName, lines: terminal.lines(old.runId) } : null
+		);
 	} else {
 		const res = await client.launchStart({ planId: prep.planId }, out.cb);
 		out.bind(res.runId);
@@ -48,7 +58,11 @@ export async function runStep(t: RunTarget): Promise<true | string> {
 	const client = await ipc();
 	try {
 		if (t.surface === 'chat') {
-			const r = await client.chatCopyAndOpen({ projectId: t.projectId, step: t.step, entry: t.entry });
+			const r = await client.chatCopyAndOpen({
+				projectId: t.projectId,
+				step: t.step,
+				entry: t.entry
+			});
 			refresh(`project:${t.projectId}`, 'today');
 			ui.toast(
 				r.missingLink
@@ -59,7 +73,12 @@ export async function runStep(t: RunTarget): Promise<true | string> {
 			);
 			return true;
 		}
-		const prep = await client.launchPrepare({ projectId: t.projectId, step: t.step, entry: t.entry, mode: t.mode ?? 'normal' });
+		const prep = await client.launchPrepare({
+			projectId: t.projectId,
+			step: t.step,
+			entry: t.entry,
+			mode: t.mode ?? 'normal'
+		});
 		return await start(client, t, prep);
 	} catch (e: unknown) {
 		const f = toIpcFailure(e);
@@ -86,10 +105,19 @@ export async function doNext(): Promise<true | string> {
 		const out = await client.doNext({});
 		if (out.kind === 'nothing') return out.why;
 		if (out.kind === 'chat') {
-			if (!out.ready) return out.blockers[0] ? blockerText(out.blockers[0]) : 'This step is blocked.';
-			return await runStep({ projectId: out.project, step: out.step, surface: 'chat', entry: 'doNext' });
+			if (!out.ready)
+				return out.blockers[0] ? blockerText(out.blockers[0]) : 'This step is blocked.';
+			return await runStep({
+				projectId: out.project,
+				step: out.step,
+				surface: 'chat',
+				entry: 'doNext'
+			});
 		}
-		return await runPrepared({ projectId: out.project, step: out.step, surface: 'cli', entry: 'doNext' }, out.prepare);
+		return await runPrepared(
+			{ projectId: out.project, step: out.step, surface: 'cli', entry: 'doNext' },
+			out.prepare
+		);
 	} catch (e: unknown) {
 		return failureText(toIpcFailure(e));
 	}

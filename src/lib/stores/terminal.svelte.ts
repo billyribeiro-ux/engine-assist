@@ -25,6 +25,8 @@ class Terminal {
 	tabs = $state<Tab[]>([]);
 	active = $state<string | null>(null);
 	focusMode = $state(false);
+	/** Bumped to move focus into the active tab's terminal (⌘⇧T, first-run probe). */
+	focusTick = $state(0);
 	private buffers = new Map<string, Uint8Array[]>();
 	private sinks = new Map<string, Sink>();
 	private pending = new Map<string, number>();
@@ -44,31 +46,65 @@ class Terminal {
 		};
 	}
 
-	add(started: RunStarted, projectId: string | null, divider: string | null = null, archived: Tab['archived'] = null): void {
+	add(
+		started: RunStarted,
+		projectId: string | null,
+		divider: string | null = null,
+		archived: Tab['archived'] = null
+	): void {
 		if (!this.tabs.some((t) => t.runId === started.runId))
 			this.tabs = [
 				...this.tabs,
-				{ runId: started.runId, chain: started.chain, tabName: started.tabName, status: 'running', exitCode: null, projectId, archived, divider }
+				{
+					runId: started.runId,
+					chain: started.chain,
+					tabName: started.tabName,
+					status: 'running',
+					exitCode: null,
+					projectId,
+					archived,
+					divider
+				}
 			];
 		this.attached.add(started.runId);
 		this.active = started.runId;
 	}
 
 	/** Re-attaches to a run that is already live (startup, ipc.md §4.7 pty_attach). */
-	async attach(client: IpcClient, runId: string, projectId: string | null, chain: string): Promise<void> {
+	async attach(
+		client: IpcClient,
+		runId: string,
+		projectId: string | null,
+		chain: string
+	): Promise<void> {
 		if (this.attached.has(runId)) return;
 		this.attached.add(runId);
 		const info = await client.ptyAttach({ runId }, this.output(runId));
 		if (!this.tabs.some((t) => t.runId === runId))
 			this.tabs = [
 				...this.tabs,
-				{ runId, chain, tabName: info.tabName, status: info.status, exitCode: null, projectId, archived: null, divider: null }
+				{
+					runId,
+					chain,
+					tabName: info.tabName,
+					status: info.status,
+					exitCode: null,
+					projectId,
+					archived: null,
+					divider: null
+				}
 			];
 		this.active ??= runId;
 	}
 
+	requestFocus(): void {
+		this.focusTick += 1;
+	}
+
 	setStatus(runId: string, status: RunStatus, exitCode: number | null = null): void {
-		this.tabs = this.tabs.map((t) => (t.runId === runId ? { ...t, status, exitCode: exitCode ?? t.exitCode } : t));
+		this.tabs = this.tabs.map((t) =>
+			t.runId === runId ? { ...t, status, exitCode: exitCode ?? t.exitCode } : t
+		);
 	}
 
 	close(runId: string): void {
@@ -92,8 +128,10 @@ class Terminal {
 		const after = Math.max(0, before + delta);
 		this.pending.set(runId, after);
 		const client = await ipc();
-		if (before <= HIGH_WATER && after > HIGH_WATER) await client.ptyFlow({ runId, paused: true }).catch(() => undefined);
-		if (before > HIGH_WATER && after <= HIGH_WATER) await client.ptyFlow({ runId, paused: false }).catch(() => undefined);
+		if (before <= HIGH_WATER && after > HIGH_WATER)
+			await client.ptyFlow({ runId, paused: true }).catch(() => undefined);
+		if (before > HIGH_WATER && after <= HIGH_WATER)
+			await client.ptyFlow({ runId, paused: false }).catch(() => undefined);
 	}
 
 	/** Writes input to the PTY in ≤ 64 KB pieces, in order (ipc.md §6.2). */

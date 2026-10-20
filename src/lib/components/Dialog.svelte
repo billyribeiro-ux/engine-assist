@@ -29,7 +29,9 @@
 		const app = document.querySelector('.app');
 		app?.setAttribute('inert', '');
 		void tick().then(() => {
-			const first = box?.querySelector<HTMLElement>('[autofocus], input, textarea, select, button, [tabindex="0"]');
+			const first = box?.querySelector<HTMLElement>(
+				'[autofocus], input, textarea, select, button, [tabindex="0"]'
+			);
 			first?.focus();
 		});
 		return () => {
@@ -46,9 +48,11 @@
 			return;
 		}
 		if (e.key !== 'Tab' || !box) return;
-		const f = [...box.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input, textarea, select, [tabindex="0"]')].filter(
-			(el) => !el.hasAttribute('disabled')
-		);
+		const f = [
+			...box.querySelectorAll<HTMLElement>(
+				'a[href], button:not([disabled]), input, textarea, select, [tabindex="0"]'
+			)
+		].filter((el) => !el.hasAttribute('disabled'));
 		const first = f[0];
 		const last = f.at(-1);
 		if (!first || !last) return;

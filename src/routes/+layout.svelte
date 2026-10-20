@@ -16,9 +16,15 @@
 	import Titlebar from '#lib/components/Titlebar.svelte';
 	import Toasts from '#lib/components/Toasts.svelte';
 	import { ipc } from '#lib/ipc/index.ts';
-	import { handlerFor, isTyping, match, NOT_HERE, registerShortcuts } from '#lib/keyboard/registry.ts';
+	import {
+		handlerFor,
+		isTyping,
+		match,
+		NOT_HERE,
+		registerShortcuts
+	} from '#lib/keyboard/registry.ts';
 	import { to } from '#lib/nav/routes.ts';
-	import { refresh } from '#lib/stores/bus.svelte.ts';
+	import { refresh } from '#lib/stores/bus.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
 	import { terminal } from '#lib/stores/terminal.svelte.ts';
@@ -35,12 +41,10 @@
 		if (settings.value) ui.applyTheme(settings.value.theme);
 	});
 
-	let drawer = $state<TerminalDrawer>();
 	let forced = $state(false);
 	const showDrawer = $derived(ui.chrome.drawer || forced);
 	$effect(() => {
-		void page.url.pathname;
-		forced = false;
+		if (page.url.pathname) forced = false;
 	});
 
 	onMount(() => {
@@ -52,12 +56,21 @@
 				terminal.setStatus(p.runId, p.status, p.status === 'exited' ? 0 : null);
 			});
 			const runs = await client.runsSearch({ query: '', projectId: null, cursor: null, limit: 50 });
-			for (const r of runs.runs.filter((x) => ['running', 'idle', 'blocked', 'starting'].includes(x.status))) {
-				const before = runs.runs.find((x) => x.chain === r.chain && x.runId !== r.runId && x.startedAt < r.startedAt);
+			for (const r of runs.runs.filter((x) =>
+				['running', 'idle', 'blocked', 'starting'].includes(x.status)
+			)) {
+				const before = runs.runs.find(
+					(x) => x.chain === r.chain && x.runId !== r.runId && x.startedAt < r.startedAt
+				);
 				await terminal.attach(client, r.runId, r.project, r.chain);
 				if (before?.step)
 					terminal.tabs = terminal.tabs.map((t) =>
-						t.runId === r.runId ? { ...t, archived: { label: `${before.step ?? ''} ${before.stepTitle}`, lines: 1842 } } : t
+						t.runId === r.runId
+							? {
+									...t,
+									archived: { label: `${before.step ?? ''} ${before.stepTitle}`, lines: 1842 }
+								}
+							: t
 					);
 			}
 		})();
@@ -118,8 +131,12 @@
 			doNext: () => doNext(),
 			returnFocus: () => {
 				const main = document.getElementById('main');
-				const target = main?.querySelector<HTMLElement>('[aria-current="step"] button, [aria-current="step"], h1') ?? main;
-				if (target && !target.hasAttribute('tabindex') && target.tagName === 'H1') target.setAttribute('tabindex', '-1');
+				const target =
+					main?.querySelector<HTMLElement>(
+						'[aria-current="step"] button, [aria-current="step"], h1'
+					) ?? main;
+				if (target && !target.hasAttribute('tabindex') && target.tagName === 'H1')
+					target.setAttribute('tabindex', '-1');
 				target?.focus();
 				return true;
 			},
@@ -128,7 +145,7 @@
 				terminal.focusMode = !terminal.focusMode;
 				forced = true;
 				if (!ui.drawerOpen) ui.toggleDrawer();
-				drawer?.focusTerminal();
+				terminal.requestFocus();
 				return true;
 			},
 			pinned: async (slot) => {
@@ -207,7 +224,6 @@
 		{@render children()}
 		{#if showDrawer}
 			<TerminalDrawer
-				bind:this={drawer}
 				projectName={current.project?.summary.name ?? null}
 				fontSize={settings.value?.terminal.fontSize ?? 12}
 				scrollback={settings.value?.terminal.scrollback ?? 10000}

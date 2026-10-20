@@ -31,7 +31,8 @@
 			aria-label="hidden character {s.label}">{s.label}</span
 		>{:else if s.kind === 'code'}<code><Text text={s.text} {layout} /></code
 		>{:else if s.kind === 'strong'}<strong><Text spans={s.children} {layout} /></strong
-		>{:else if s.kind === 'emph'}<em><Text spans={s.children} {layout} /></em
-		>{:else if s.kind === 'link'}<span class="link-text"><Text text={s.text} {layout} /></span>
+		>{:else if s.kind === 'emph'}<em><Text spans={s.children} {layout} /></em>{:else}<span
+			class="link-text"><Text text={s.text} {layout} /></span
+		>
 		<span class="muted">(<Text text={s.url} layout={false} />)</span>{/if}
 {/each}

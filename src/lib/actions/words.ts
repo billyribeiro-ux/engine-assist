@@ -123,10 +123,13 @@ export function failureText(e: IpcFailure): string {
 
 const RULES: Record<string, string> = {
 	'core-step-skip': 'Core steps can never be skipped.',
-	'conditional-step-skip': 'A conditional step applies or not by its condition; it is never skipped by hand.',
+	'conditional-step-skip':
+		'A conditional step applies or not by its condition; it is never skipped by hand.',
 	'reason-required': 'Write a one-line reason first.',
-	'condition-locked-after-stage-2': 'Change requires a Change Request (v1.1): conditions are frozen once Stage 2 is signed. See docs/templates/change-request.md.',
-	'late-condition-locked-after-stage-4': 'Change requires a Change Request (v1.1): late conditions are frozen once Stage 4 is signed.',
+	'condition-locked-after-stage-2':
+		'Change requires a Change Request (v1.1): conditions are frozen once Stage 2 is signed. See docs/templates/change-request.md.',
+	'late-condition-locked-after-stage-4':
+		'Change requires a Change Request (v1.1): late conditions are frozen once Stage 4 is signed.',
 	'unresolved-tokens': 'Fill the highlighted inputs first.',
 	'prompt-control-char': 'The prompt has a control character. Remove it from the input.',
 	'cli-finishes-by-exit': 'CLI steps finish when Claude Code exits, not by marking them done.',

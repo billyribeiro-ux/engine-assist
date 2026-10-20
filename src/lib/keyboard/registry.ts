@@ -73,8 +73,10 @@ export function match(e: KeyLike, plainKeys: boolean): { id: ActionId; arg?: num
 	const code = e.code ?? '';
 	if (e.ctrlKey && !e.metaKey && (k === '`' || code === 'Backquote')) return { id: 'toggleDrawer' };
 	if (e.metaKey && !e.ctrlKey) {
-		if (e.altKey && !e.shiftKey && (k === 'c' || code === 'KeyC' || k === 'ç')) return { id: 'copyCommand' };
-		if (e.altKey && !e.shiftKey && (k === 'i' || code === 'KeyI' || k === 'ˆ')) return { id: 'toggleInspector' };
+		if (e.altKey && !e.shiftKey && (k === 'c' || code === 'KeyC' || k === 'ç'))
+			return { id: 'copyCommand' };
+		if (e.altKey && !e.shiftKey && (k === 'i' || code === 'KeyI' || k === 'ˆ'))
+			return { id: 'toggleInspector' };
 		if (e.altKey) return null;
 		if (e.shiftKey) {
 			if (k === 'Enter') return { id: 'doNext' };

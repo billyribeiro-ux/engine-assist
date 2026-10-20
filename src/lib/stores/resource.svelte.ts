@@ -4,7 +4,7 @@ import type { IpcClient } from '#lib/ipc/contract.ts';
 import { toIpcFailure, type IpcFailure } from '#lib/ipc/errors.ts';
 import { ipc } from '#lib/ipc/index.ts';
 
-import { onRefresh, startBus, type RefreshKey } from './bus.svelte.ts';
+import { onRefresh, startBus, type RefreshKey } from './bus.ts';
 
 export interface Resource<T> {
 	readonly value: T | undefined;
@@ -50,9 +50,9 @@ export function resource<A, T>(
 		const a = args();
 		current = a;
 		void load(a);
-		const ks = new Set(keys(a));
+		const ks = keys(a);
 		return onRefresh((k) => {
-			if (ks.has(k)) void load(current);
+			if (ks.includes(k)) void load(current);
 		});
 	});
 

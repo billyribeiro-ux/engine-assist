@@ -39,7 +39,8 @@
 	function badge(p: ProjectSummary): 'fail' | 'attention' | null {
 		const mine = inbox.filter((i) => i.project === p.id);
 		if (p.readOnly || mine.some((i) => FAIL.has(i.kind))) return 'fail';
-		if (mine.some((i) => i.kind === 'gateSignable' || i.kind === 'packetLanded')) return 'attention';
+		if (mine.some((i) => i.kind === 'gateSignable' || i.kind === 'packetLanded'))
+			return 'attention';
 		return null;
 	}
 
@@ -53,7 +54,7 @@
 	/** Consecutive signed stages, and the stages beyond 5 the blueprint doesn't annotate, fold into one row. */
 	const rows: Row[] = $derived.by(() => {
 		const v = current.project;
-		if (!v || v.summary.id !== openId) return [];
+		if (v?.summary.id !== openId) return [];
 		const out: Row[] = [];
 		const cls = (s: StageView) =>
 			s.status === 'signed'
@@ -66,7 +67,11 @@
 			const s = v.stages[i];
 			if (!s) break;
 			let j = i;
-			while (j + 1 < v.stages.length && cls(v.stages[j + 1] ?? s) === cls(s) && !cls(s).startsWith('one'))
+			while (
+				j + 1 < v.stages.length &&
+				cls(v.stages[j + 1] ?? s) === cls(s) &&
+				!cls(s).startsWith('one')
+			)
 				j += 1;
 			const last = v.stages[j] ?? s;
 			if (j > i) {
@@ -78,7 +83,14 @@
 					stage: signed ? s : { ...s, status: 'needsAnnotation' },
 					spoken: signed ? 'signed' : 'need annotation'
 				});
-			} else out.push({ key: `${s.stage}`, num: `${s.stage}`, name: s.title, stage: s, spoken: SHEET[s.status].word });
+			} else
+				out.push({
+					key: `${s.stage}`,
+					num: `${s.stage}`,
+					name: s.title,
+					stage: s,
+					spoken: SHEET[s.status].word
+				});
 			i = j + 1;
 		}
 		return out;
@@ -97,7 +109,7 @@
 				>{/if}</a
 		>
 		<div class="side-head" id="side-projects">Projects</div>
-		{#if projects.value && projects.value.length === 0}
+		{#if projects.value?.length === 0}
 			<p class="side-empty">No projects yet</p>
 		{/if}
 		<ul aria-labelledby="side-projects">
@@ -164,10 +176,15 @@
 			{:else if doctorLevel === 'warning'}
 				<span class="badge" aria-label="Doctor: warnings"><span class="dot attention"></span></span>
 			{:else if doctorLevel === 'ok'}
-				<span class="badge" aria-label="Doctor: all checks pass"><span class="dot pass"></span></span>
+				<span class="badge" aria-label="Doctor: all checks pass"
+					><span class="dot pass"></span></span
+				>
 			{/if}</a
 		>
-		<a class="side-item" href={to.settings()} aria-current={path === '/settings' ? 'page' : undefined}
+		<a
+			class="side-item"
+			href={to.settings()}
+			aria-current={path === '/settings' ? 'page' : undefined}
 			><Icon name="sliders" /><span class="label">Settings</span><span class="meta">⌘,</span></a
 		>
 	</div>

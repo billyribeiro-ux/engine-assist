@@ -64,7 +64,11 @@ class Ui {
 		this.chrome = { sub: '', drawer: false, inspector: false, ...c };
 	}
 
-	toast(text: string, tone: Toast['tone'] = 'pass', icon: Toast['icon'] = tone === 'pass' ? 'check' : 'cross'): void {
+	toast(
+		text: string,
+		tone: Toast['tone'] = 'pass',
+		icon: Toast['icon'] = tone === 'pass' ? 'check' : 'cross'
+	): void {
 		const id = this.nextId++;
 		this.toasts = [...this.toasts, { id, text, tone, icon }];
 		this.announce(text);
@@ -98,8 +102,11 @@ class Ui {
 		this.drawerHeight = Math.min(max, Math.max(120, Math.round(px)));
 		write(DRAWER_KEY, String(this.drawerHeight));
 	}
+	/** Below 1360 px the inspector is hidden; ⌘⌥I brings it back as an overlay (A.10). */
+	inspectorOverlay = $state(false);
 	toggleInspector(): void {
-		this.inspectorOpen = !this.inspectorOpen;
+		if (window.innerWidth < 1360) this.inspectorOverlay = !this.inspectorOverlay;
+		else this.inspectorOpen = !this.inspectorOpen;
 	}
 
 	applyTheme(t: Theme): void {
