@@ -640,6 +640,8 @@ pub fn step_mark_done(app: &App, req: StepMarkDoneReq) -> Result<StepView, IpcEr
         "not-markable",
     )?;
     p.save_progress(app)?;
+    // A chat step's run clock ends when the step is done (M3-26, AC-F026-04).
+    crate::runs::note_step_done(app, req.project_id.as_str(), req.step.as_str());
     view_of(app, &p, req.step.as_str())
 }
 

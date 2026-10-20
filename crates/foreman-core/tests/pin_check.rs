@@ -1,4 +1,5 @@
-//! CR-003: the setup preview's read-only pin check finds exactly what `lock::pin` refuses on.
+//! CR-003: the setup preview's read-only pin check (`lock::p1_annotation_errors`) finds exactly
+//! what `lock::pin` refuses on.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -9,8 +10,8 @@
 mod common;
 
 use common::{blueprint, replace_once};
+use foreman_core::lock::p1_annotation_errors;
 use foreman_core::lock::{self as lk, BlueprintState, LockError};
-use foreman_core::pin_check::p1_annotation_errors;
 use foreman_core::store::{Root, RootKind};
 
 fn pin(src: &str) -> Result<(), LockError> {

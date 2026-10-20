@@ -78,6 +78,8 @@ pub fn launch_prepare(
     req: LaunchPrepareReq,
     progress: Channel<LaunchProgress>,
 ) -> Result<PrepareOutcome, IpcError> {
+    // ADR-013: the interest set is re-stat'ed before every launch.
+    crate::watch::restat_before_acting(app, req.project_id.as_str());
     let mut p = project::open(app, req.project_id.as_str())?;
     let s = p.step(req.step.as_str())?;
     if req.mode == PrepareMode::FreshWithContext
@@ -123,6 +125,9 @@ pub fn chain_resume_prepare(
         let Some(c) = p.progress.chains.iter().find(|c| c.id == id).cloned() else {
             continue;
         };
+        if crate::watch::restat_before_acting(app, &e.project_id) > 0 {
+            p = project::open(app, &e.project_id)?;
+        }
         if c.status == ChainStatus::HandedOff {
             return Err(IpcError::not_allowed(
                 "chain-handed-off",
@@ -176,6 +181,8 @@ pub fn launch_start(
     output: Channel<Response>,
 ) -> Result<RunStarted, IpcError> {
     let held = app.launch().plans.take(req.plan_id.as_str())?;
+    // ADR-013: a change a missed event hid lands now, so the revision check below sees it.
+    crate::watch::restat_before_acting(app, &held.project_id);
     let mut p = project::open(app, &held.project_id)?;
     p.writable()?;
     if p.progress.rev != held.rev {

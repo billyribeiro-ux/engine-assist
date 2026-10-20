@@ -65,6 +65,12 @@ skip = [
   { crate = "phf_codegen@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
   { crate = "phf_generator@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
   { crate = "phf_shared@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  # Stage 5 integration (2026-10-20): portable-pty 0.9.0 (newest) needs filedescriptor 0.8.3
+  # (newest, crates.io 2025-02-11), which requires thiserror ^1.0; the workspace uses thiserror 2.
+  # No release aligns them without downgrading, so the 1.x pair is skipped until filedescriptor
+  # moves to thiserror 2.
+  { crate = "thiserror@1.0.69", reason = "older duplicate pulled by filedescriptor 0.8.3 (portable-pty 0.9.0)" },
+  { crate = "thiserror-impl@1.0.69", reason = "older duplicate pulled by thiserror 1.0.69 (filedescriptor 0.8.3)" },
 ]
 deny = [
   { crate = "reqwest", reason = "SR-60: no HTTP client" },

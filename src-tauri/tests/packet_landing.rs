@@ -341,6 +341,61 @@ mod watcher {
         assert!(v.exists && v.problems.iter().any(|x| x.rule == "packet.open-items"));
     }
 
+    /// ADR-013 (watcher disabled): missed events are tolerated. With no watcher running, a packet
+    /// that lands is still seen at the next interaction: the interest-set re-stat on window focus,
+    /// before a launch (`launch_prepare`, `launch_start`) and before a sign (`sign_preview`,
+    /// `sign_apply`).
+    #[test]
+    fn refocus_rescan_catches_missed_event() {
+        let p = ProjectApp::new(json!({}));
+        // `project_open` whose watcher couldn't start: the first re-stat records the stamps.
+        let o = foreman_app::project::open(&p.t.app, &p.id).unwrap();
+        assert_eq!(foreman_app::watch::restat_project(&p.t.app, &o), 0);
+        assert!(!p.t.app.watchers().is_watching(&p.id));
+        let stages = |p: &ProjectApp| -> Vec<u64> {
+            packet_events(p)
+                .iter()
+                .map(|e| e["stage"].as_u64().unwrap())
+                .collect()
+        };
+
+        // A packet lands; nothing is watching, so nothing is emitted…
+        write_packet(&p, 1, &unsigned(&tradelog_packet(1)));
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(stages(&p).is_empty());
+        // …until the window is focused.
+        foreman_app::watch::on_focus(&p.t.app);
+        assert_eq!(stages(&p), [1]);
+        foreman_app::watch::on_focus(&p.t.app);
+        assert_eq!(stages(&p), [1], "an unchanged file is not a change");
+
+        // Before a launch.
+        write_packet(&p, 2, &unsigned(&tradelog_packet(2)));
+        let _ = p.prepare("2.2");
+        assert_eq!(stages(&p), [1, 2]);
+
+        // Before a sign (the preview's answer doesn't matter here).
+        write_packet(
+            &p,
+            1,
+            &unsigned(&tradelog_packet(1)).replacen("OPEN ITEMS: none", "OPEN ITEMS: x", 1),
+        );
+        let _ = foreman_app::ipc::commands::signing::sign_preview(
+            &p.t.app,
+            req(
+                json!({ "projectId": p.id, "stage": 1, "branch": { "kind": "current" }, "name": "Billy Ribeiro", "date": "2026-10-20" }),
+            ),
+        );
+        assert_eq!(stages(&p), [1, 2, 1]);
+        // The packet view re-reads it (the event is only a hint).
+        assert!(
+            view(&p, 1)
+                .problems
+                .iter()
+                .any(|x| x.rule == "packet.open-items")
+        );
+    }
+
     /// ADR-013, SR-18, IPC-R6: the app's watch module maps hints to state and events only; it
     /// can't reach a command handler, a launch, a re-arm, a spawn or git.
     #[test]

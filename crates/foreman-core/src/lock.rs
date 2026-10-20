@@ -160,6 +160,27 @@ fn problem(t: &Template, e: ScopedError) -> AnnotationProblem {
     }
 }
 
+/// Parses `source` and refuses on an annotation error in the P1 scope (Stages 1–2 and F.2), the
+/// check [`pin`] makes before it writes anything (CR-003).
+fn p1_checked(source: &str) -> Result<Template, LockError> {
+    let (t, errors) = parse_template_p1(source, FILE);
+    if errors.is_empty() {
+        return Ok(t);
+    }
+    Err(LockError::AnnotationErrors {
+        problems: errors.into_iter().map(|e| problem(&t, e)).collect(),
+    })
+}
+
+/// The read-only pin check (CR-003, DR-155) for the setup preview: the P1 annotation errors that
+/// [`pin`] refuses on, found without writing anything (the same check `pin` runs).
+///
+/// # Errors
+/// [`LockError::AnnotationErrors`] when a step in Stages 1–2 or F.2 has an annotation error.
+pub fn p1_annotation_errors(source: &str) -> Result<(), LockError> {
+    p1_checked(source).map(|_| ())
+}
+
 /// Why a project opens read-only (DR-156).
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ReadOnly {
@@ -290,13 +311,7 @@ pub fn pin(
             head: state.head_oid.clone(),
         });
     }
-    let text = String::from_utf8_lossy(&state.bytes);
-    let (t, p1_errors) = parse_template_p1(&text, FILE);
-    if !p1_errors.is_empty() {
-        return Err(LockError::AnnotationErrors {
-            problems: p1_errors.into_iter().map(|e| problem(&t, e)).collect(),
-        });
-    }
+    let t = p1_checked(&String::from_utf8_lossy(&state.bytes))?;
     store_text(app, &t.source_sha256, &state.bytes)?;
     let lock = lock_for(&t, &state.commit, path, pinned_at);
     let json = crate::json::to_canonical(&lock).map_err(|e| StoreError::Io {
