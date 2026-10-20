@@ -294,6 +294,15 @@ pub fn resolve(program: Program, ctx: &SpawnCtx) -> Result<PathBuf, SpawnError> 
         .ok_or_else(|| SpawnError::Unlisted(program.file_name().to_owned()))
 }
 
+/// The program and argument vector a request runs (no spawn). `ScriptedOs` records these so tests
+/// see exactly what `/usr/bin/open` would be given.
+///
+/// # Errors
+/// [`SpawnError::InvalidRequest`] when a request breaks its shape (relative path, option-like bundle).
+pub fn argv(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnError> {
+    program_and_args(req)
+}
+
 fn program_and_args(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnError> {
     Ok(match req {
         SpawnRequest::ClaudeVersion => (Program::Claude, vec!["-v".into()]),

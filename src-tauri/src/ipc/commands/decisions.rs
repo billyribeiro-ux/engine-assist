@@ -123,29 +123,41 @@ fn current(
     id: &str,
     seen: &str,
 ) -> Result<(PendingOutside, Vec<u8>, ReadStamp), IpcError> {
-    let x = p
+    let fresh = || -> Vec<PendingChange> {
+        p.progress
+            .pending_outside
+            .iter()
+            .map(|y| pending_view(p, y))
+            .collect()
+    };
+    let Some(x) = p
         .progress
         .pending_outside
         .iter()
         .find(|x| x.id == id)
         .cloned()
-        .ok_or_else(|| IpcError::not_found("That change isn't pending any more."))?;
+    else {
+        // The file changed again and the watcher replaced this review with a new one (AC-F022-05):
+        // refuse, and hand back the review that is pending now.
+        if p.progress.pending_outside.is_empty() {
+            return Err(IpcError::not_found("That change isn't pending any more."));
+        }
+        return Err(IpcError::stale(
+            StaleWhat::ReadStamp,
+            "That file changed again. Review the new change.",
+            serde_json::to_value(fresh()).ok(),
+        ));
+    };
     let rel = pathpolicy::check_read(x.file.repo_path(), ReadClass::Decision)?;
     let (bytes, stamp) = p.root()?.read(&rel, ReadClass::Decision)?;
     if sha256_hex(&bytes) != seen || x.seen_sha256 != seen {
-        let fresh: Vec<PendingChange> = p
-            .progress
-            .pending_outside
-            .iter()
-            .map(|y| pending_view(p, y))
-            .collect();
         return Err(IpcError::stale(
             StaleWhat::ReadStamp,
             format!(
                 "{} changed again. Review the new change.",
                 x.file.repo_path()
             ),
-            serde_json::to_value(fresh).ok(),
+            serde_json::to_value(fresh()).ok(),
         ));
     }
     Ok((x, bytes, stamp))

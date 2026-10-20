@@ -101,6 +101,17 @@ pub trait Os: Send + Sync {
     /// # Errors
     /// The spawn's failure, as text.
     fn open_terminal(&self, dir: &Path, ctx: &SpawnCtx) -> Result<(), String>;
+    /// Runs one `/usr/bin/open` request (`-b <editor bundle> <file>` or `-R <file>`; AC-XC-28,
+    /// SR-25a) through `foreman-sys::spawn`. The caller has already passed the path through the
+    /// read policy.
+    ///
+    /// # Errors
+    /// The spawn's failure, as text.
+    fn open_request(
+        &self,
+        req: &foreman_sys::spawn::SpawnRequest,
+        ctx: &SpawnCtx,
+    ) -> Result<(), String>;
     /// Shows a notification from a Foreman template (SR-56, AC-F017-09).
     ///
     /// # Errors
@@ -224,6 +235,14 @@ impl<R: tauri::Runtime> Os for TauriOs<R> {
         sys_open_terminal(dir, ctx)
     }
 
+    fn open_request(
+        &self,
+        req: &foreman_sys::spawn::SpawnRequest,
+        ctx: &SpawnCtx,
+    ) -> Result<(), String> {
+        sys_open(req, ctx)
+    }
+
     fn notify(&self, n: &Notice) -> Result<(), String> {
         use tauri_plugin_notification::NotificationExt as _;
         // No action type and no handler is registered, so a click only activates the app.
@@ -339,6 +358,7 @@ pub struct ScriptedOs {
     events: Mutex<Vec<Event>>,
     opened: Mutex<Vec<String>>,
     terminals: Mutex<Vec<PathBuf>>,
+    open_requests: Mutex<Vec<Vec<String>>>,
     open_fails: Mutex<bool>,
     notices: Mutex<Vec<Notice>>,
     badge: Mutex<Option<u32>>,
@@ -359,6 +379,7 @@ impl Default for ScriptedOs {
             events: Mutex::new(Vec::new()),
             opened: Mutex::new(Vec::new()),
             terminals: Mutex::new(Vec::new()),
+            open_requests: Mutex::new(Vec::new()),
             open_fails: Mutex::new(false),
             notices: Mutex::new(Vec::new()),
             badge: Mutex::new(None),
@@ -423,6 +444,11 @@ impl ScriptedOs {
     #[must_use]
     pub fn terminals(&self) -> Vec<PathBuf> {
         lock(&self.terminals).clone()
+    }
+    /// The argument vector (after `/usr/bin/open`) of every file open or reveal so far.
+    #[must_use]
+    pub fn open_requests(&self) -> Vec<Vec<String>> {
+        lock(&self.open_requests).clone()
     }
     /// Makes the next opens fail (as `open` exiting non-zero would).
     pub fn fail_opens(&self, fail: bool) {
@@ -490,6 +516,19 @@ impl Os for ScriptedOs {
             return Err("open exited with Some(1)".to_owned());
         }
         lock(&self.terminals).push(dir.to_path_buf());
+        Ok(())
+    }
+
+    fn open_request(
+        &self,
+        req: &foreman_sys::spawn::SpawnRequest,
+        _ctx: &SpawnCtx,
+    ) -> Result<(), String> {
+        let (_, args) = foreman_sys::spawn::argv(req).map_err(|e| e.to_string())?;
+        if *lock(&self.open_fails) {
+            return Err("open exited with Some(1)".to_owned());
+        }
+        lock(&self.open_requests).push(args);
         Ok(())
     }
 

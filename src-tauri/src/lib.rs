@@ -19,6 +19,7 @@ pub mod runs;
 pub mod sensor;
 pub mod sensor_ingest;
 pub mod signing;
+pub mod startup;
 pub mod state;
 pub mod text;
 pub mod watch;
@@ -149,6 +150,7 @@ pub fn run() -> tauri::Result<()> {
                 home: app.path().home_dir()?,
             };
             let os = Arc::new(os::TauriOs::new(app.handle().clone()));
+            startup::harden(&paths.app_data)?;
             let state = state::App::new(os, paths);
             watch::start(state.weak());
             inbox::start(&state);

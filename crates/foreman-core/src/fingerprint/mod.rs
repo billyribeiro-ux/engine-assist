@@ -77,26 +77,48 @@ fn sensitive_key(k: &str) -> bool {
 /// Strings that look like credentials (a subset of the secret scanner's patterns, SR-55).
 #[must_use]
 pub fn looks_secret(s: &str) -> bool {
-    const PREFIXES: [&str; 12] = [
+    const PREFIXES: [&str; 19] = [
         "sk-",
         "sk_live_",
         "rk_live_",
+        "pk_live_",
         "ghp_",
         "gho_",
         "ghu_",
         "ghs_",
+        "ghr_",
         "github_pat_",
+        "glpat-",
         "xoxb-",
         "xoxp-",
+        "xoxa-",
+        "xoxr-",
+        "xoxs-",
         "AIza",
+        "ya29.",
         "-----BEGIN",
     ];
     let t = s.trim();
+    let aws = t.len() == 20
+        && (t.starts_with("AKIA") || t.starts_with("ASIA"))
+        && t.bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit());
+    // A JSON web token: three base64url segments, the first two starting `eyJ` ({"…).
+    let jwt = t.starts_with("eyJ") && t.split('.').count() == 3 && t.len() > 30;
+    let npm = t.len() == 40 && t.starts_with("npm_");
+    // `Bearer <token>` / `Basic <base64>` header values, and SendGrid keys.
+    let credential_after = |p: &str| {
+        t.strip_prefix(p)
+            .is_some_and(|r| r.len() >= 8 && !r.contains(char::is_whitespace))
+    };
+    let header = credential_after("Bearer ") || credential_after("Basic ");
+    let sendgrid = t.len() >= 20 && t.starts_with("SG.") && !t.contains(char::is_whitespace);
     PREFIXES.iter().any(|p| t.starts_with(p))
-        || (t.len() == 20
-            && t.starts_with("AKIA")
-            && t.bytes()
-                .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit()))
+        || aws
+        || jwt
+        || npm
+        || header
+        || sendgrid
         || t.contains("://")
             && t.split("://").nth(1).is_some_and(|r| {
                 r.split('/')
