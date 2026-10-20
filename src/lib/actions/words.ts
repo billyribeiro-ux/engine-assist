@@ -147,6 +147,17 @@ export function failureText(e: IpcFailure): string {
 }
 
 const RULES: Record<string, string> = {
+	'bypass-permissions':
+		'bypassPermissions is never allowed. Take that word out of the title, the prompt and the file names.',
+	'invalid-start':
+		"That run config doesn't fit the surface. A chat step uses adaptive effort and no mode; a terminal or Desktop step needs a mode and a working folder.",
+	'stage-not-applicable':
+		"This stage doesn't apply to this project, so nothing can be added to it.",
+	'wrong-stage': "That step isn't in this stage.",
+	'bad-title': 'A title is one line of 1–200 characters.',
+	'bad-text': 'Write 1–4,000 characters for a prompt, or one line of up to 200 for an item.',
+	'bad-out': 'List at most eight different files, one per line.',
+	'too-many': 'This stage has the most additions Foreman keeps.',
 	'core-step-skip': 'Core steps can never be skipped.',
 	'conditional-step-skip':
 		'A conditional step applies or not by its condition; it is never skipped by hand.',

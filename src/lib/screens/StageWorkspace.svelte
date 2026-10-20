@@ -9,6 +9,7 @@
 	import CloseOutChecklist from '#lib/components/CloseOutChecklist.svelte';
 	import Dialog from '#lib/components/Dialog.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import InsertPoint from '#lib/components/InsertPoint.svelte';
 	import Inspector from '#lib/components/Inspector.svelte';
 	import type { RowApi } from '#lib/components/row-api.ts';
 	import StepRow from '#lib/components/StepRow.svelte';
@@ -156,46 +157,7 @@
 		}
 	}
 
-	// Insert point (F-025, P2): add a prompt or an inspection item for this project only.
-	let menuAfter = $state<string | null>(null);
-	let adding = $state<{ kind: 'prompt' | 'item'; after: string } | null>(null);
-	let addTitle = $state('');
-	let addText = $state('');
-	let addError = $state<string | null>(null);
-	async function add(): Promise<void> {
-		if (!adding || !stage) return;
-		const c = await ipc();
-		try {
-			if (adding.kind === 'prompt')
-				await c.addStep({
-					projectId: pid,
-					stage: stage.stage,
-					after: adding.after,
-					copyConfigFrom: adding.after,
-					title: addTitle,
-					text: addText,
-					config: {
-						surface: 'cli',
-						cwd: 'spec',
-						start: { model: 'opus', effort: 'high', mode: 'plan' },
-						out: []
-					},
-					tag: 'optional'
-				});
-			else await c.addItem({ projectId: pid, stage: stage.stage, text: addText });
-			ui.toast(
-				adding.kind === 'prompt'
-					? 'Prompt added for this project'
-					: 'Inspection item added for this project'
-			);
-			adding = null;
-			addTitle = '';
-			addText = '';
-			refresh(`project:${pid}`);
-		} catch (e: unknown) {
-			addError = failureText(toIpcFailure(e));
-		}
-	}
+	// Insert point (F-025, P2): the + between steps, in InsertPoint.
 	const showInsert = (s: StepSummary) => s.state === 'running' || s.next || s.key === selectedKey;
 	const stageWord = $derived(
 		stage?.status === 'notApplicable'
@@ -277,35 +239,7 @@
 						ontoggle={() => toggle(s.key)}
 					/>
 					{#if showInsert(s) && s !== steps.at(-1) && !project.readOnly && s.state !== 'needsAnnotation'}
-						<li class="insert">
-							<button
-								type="button"
-								aria-label="Add to Stage {stage.stage} after {s.number}: prompt or inspection item, this project only"
-								aria-haspopup="menu"
-								aria-expanded={menuAfter === s.key}
-								title="Add prompt or inspection item (this project only)"
-								onclick={() => (menuAfter = menuAfter === s.key ? null : s.key)}
-								><Icon name="plus" size="none" /></button
-							>
-							{#if menuAfter === s.key}
-								<div class="menu" role="menu" aria-label="Add to this stage">
-									<button
-										role="menuitem"
-										type="button"
-										onclick={() => (
-											(adding = { kind: 'prompt', after: s.key }),
-											(menuAfter = null)
-										)}>Add prompt <span class="muted">this project only</span></button
-									>
-									<button
-										role="menuitem"
-										type="button"
-										onclick={() => ((adding = { kind: 'item', after: s.key }), (menuAfter = null))}
-										>Add inspection item <span class="muted">this project only</span></button
-									>
-								</div>
-							{/if}
-						</li>
+						<InsertPoint {project} {stage} after={s} />
 					{/if}
 				{/each}
 				{#if stage.closeoutChecklist.length}
@@ -348,51 +282,6 @@
 	</Dialog>
 {/if}
 
-{#if adding}
-	<Dialog
-		title={adding.kind === 'prompt'
-			? 'Add a prompt after ' + adding.after
-			: 'Add an inspection item'}
-		description="For this project only. It is written to .foreman/overlay.json, and added steps always confirm before running."
-		onclose={() => (adding = null)}
-		width="narrow"
-	>
-		{#if adding.kind === 'prompt'}
-			<div class="field">
-				<label for="add-title">Title</label><input
-					class="input"
-					id="add-title"
-					bind:value={addTitle}
-					maxlength="200"
-				/>
-			</div>
-		{/if}
-		<div class="field">
-			<label for="add-text">{adding.kind === 'prompt' ? 'Prompt' : 'Item'}</label>
-			<textarea
-				class="textarea"
-				id="add-text"
-				rows="4"
-				bind:value={addText}
-				aria-invalid={addError ? 'true' : undefined}
-				aria-describedby={addError ? 'add-err' : undefined}></textarea>
-			{#if addError}<p class="err" id="add-err">
-					<Icon name="cross" size="glyph" />{addError}
-				</p>{/if}
-		</div>
-		{#snippet footer()}
-			<span class="spacer"></span>
-			<button class="btn" type="button" onclick={() => (adding = null)}>Cancel</button>
-			<button
-				class="btn primary"
-				type="button"
-				disabled={!addText.trim() || (adding?.kind === 'prompt' && !addTitle.trim())}
-				onclick={add}>Add</button
-			>
-		{/snippet}
-	</Dialog>
-{/if}
-
 <style>
 	.steps {
 		padding: var(--space-3) var(--space-7) var(--space-8) var(--space-5);
@@ -405,62 +294,6 @@
 		font-size: var(--text-12);
 		color: var(--ink-muted);
 		border-bottom: var(--hairline) solid var(--rule);
-	}
-	.insert {
-		display: grid;
-		grid-template-columns: var(--step-margin) 1fr;
-		align-items: center;
-		height: 0;
-		position: relative;
-		z-index: 1;
-	}
-	.insert > button {
-		justify-self: center;
-		width: 18px;
-		height: 18px;
-		margin-top: -1px;
-		border-radius: 50%;
-		border: 1px solid var(--control-edge);
-		background: var(--sheet);
-		color: var(--ink-muted);
-		display: grid;
-		place-items: center;
-		padding: 0;
-		transform: translateY(-50%);
-	}
-	.insert > button:hover,
-	.insert > button:focus-visible {
-		color: var(--ink);
-	}
-	.insert :global(svg) {
-		width: 10px;
-		height: 10px;
-		stroke: currentColor;
-		stroke-width: 1.6;
-		fill: none;
-	}
-	.menu {
-		position: absolute;
-		left: var(--step-margin);
-		top: var(--space-2);
-		z-index: 25;
-		display: grid;
-		min-width: 260px;
-		padding: var(--space-2);
-		background: var(--sheet-raised);
-		border-radius: var(--radius-control);
-		box-shadow: var(--shadow-overlay);
-	}
-	.menu button {
-		text-align: left;
-		border: 0;
-		background: transparent;
-		padding: var(--space-2) var(--space-3);
-		border-radius: var(--radius-control);
-	}
-	.menu button:hover,
-	.menu button:focus-visible {
-		background: var(--selected);
 	}
 	@media (max-width: 1359px) {
 		.steps {

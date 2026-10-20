@@ -1258,7 +1258,7 @@ TS    { projectId: string; stage: number; after: string; copyConfigFrom: string;
 Res   ProjectView
 Err   NotAllowed ("bypass-permissions", "invalid-start") · PolicyViolation (an `out` path) · Conflict
 ```
-F-025 · AC-F025-01, -03, -04, -05 · SR-03, SR-19, SR-30.
+F-025 · AC-F025-01, -03, -04, -05 · SR-03, SR-19, SR-30. As built (M4-30, M4-31): `NotAllowed` also carries `stage-not-applicable`, `wrong-stage` (`after` is not in `stage`), `bad-title` (empty, over 200 characters or a line break), `bad-text` (empty or over 4000), `bad-out` (more than 8 outputs) and `too-many` (999 added steps in a stage); `invalid-start` means the start config is not the one the surface needs (a chat step has no mode or folder and adaptive effort; a CLI step needs a folder, a mode and a non-adaptive effort). Nothing is written when a check fails. Foreman numbers the step `x-<stage>-<n>` (highest `n` in the overlay plus one) and writes it to `.foreman/overlay.json` through `Opened::own_change`. The project's effective template is the project-local template with each added step spliced in after `after`, so the path, stage view, resolver and launch treat an added step like any other; stage state counts template steps only (DR-054), and a launch of an added step always asks first (`ConfirmReason::OverlayStep`, SR-19).
 
 **`add_item`** · M4 · **repo** (`overlay.json`)
 ```text
@@ -1267,7 +1267,7 @@ TS    { projectId: string; stage: number; text: string }
 Res   GateView
 Err   Conflict
 ```
-F-025 · AC-F025-02.
+F-025 · AC-F025-02. As built (M4-30, M4-31): the item is an `attest` item `xi-<stage>-<n>`; it shows in the gate and in the close-out checklist after the template's items. `NotAllowed` carries `bad-text` and `wrong-stage` like `add_step`.
 
 **`run_sheet_export`** · M4 · writes to the Rust save dialog's path
 ```text

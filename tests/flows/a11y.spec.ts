@@ -48,6 +48,17 @@ for (const scheme of ['dark', 'light'] as const) {
 				).toEqual([]);
 			});
 		}
+		test('Add a prompt dialog open: no axe violations', async ({ page }) => {
+			await page.goto(`/projects/${TL}/stages/2`);
+			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+			await page.getByRole('button', { name: /Add to Stage 2 after 2\.4/ }).click();
+			await page.getByRole('menuitem', { name: /Add prompt/ }).click();
+			await expect(page.getByRole('dialog')).toBeVisible();
+			const axe = await new AxeBuilder({ page })
+				.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+				.analyze();
+			expect(axe.violations.map((v) => v.id)).toEqual([]);
+		});
 		test('Command palette open: no axe violations', async ({ page }) => {
 			await page.goto(`/projects/${TL}/stages/2`);
 			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

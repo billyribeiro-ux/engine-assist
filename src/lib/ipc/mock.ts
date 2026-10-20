@@ -3146,20 +3146,43 @@ export class MockIpcClient implements IpcClient {
 			const p = this.project(req.projectId);
 			const s = p.stages[req.stage];
 			if (!s) throw notFound();
-			if (req.config.start.mode === 'auto' && req.tag === 'core') throw notAllowed('invalid-start');
+			// DR-061: the same checks Rust makes (DR-016, DR-023, DR-026).
+			const bypass = (t: string) => t.toLowerCase().includes('bypasspermissions');
+			if (bypass(req.title) || bypass(req.text) || req.config.out.some(bypass))
+				throw notAllowed('bypass-permissions');
+			const chat = req.config.surface === 'chat';
+			if (
+				(chat && (req.config.start.mode !== null || req.config.cwd !== null)) ||
+				(!chat && (req.config.start.mode === null || req.config.cwd === null)) ||
+				(req.config.start.effort === 'adaptive') !== chat
+			)
+				throw notAllowed('invalid-start');
+			if (!req.title.trim() || req.title.includes('\n')) throw notAllowed('bad-title');
+			if (!req.text.trim()) throw notAllowed('bad-text');
 			for (const o of req.config.out)
 				if (o.startsWith('/') || o.includes('..') || o.startsWith('.github/'))
 					throw fail('policyViolation', { kind: 'policyViolation', path: o, rule: 'out-path' });
 			this.writable(p);
 			const idx = s.steps.findIndex((x) => x.tpl.key === req.after);
-			const n = s.steps.filter((x) => x.tpl.tag === 'added').length + 1;
+			if (idx < 0) throw notFound();
 			const from = this.step(p, req.copyConfigFrom);
-			const key = `x-${req.stage}-${n + (req.stage === 2 ? 1 : 0)}`;
+			const hi = Math.max(
+				0,
+				...s.steps.map((x) => Number(/^x-\d+-(\d+)$/.exec(x.tpl.key)?.[1] ?? 0))
+			);
+			const key = `x-${req.stage}-${hi + 1}`;
 			const st: MStep = {
 				...structuredClone(from),
-				tpl: { ...from.tpl, key, number: key.replace(/-/g, '‑'), title: req.title, tag: 'added' },
+				tpl: {
+					...from.tpl,
+					key,
+					number: key.replace(/-/g, '‑'),
+					title: req.title,
+					tag: 'added',
+					surface: req.config.surface
+				},
 				state: 'notStarted',
-				stateText: 'Not started, added',
+				stateText: req.tag === 'core' ? 'Not started, core' : 'Not started, optional',
 				why: 'Added steps always confirm before running.',
 				run: null,
 				next: false,
@@ -3177,8 +3200,15 @@ export class MockIpcClient implements IpcClient {
 			const p = this.project(req.projectId);
 			this.gate(p, req.stage);
 			this.writable(p);
+			if (!req.text.trim() || req.text.includes('\n')) throw notAllowed('bad-text');
+			if (req.text.toLowerCase().includes('bypasspermissions'))
+				throw notAllowed('bypass-permissions');
+			const hiItem = Math.max(
+				0,
+				...(p.gates[req.stage] ?? []).map((g) => Number(/^xi-\d+-(\d+)$/.exec(g.id)?.[1] ?? 0))
+			);
 			(p.gates[req.stage] ?? []).push({
-				id: `xi-${req.stage}-${(p.gates[req.stage] ?? []).length + 1}`,
+				id: `xi-${req.stage}-${hiItem + 1}`,
 				text: req.text,
 				kind: 'attest',
 				how: 'Added for this project',

@@ -10,6 +10,8 @@ use crate::schema::overlay::{OverlayFile, Skip};
 use crate::schema::project::{ConditionAudit, Conditions, ProjectFile};
 use crate::template::{Expr, Step, StepKind, StepStatus, Tag, Template};
 
+pub mod overlay;
+
 pub use crate::template::expr::{ExprError, parse_expr};
 
 /// Kleene evaluation (DR-051): `!U = U`; `Y & U = U`, `N & U = N`; `Y | U = Y`, `N | U = U`.
@@ -220,7 +222,9 @@ pub fn applicable_path(t: &Template, c: &Conditions, overlay: &OverlayFile) -> A
             .steps
             .iter()
             .zip(steps.iter())
-            .filter(|(s, _)| s.stage == st.number && s.template_id.is_none())
+            .filter(|(s, _)| {
+                s.stage == st.number && s.template_id.is_none() && !s.key.as_str().starts_with("x-")
+            })
             .map(|(_, (_, a))| a)
             .collect();
         let state = if own.is_empty()

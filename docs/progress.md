@@ -202,8 +202,8 @@ branches. APIs: design doc §3.2.3. A command not built yet answers `Unsupported
 | M4-27 | todo | Knowledge manifest | none named | `manifest_view`, `manifest_mark` answer `notYetAvailable:M4-27`. |
 | M4-28 | in-progress | Build-package assembler and root `CLAUDE.md` | 1/3 | Screen built in `6637582`; its commands answer `notYetAvailable:M4-28`. Missing `assembler::rejects_policy_violations`, `rules::late_condition_evidence`. |
 | M4-29 | todo | Desktop handoff | 1/1 | `desktop_open`, `desktop_handoff` answer `notYetAvailable:M4-29`. |
-| M4-30 | todo | Overlay additions: rules and validation | 1/6 | Missing `rules::overlay_add_only`, `rules::added_step_rules`, `rules::added_item_attest_only`, `rules::added_step_validated`, `rules::overlay_roundtrip`. |
-| M4-31 | todo | Add a prompt or inspection item | none named | `add_step`, `add_item` answer `notYetAvailable:M4-31`. |
+| M4-30 | done | Overlay additions: rules and validation | 6/6 | Built in the UI wave because M4-31 depends on it (nothing else had picked it up). `foreman-core::rules::overlay` (`add_step`, `add_item`, `effective_template`, `validate_step`; `rules.rs` became `rules/mod.rs`). Tests: `rules::overlay_add_only`, `added_step_rules`, `added_item_attest_only`, `added_step_validated`, `overlay_roundtrip` (`crates/foreman-core/tests/overlay.rs`) and the overlay case of `template::rejects_bypass_permissions`. |
+| M4-31 | done | Add a prompt or inspection item | none named | `add_step`, `add_item` are real (`src-tauri/src/ipc/commands/overlay.rs`; `project.rs` splices the effective template; tests `overlay::add_step_is_stored_and_listed`, `added_step_always_confirms`, `add_item_lands_in_the_gate`, `refusals_write_nothing`). `InsertPoint.svelte` replaces the old insert dialog in the stage workspace: menu (Add prompt, Add inspection item), copy-config picker, surface, folder, mode, model, effort, outputs, optional/core, the Rust refusal sentence in the dialog; component tests in `InsertPoint.svelte.test.ts` (9, with the workspace's "Added for this project" badge and the overlay-step confirm). |
 | M4-32 | todo | Run sheet export | none named | `run_sheet_export` answers `notYetAvailable:M4-32`. |
 | M4-33 | todo | Command palette and remaining shortcuts | none named | `terminal_open_here` answers `notYetAvailable:M4-33`. The UI branch owns the palette now. |
 | M4-34 | todo | Settings (P2) | 1/2 | Missing `settings::security_fields_require_native_confirm`. |
@@ -223,7 +223,6 @@ branch isn't taken.
 | M4-27 | `manifest_view`, `manifest_mark` |
 | M4-28 | `assembler_view`, `assembler_paste_preview`, `assembler_paste_apply` |
 | M4-29 | `desktop_open`, `desktop_handoff` |
-| M4-31 | `add_step`, `add_item` |
 | M4-32 | `run_sheet_export` |
 
 ## Run metrics: definitions and assumptions (M3-26, M4-02, M4-03)

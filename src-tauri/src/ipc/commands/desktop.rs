@@ -36,20 +36,20 @@ pub fn desktop_handoff(_app: &App, _req: DesktopHandoffReq) -> Result<(), IpcErr
     Err(IpcError::not_yet_available("desktop_handoff", "M4-29"))
 }
 
-/// `add_step`: not built yet (M4-31; IPC-R12).
+/// `add_step` (M4-31): in [`super::overlay`].
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M4-31`).
-pub fn add_step(_app: &App, _req: AddStepReq) -> Result<ProjectView, IpcError> {
-    Err(IpcError::not_yet_available("add_step", "M4-31"))
+/// See [`super::overlay::add_step`].
+pub fn add_step(app: &App, req: AddStepReq) -> Result<ProjectView, IpcError> {
+    super::overlay::add_step(app, req)
 }
 
-/// `add_item`: not built yet (M4-31; IPC-R12).
+/// `add_item` (M4-31): in [`super::overlay`].
 ///
 /// # Errors
-/// `Unsupported` (`notYetAvailable:M4-31`).
-pub fn add_item(_app: &App, _req: AddItemReq) -> Result<GateView, IpcError> {
-    Err(IpcError::not_yet_available("add_item", "M4-31"))
+/// See [`super::overlay::add_item`].
+pub fn add_item(app: &App, req: AddItemReq) -> Result<GateView, IpcError> {
+    super::overlay::add_item(app, req)
 }
 
 /// `run_sheet_export`: not built yet (M4-32; IPC-R12).

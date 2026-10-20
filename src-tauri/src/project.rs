@@ -300,6 +300,7 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
     // A decision file that no longer differs drops its stale pending entry.
     progress.pending_outside.retain(|p| still_pending(&root, p));
     opened.project = d.effective_project().ok();
+    let mut overlay_flags: Vec<String> = Vec::new();
     opened.overlay = d
         .effective_overlay()
         .unwrap_or_else(|_| OverlayFile::empty());
@@ -329,6 +330,14 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         match restored {
             Ok((text, _)) => {
                 let (t, _) = template::cache::load_or_parse(&app_root, &text)?;
+                // F-025: the overlay's added steps join a copy of the pinned template, in place.
+                let t = if opened.overlay.added_steps.is_empty() {
+                    t
+                } else {
+                    let (eff, flags) = rules::overlay::effective_template(&t, &opened.overlay);
+                    overlay_flags = flags;
+                    eff
+                };
                 opened.template = Some(t);
             }
             Err(e) => {
@@ -353,7 +362,9 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         });
     }
     if let (Some(t), Some(p)) = (&opened.template, &opened.project) {
-        opened.path = Some(rules::applicable_path(t, &p.conditions, &opened.overlay));
+        let mut path = rules::applicable_path(t, &p.conditions, &opened.overlay);
+        path.flags.append(&mut overlay_flags);
+        opened.path = Some(path);
     }
     for n in 0..=17u8 {
         let Ok(rel) = pathpolicy::check_read(&packet::file_name(n), ReadClass::Decision) else {

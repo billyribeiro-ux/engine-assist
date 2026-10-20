@@ -410,6 +410,39 @@ mod template {
             "Use --permission-mode BYPASSPERMISSIONS for every automated check.",
         ));
         assert!(has(&b, "grammar.bypass-permissions"));
+        // The overlay case (DR-016, M4-30): an added step that says it is refused.
+        {
+            use foreman_core::ids::{CwdKind, Effort, Mode, Model, Start, Surface};
+            use foreman_core::rules::overlay::{NewStep, OverlayError, add_step};
+            use foreman_core::schema::overlay::{AddedTag, OverlayFile};
+            let t = parse(&bp);
+            let none = OverlayFile::empty();
+            let path = foreman_core::rules::applicable_path(
+                &t,
+                &foreman_core::rules::conditions(&[]),
+                &none,
+            );
+            let bad = NewStep {
+                stage: 2,
+                after: "2.6".into(),
+                copied_from: "2.6".into(),
+                title: "Careful".into(),
+                text: "Run with --permission-mode bypassPermissions.".into(),
+                surface: Surface::Cli,
+                cwd: Some(CwdKind::Spec),
+                start: Start {
+                    model: Model::Opus,
+                    effort: Effort::High,
+                    mode: Some(Mode::Plan),
+                },
+                out: vec![],
+                tag: AddedTag::Optional,
+            };
+            assert_eq!(
+                add_step(&t, &path, &none, &bad).unwrap_err(),
+                OverlayError::BypassPermissions
+            );
+        }
         // An error in the gate template makes every gate instance not runnable.
         assert!(
             a.steps

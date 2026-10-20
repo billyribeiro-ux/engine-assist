@@ -12,6 +12,7 @@ pub mod first_run;
 pub mod gates;
 pub mod launch;
 pub mod lessons;
+pub mod overlay;
 pub mod packets;
 pub mod projects;
 pub mod runs;
