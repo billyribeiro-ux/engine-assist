@@ -13,7 +13,9 @@ use crate::pathpolicy::{self, DecisionPath, ReadClass, WritePurpose};
 use crate::schema::approvals::{Approval, ApprovalsFile};
 use crate::schema::lock::LockFile;
 use crate::schema::overlay::OverlayFile;
-use crate::schema::progress::{ChangeKind, DecisionFileKind, DiffEntry, PendingOutside, PendingOwn};
+use crate::schema::progress::{
+    ChangeKind, DecisionFileKind, DiffEntry, PendingOutside, PendingOwn,
+};
 use crate::schema::project::ProjectFile;
 use crate::schema::{self, Loaded};
 use crate::store::{ReadStamp, Root, StoreError, sha256_hex};
@@ -30,7 +32,9 @@ pub fn approved_path(project_id: &str, kind: DecisionFileKind) -> String {
     format!("approvals/{project_id}/{}", kind.approved_name())
 }
 
-fn decision_path(kind: DecisionFileKind) -> DecisionPath {
+/// The path-policy decision path of a decision file.
+#[must_use]
+pub fn decision_path(kind: DecisionFileKind) -> DecisionPath {
     match kind {
         DecisionFileKind::Project => DecisionPath::Project,
         DecisionFileKind::Overlay => DecisionPath::Overlay,
@@ -38,7 +42,7 @@ fn decision_path(kind: DecisionFileKind) -> DecisionPath {
     }
 }
 
-fn entry<'a>(a: &'a mut ApprovalsFile, kind: DecisionFileKind) -> &'a mut Approval {
+fn entry(a: &mut ApprovalsFile, kind: DecisionFileKind) -> &mut Approval {
     match kind {
         DecisionFileKind::Project => &mut a.files.project,
         DecisionFileKind::Overlay => &mut a.files.overlay,
@@ -112,7 +116,12 @@ fn shown(path: &[String], v: &Value) -> String {
     }
 }
 
-fn diff_into(path: &mut Vec<String>, a: Option<&Value>, b: Option<&Value>, out: &mut Vec<DiffEntry>) {
+fn diff_into(
+    path: &mut Vec<String>,
+    a: Option<&Value>,
+    b: Option<&Value>,
+    out: &mut Vec<DiffEntry>,
+) {
     match (a, b) {
         (Some(Value::Object(x)), Some(Value::Object(y))) => {
             let mut keys: Vec<&String> = x.keys().chain(y.keys()).collect();
@@ -151,15 +160,25 @@ pub fn diff(approved: &Value, on_disk: &Value) -> Vec<DiffEntry> {
 
 /// DR-151 (`core::decisions::classify_outside_change`).
 #[must_use]
-pub fn classify_outside_change(kind: DecisionFileKind, approved: &[u8], on_disk: &[u8]) -> Classified {
+pub fn classify_outside_change(
+    kind: DecisionFileKind,
+    approved: &[u8],
+    on_disk: &[u8],
+) -> Classified {
     if approved == on_disk {
         return Classified::Unchanged;
     }
     if let Err(reason) = typed_ok(kind, on_disk) {
         return Classified::ReadOnly(format!("{}: {reason}", kind.repo_path()));
     }
-    let (Ok(a), Ok(b)) = (crate::json::parse_value(approved), crate::json::parse_value(on_disk)) else {
-        return Classified::ReadOnly(format!("{}: the approved copy is unreadable", kind.repo_path()));
+    let (Ok(a), Ok(b)) = (
+        crate::json::parse_value(approved),
+        crate::json::parse_value(on_disk),
+    ) else {
+        return Classified::ReadOnly(format!(
+            "{}: the approved copy is unreadable",
+            kind.repo_path()
+        ));
     };
     let d = diff(&a, &b);
     if d.is_empty() {
@@ -206,6 +225,8 @@ pub struct Decisions<'a> {
 pub enum OwnChange {
     /// Before Stage 5 is signed: the repo file is written; commit it now by pathspec.
     CommitNow {
+        /// Which file.
+        file: DecisionFileKind,
         /// Repo path.
         path: String,
         /// SHA-256 of the bytes written (the commit's reviewed hash).
@@ -216,13 +237,16 @@ pub enum OwnChange {
 }
 
 impl Decisions<'_> {
-    fn app_rel(&self, rel: &str) -> Result<pathpolicy::RepoPath, DecisionError> {
+    fn app_rel(rel: &str) -> Result<pathpolicy::RepoPath, DecisionError> {
         Ok(pathpolicy::check_app_data(rel).map_err(StoreError::from)?)
     }
 
     fn repo_rel(kind: DecisionFileKind) -> Result<pathpolicy::RepoPath, DecisionError> {
         let d = decision_path(kind);
-        Ok(pathpolicy::check_write(&d.path(), WritePurpose::DecisionFile(d)).map_err(StoreError::from)?)
+        Ok(
+            pathpolicy::check_write(&d.path(), WritePurpose::DecisionFile(d))
+                .map_err(StoreError::from)?,
+        )
     }
 
     /// The approvals file (a fresh one when absent).
@@ -230,7 +254,7 @@ impl Decisions<'_> {
     /// # Errors
     /// Store or parse failure.
     pub fn approvals(&self) -> Result<(ApprovalsFile, ReadStamp), DecisionError> {
-        let rel = self.app_rel(&approvals_path(self.project_id))?;
+        let rel = Self::app_rel(&approvals_path(self.project_id))?;
         let (bytes, stamp) = self.app.read_opt(&rel, ReadClass::AppState)?;
         let a = match bytes {
             None => ApprovalsFile::new(self.project_id),
@@ -243,7 +267,7 @@ impl Decisions<'_> {
     }
 
     fn save_approvals(&self, a: &ApprovalsFile, stamp: &ReadStamp) -> Result<(), DecisionError> {
-        let rel = self.app_rel(&approvals_path(self.project_id))?;
+        let rel = Self::app_rel(&approvals_path(self.project_id))?;
         let text = schema::to_file(a).map_err(|e| DecisionError::Corrupt(e.to_string()))?;
         self.app.write(&rel, text.as_bytes(), stamp)?;
         Ok(())
@@ -254,7 +278,7 @@ impl Decisions<'_> {
     /// # Errors
     /// [`DecisionError::NoApprovedCopy`], store failure.
     pub fn approved(&self, kind: DecisionFileKind) -> Result<(Vec<u8>, ReadStamp), DecisionError> {
-        let rel = self.app_rel(&approved_path(self.project_id, kind))?;
+        let rel = Self::app_rel(&approved_path(self.project_id, kind))?;
         match self.app.read_opt(&rel, ReadClass::Decision)? {
             (Some(b), s) => Ok((b, s)),
             (None, _) => Err(DecisionError::NoApprovedCopy(kind.repo_path().into())),
@@ -290,15 +314,25 @@ impl Decisions<'_> {
         schema::load::<T>(&b)
             .ok()
             .and_then(Loaded::value)
-            .ok_or_else(|| DecisionError::Corrupt(format!("the approved {} is unreadable", kind.approved_name())))
+            .ok_or_else(|| {
+                DecisionError::Corrupt(format!(
+                    "the approved {} is unreadable",
+                    kind.approved_name()
+                ))
+            })
     }
 
     /// Records the repo bytes as approved and committed (setup, accept, or a commit landing).
     ///
     /// # Errors
     /// Store failure.
-    pub fn approve(&self, kind: DecisionFileKind, bytes: &[u8], committed: bool) -> Result<(), DecisionError> {
-        let rel = self.app_rel(&approved_path(self.project_id, kind))?;
+    pub fn approve(
+        &self,
+        kind: DecisionFileKind,
+        bytes: &[u8],
+        committed: bool,
+    ) -> Result<(), DecisionError> {
+        let rel = Self::app_rel(&approved_path(self.project_id, kind))?;
         let (_, stamp) = self.app.read_opt(&rel, ReadClass::Decision)?;
         self.app.write(&rel, bytes, &stamp)?;
         let (mut a, s) = self.approvals()?;
@@ -315,7 +349,11 @@ impl Decisions<'_> {
     ///
     /// # Errors
     /// Store failure.
-    pub fn mark_committed(&self, kind: DecisionFileKind, sha256: &str) -> Result<(), DecisionError> {
+    pub fn mark_committed(
+        &self,
+        kind: DecisionFileKind,
+        sha256: &str,
+    ) -> Result<(), DecisionError> {
         let (mut a, s) = self.approvals()?;
         entry(&mut a, kind).committed_sha256 = Some(sha256.to_owned());
         self.save_approvals(&a, &s)
@@ -326,11 +364,22 @@ impl Decisions<'_> {
     ///
     /// # Errors
     /// Store failure, or no approved copy.
-    pub fn process(&self, kind: DecisionFileKind, id: &str, now: &str) -> Result<Processed, DecisionError> {
+    pub fn process(
+        &self,
+        kind: DecisionFileKind,
+        id: &str,
+        now: &str,
+    ) -> Result<Processed, DecisionError> {
         let rel = Self::repo_rel(kind)?;
         let disk = match self.project.read(&rel, ReadClass::Decision) {
             Ok((b, _)) => b,
-            Err(e @ (StoreError::NotFound(_) | StoreError::Policy(_) | StoreError::NotRegular(_) | StoreError::HardLink(..) | StoreError::TooLarge { .. })) => {
+            Err(
+                e @ (StoreError::NotFound(_)
+                | StoreError::Policy(_)
+                | StoreError::NotRegular(_)
+                | StoreError::HardLink(..)
+                | StoreError::TooLarge { .. }),
+            ) => {
                 return Ok(Processed::ReadOnly(e.to_string()));
             }
             Err(e) => return Err(e.into()),
@@ -348,7 +397,11 @@ impl Decisions<'_> {
             Classified::Unchanged => Processed::Unchanged,
             Classified::ReadOnly(r) => Processed::ReadOnly(r),
             Classified::VariablesOnly if !own_pending => {
-                self.approve(kind, &disk, e.committed_sha256.as_deref() == Some(sha.as_str()))?;
+                self.approve(
+                    kind,
+                    &disk,
+                    e.committed_sha256.as_deref() == Some(sha.as_str()),
+                )?;
                 Processed::VariablesReloaded
             }
             Classified::VariablesOnly => Processed::Pending(PendingOutside {
@@ -380,7 +433,7 @@ impl Decisions<'_> {
         stage5_signed: bool,
         now: &str,
     ) -> Result<OwnChange, DecisionError> {
-        let copy_rel = self.app_rel(&approved_path(self.project_id, kind))?;
+        let copy_rel = Self::app_rel(&approved_path(self.project_id, kind))?;
         let (old_copy, copy_stamp) = self.app.read_opt(&copy_rel, ReadClass::Decision)?;
         let repo_rel = Self::repo_rel(kind)?;
         let (repo_now, repo_stamp) = self.project.read_opt(&repo_rel, ReadClass::Decision)?;
@@ -408,26 +461,27 @@ impl Decisions<'_> {
                 at: now.to_owned(),
             }));
         }
-        match old_copy {
+        if let Some(old) = old_copy {
             // The copy first, then the repo file; a repo conflict restores the copy.
-            Some(old) => {
-                let written = self.app.write(&copy_rel, bytes, &copy_stamp)?;
-                if let Err(e) = self.project.write(&repo_rel, bytes, &repo_stamp) {
-                    self.app.write(&copy_rel, &old, &written)?;
-                    return Err(e.into());
-                }
+            let written = self.app.write(&copy_rel, bytes, &copy_stamp)?;
+            if let Err(e) = self.project.write(&repo_rel, bytes, &repo_stamp) {
+                self.app.write(&copy_rel, &old, &written)?;
+                return Err(e.into());
             }
+        } else {
             // No approved copy yet (the file's first write): the repo file first, so a failure
             // leaves nothing approved; a copy failure afterwards shows as a pending change.
-            None => {
-                self.project.write(&repo_rel, bytes, &repo_stamp)?;
-                self.app.write(&copy_rel, bytes, &copy_stamp)?;
-            }
+            self.project.write(&repo_rel, bytes, &repo_stamp)?;
+            self.app.write(&copy_rel, bytes, &copy_stamp)?;
         }
         let (mut a, s) = self.approvals()?;
         entry(&mut a, kind).approved_sha256 = Some(sha.clone());
         self.save_approvals(&a, &s)?;
-        Ok(OwnChange::CommitNow { path: kind.repo_path().to_owned(), sha256: sha })
+        Ok(OwnChange::CommitNow {
+            file: kind,
+            path: kind.repo_path().to_owned(),
+            sha256: sha,
+        })
     }
 }
 
