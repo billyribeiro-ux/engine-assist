@@ -17,6 +17,7 @@ pub mod resolver;
 pub mod rules;
 pub mod sanitize;
 pub mod schema;
+pub mod steps;
 pub mod store;
 pub mod template;
 
