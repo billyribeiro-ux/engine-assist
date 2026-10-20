@@ -912,7 +912,7 @@ Threats mitigated: none
 Likely files: src/routes/+layout.svelte, src/routes/+page.svelte, src/routes/first-run/+page.svelte, src/routes/setup/+page.svelte, src/routes/doctor/+page.svelte, src/routes/settings/+page.svelte, src/routes/projects/[projectId]/+layout.svelte, src/routes/projects/[projectId]/stages/[stage]/+page.svelte, src/lib/components/ui/, src/lib/stores/, src/lib/nav/, docs/design/tokens.css → src/lib/styles/tokens.css
 Acceptance criteria:
 - EX-M2-01 (routes exist; real data arrives with each screen ticket)
-- Given each P1 route, then it renders under the root layout (sidebar, terminal drawer host, aria-live region) in mock mode, with bits-ui 2.19.5 wrappers styled only by tokens
+- Given each P1 route, then it renders under the root layout (sidebar, terminal drawer host, aria-live region) in mock mode, with hand-built primitives (ADR-020 amendment 2026-10-20; bits-ui is not used) styled only by tokens
 Required tests:
 - none named (one component test per route stub)
 Out of scope: screen content (later M2 tickets).

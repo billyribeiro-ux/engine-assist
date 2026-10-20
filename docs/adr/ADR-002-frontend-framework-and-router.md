@@ -59,7 +59,7 @@ Registry check, 2026-10-19:
 
 - `pnpm verify`: `svelte-check --fail-on-warnings`, ESLint (no `{@html}`, no server files, `@tauri-apps/api` imported only in `#lib/ipc`), Vitest.
 - WDIO smoke on the built app (SR-20): the served CSP header contains the bootstrap hash, and an injected inline `<script>` raises `securitypolicyviolation` and doesn't run. Playwright: navigation and a reload on a deep route render the same screen.
-- S-0: CSP check with bits-ui, Svelte transitions, xterm and the SvelteKit bootstrap; DevTools shows no CSP violations and no `version.json` requests.
+- S-0: CSP check with Svelte transitions, xterm and the SvelteKit bootstrap; DevTools shows no CSP violations and no `version.json` requests.
 - NFR-01 startup mark.
 
 ## Revisit when

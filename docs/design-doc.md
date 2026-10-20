@@ -307,7 +307,7 @@ src/
     ipc/  bindings/ (ts-rs, checked in) · contract.ts (IpcClient) · tauri.ts · mock.ts · index.ts
     stores/      *.svelte.ts rune modules (projects, today, workspace, terminals, doctor, settings)
     terminal/    xterm host, key router, link handler, paste path, archive sections
-    components/ui/  bits-ui wrappers;  components/  step block, spec line, prompt block, packet view
+    components/  hand-built primitives (Dialog, Palette, Segmented; ADR-020), step block, spec line, prompt block, packet view
     render/      Rust node tree → Svelte components (no HTML strings)
     keyboard/    shortcut registry;  nav/  goto/$app/state wrapper
 ```
@@ -574,7 +574,7 @@ recovered/<timestamp>-<name>                  leftover temp files that differed 
 
 ### 5.4 Accessibility
 
-- WCAG 2.2 AA through bits-ui primitives in `#lib/components/ui` wrappers and the tokens (Stage 4.5 contrast table, NFR-35).
+- WCAG 2.2 AA through hand-built, keyboard-complete primitives in `#lib/components` (ADR-020 amendment 2026-10-20) and the tokens (Stage 4.5 contrast table, NFR-35).
 - Keyboard: the shortcut registry; xterm's `attachCustomKeyEventHandler` routes ⌘-chords to the app (except ⌘C/⌘V/⌘A/⌘F); ⌘⇧E leaves the terminal, so there's no trap.
 - VoiceOver: an `aria-live` region. A Settings toggle, "Screen reader mode", turns on xterm `screenReaderMode` and adds `--ax-screen-reader` to CLI launches (Foreman doesn't detect VoiceOver).
 - Reduce Motion and Increase Contrast are CSS media queries in the webview (`prefers-reduced-motion`, `prefers-contrast: more`, whose tokens reach ≥ 7:1). Reduce Transparency is detected the same way (`prefers-reduced-transparency`); the webview reports it and Increase Contrast to Rust (`settings_update` `osDisplay`), which turns the window's vibrancy off (ADR-014).
@@ -647,7 +647,7 @@ A failed probe disables only the dependent feature; an inconclusive one keeps th
 | Risk | Mitigation | Owner |
 |---|---|---|
 | xterm 6 in WKWebView with the real TUI | S-0 decision rule | S-0 |
-| Strict `style-src` with SvelteKit's `app.html` style attribute, Svelte transitions, bits-ui, xterm | S-0 rule: `style-src 'unsafe-inline'` only, recorded in ADR-014 | S-0 |
+| Strict `style-src` with SvelteKit's `app.html` style attribute, Svelte transitions, xterm (bits-ui is not used, ADR-020) | S-0 rule: `style-src 'unsafe-inline'` only, recorded in ADR-014 | S-0 |
 | SvelteKit 3 `version.json` focus/visibility check with `pollInterval: 0` (**UNVERIFIED**) | S-0. If it fetches, `connect-src` gains `'self'` | S-0 |
 | Non-PTY children get `process_group(0)`, not `setsid` (no safe stable `setsid` in std 1.99.1) | Accepted in Stage 4.7 (SR-57 amended); fallback is spawning via portable-pty | ADR-007, `spawn::no_inherited_fds` |
 | Fds inherited by non-PTY children from system frameworks | `spawn::no_inherited_fds` in M2; same fallback | ADR-007 |
