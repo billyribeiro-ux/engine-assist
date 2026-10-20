@@ -1,0 +1,39 @@
+{
+  "acked": {
+    "at": "2026-10-20T09:00:00Z",
+    "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "snapshot": [
+      {
+        "path": "~/.claude/settings.json",
+        "redacted": {
+          "env": {
+            "FOO": "‹redacted sha256:abcd1234›"
+          }
+        },
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source": "userSettings"
+      }
+    ]
+  },
+  "auth": {
+    "at": "2026-10-20T09:00:00Z",
+    "authMethod": "claude.ai",
+    "claudeVersion": "2.1.304",
+    "envKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "exit": 0,
+    "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "cwd": "/Users/billy/dev/tradelog",
+  "projectId": "3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b",
+  "schemaVersion": 1,
+  "stat": [
+    {
+      "dev": 1,
+      "ino": 2,
+      "mtimeNs": 4,
+      "path": "/Users/billy/.claude/settings.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 3
+    }
+  ]
+}

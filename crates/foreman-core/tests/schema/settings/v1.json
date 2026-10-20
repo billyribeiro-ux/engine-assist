@@ -1,0 +1,49 @@
+{
+  "authKeyAllowlist": [],
+  "blueprintRepo": {
+    "path": "/Users/billy/dev/claude-blueprint",
+    "source": "autoDetect"
+  },
+  "contract": {
+    "outcomes": {
+      "probeA": {
+        "flag": null,
+        "result": "pass"
+      },
+      "probeB": {
+        "flag": null,
+        "result": "pass"
+      }
+    },
+    "verifiedAt": "2026-10-20T09:00:00Z",
+    "version": "2.1.304"
+  },
+  "driName": "Billy Ribeiro",
+  "editorBundleId": "com.microsoft.VSCode",
+  "envPassthrough": [
+    "JAVA_HOME"
+  ],
+  "globalVariables": {
+    "PREFERRED_STACK": "Svelte 5 + SvelteKit 3"
+  },
+  "lastSeenClaudeVersion": "2.1.304",
+  "loginPath": null,
+  "probeFolderTrusted": false,
+  "schemaVersion": 1,
+  "terminal": {
+    "fontSize": 13,
+    "macOptionIsMeta": true,
+    "scrollback": 10000
+  },
+  "theme": "system",
+  "tools": {
+    "claude": {
+      "path": "/Users/billy/.local/bin/claude",
+      "source": "auto"
+    },
+    "git": {
+      "path": "/usr/bin/git",
+      "source": "auto"
+    }
+  }
+}

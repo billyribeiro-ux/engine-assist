@@ -1,0 +1,11 @@
+{
+  "event": "Stop",
+  "payload": {
+    "hook_event_name": "Stop",
+    "session_id": "6f1c2a3b-1d2e-4f50-8a9b-0c1d2e3f4a5b"
+  },
+  "receivedAt": "2026-10-20T09:00:00Z",
+  "schemaVersion": 1,
+  "token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "truncated": false
+}

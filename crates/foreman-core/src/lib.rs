@@ -9,6 +9,8 @@
 pub mod diagnostic;
 pub mod ids;
 pub mod json;
+pub mod pathpolicy;
+pub mod store;
 pub mod schema;
 
 /// The crate version, as built.

@@ -1,0 +1,33 @@
+{
+  "envApprovals": [],
+  "files": {
+    "blueprintLock": {
+      "approvedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "committedOnOtherBranches": {
+        "refs/heads/release": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "committedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "overlay": {
+      "approvedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "committedOnOtherBranches": {},
+      "committedSha256": null
+    },
+    "project": {
+      "approvedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "committedOnOtherBranches": {},
+      "committedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "itemKinds": {},
+  "outsideSignatures": {
+    "1": {
+      "at": "2026-10-20T09:00:00Z",
+      "packetSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "signedBy": "Billy Ribeiro",
+      "signedOn": "2026-10-19"
+    }
+  },
+  "projectId": "3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b",
+  "schemaVersion": 1
+}
