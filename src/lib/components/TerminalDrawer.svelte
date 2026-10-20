@@ -125,6 +125,7 @@
 	</section>
 {:else}
 	<section class={['drawer', terminal.focusMode && 'focus-mode']} aria-label="Terminal drawer" {@attach heightStyle}>
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (a focusable separator is the ARIA splitter pattern: ↑ ↓ resize) -->
 		<div
 			class="drawer-grip"
 			role="separator"

@@ -26,7 +26,8 @@ async function start(client: IpcClient, t: RunTarget, prep: PrepareOutcome): Pro
 	}
 	const out = pendingOutput();
 	if (prep.rearm?.kind === 'idleConfirmation') {
-		const old = terminal.tabs.find((x) => x.chain === prep.rearm?.chain && x.status === 'running');
+		const chain = prep.rearm.chain;
+		const old = terminal.tabs.find((x) => x.chain === chain && x.status === 'running');
 		const res = await client.rearmStart({ planId: prep.planId }, out.cb);
 		if (res.kind === 'endYourself') return "Claude didn't exit. End it yourself, then press Continue.";
 		out.bind(res.runId);

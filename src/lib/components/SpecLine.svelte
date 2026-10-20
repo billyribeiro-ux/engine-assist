@@ -6,7 +6,7 @@
 
 	import Icon from './Icon.svelte';
 
-	let { line, id }: { line: SpecLine; id: string } = $props();
+	let { line, id, compact = false }: { line: SpecLine; id: string; compact?: boolean } = $props();
 
 	function why(e: Explained<string>, other: Explained<string> | null): string {
 		switch (e.origin.kind) {
@@ -61,7 +61,7 @@
 		<div><dt>Mode</dt><dd>—</dd></div>
 	{/if}
 	{#if agents}<div><dt>Agents</dt><dd>{agents}</dd></div>{/if}
-	{#each line.droppedAgents as a (a)}<div><dt>Agent dropped</dt><dd>{a} not applicable</dd></div>{/each}
+	{#each compact ? [] : line.droppedAgents as a (a)}<div><dt>Agent dropped</dt><dd>{a} not applicable</dd></div>{/each}
 	{#if line.note && line.model}<div><dt>Note</dt><dd class="note">{line.note}</dd></div>{/if}
 </dl>
 

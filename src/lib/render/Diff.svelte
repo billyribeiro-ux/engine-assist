@@ -37,6 +37,7 @@
 	});
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable regions are focusable, components.md) -->
 <pre class="diff" tabindex="0" aria-label={label}>{#each lines as l, i (i)}<span class={l.cls}
 			>{#if l.sign}<span class="sign">{l.sign}</span>{/if}{#if l.spans}<Text
 					spans={l.spans}

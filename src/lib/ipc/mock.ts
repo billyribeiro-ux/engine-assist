@@ -273,7 +273,7 @@ export class MockIpcClient implements IpcClient {
 			: null;
 		const line: T.SpecLine = {
 			surface: t.surface,
-			where: t.where,
+			where: t.where.endsWith('in Project') ? `${t.where} ${p.name}` : t.where,
 			model,
 			effort,
 			mode,
@@ -496,7 +496,8 @@ export class MockIpcClient implements IpcClient {
 	}
 	private chainRun(chain: string | null): World['runs'][number] | undefined {
 		if (!chain) return undefined;
-		return [...this.world.runs].reverse().find((r) => r.summary.chain === chain);
+		const mine = this.world.runs.filter((r) => r.summary.chain === chain);
+		return mine.find((r) => r.live) ?? [...mine].sort((a, b) => b.summary.startedAt.localeCompare(a.summary.startedAt))[0];
 	}
 	private continues(p: MProject, st: MStep): MStep | undefined {
 		const m = /continues (\S+)/.exec(st.tpl.where);

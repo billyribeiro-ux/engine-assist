@@ -166,17 +166,11 @@
 					<ol class="inbox" aria-label="Waiting on you, in priority order">
 						{#each inbox as i, n (n)}
 							{@const look = INBOX_LOOK[i.kind]}
-							<li
-								tabindex="-1"
-								data-today-row
-								onkeydown={(e) => {
-									if (e.key === 'Enter' && e.target === e.currentTarget) void act(i);
-								}}
-							>
+							<li>
 								<Icon name={look.icon} size="glyph" tone={look.tone} />
 								<span class="proj">{i.projectName}</span>
 								<span class="what">{i.title}<small>{i.detail}</small></span>
-								<button class="btn" type="button" onclick={() => act(i)}
+								<button class="btn" type="button" data-today-row onclick={() => act(i)}
 									>{#if i.kind === 'sessionBlocked'}<Icon name="terminal" />{/if}{look.action}</button
 								>
 							</li>
@@ -207,7 +201,7 @@
 												: `Stage ${row.project.currentStage ?? ''}, ${row.stageTitle ?? ''}`}</span
 										>
 									</div>
-									{#if row.next.specLine}<SpecLine line={row.next.specLine} id="today-{row.project.id}" />{/if}
+									{#if row.next.specLine}<SpecLine line={row.next.specLine} id="today-{row.project.id}" compact />{/if}
 								{:else if row.whyNone && row.project.readOnly}
 									<div class="stepname">{row.whyNone}</div>
 									<p class="small muted">Nothing here runs until the folder is back.</p>
@@ -258,7 +252,7 @@
 		border-bottom: var(--hairline) solid var(--rule);
 	}
 	.inbox li:first-child,
-	.inbox li:focus-visible {
+	.inbox li:focus-within {
 		background: var(--sheet-raised);
 	}
 	.inbox .proj {

@@ -3,6 +3,7 @@
 	// plain words (AC-F019-04, -06); the capability table and contract probes (P2); toolchain and the
 	// consented login-shell PATH capture (P2, SR-02: Rust asks in a native dialog first).
 	import { failureText } from '#lib/actions/words.ts';
+	import Dialog from '#lib/components/Dialog.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import { toIpcFailure } from '#lib/ipc/errors.ts';
 	import { ipc } from '#lib/ipc/index.ts';
@@ -160,31 +161,28 @@
 </main>
 
 {#if preview}
-	<div class="scrim" aria-hidden="true"></div>
-	<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="lp-title" aria-describedby="lp-desc">
-		<div class="dialog-head">
-			<h2 class="dialog-title" id="lp-title">Login shell PATH from {preview.shell}</h2>
-			<p class="hint" id="lp-desc">Foreman keeps only absolute entries. Save asks you once more in a macOS dialog.</p>
-		</div>
-		<div class="dialog-body">
-			<ul class="writes">
-				{#each preview.entries as e, i (i)}
-					<li>
-						<span class="what"
-							>{#if e.ok}<Icon name="check" size="glyph" tone="pass" /> Keep{:else}<Icon name="cross" size="glyph" tone="fail" /> Drop{/if}</span
-						>
-						<span><code><Text text={e.entry} /></code>{#if e.why}<span class="muted"> {e.why}</span>{/if}</span>
-					</li>
-				{/each}
-			</ul>
-		</div>
-		<div class="dialog-foot">
+	<Dialog
+		title="Login shell PATH from {preview.shell}"
+		description="Foreman keeps only absolute entries. Save asks you once more in a macOS dialog."
+		onclose={() => (preview = null)}
+		width="narrow"
+	>
+		<ul class="writes">
+			{#each preview.entries as e, i (i)}
+				<li>
+					<span class="what"
+						>{#if e.ok}<Icon name="check" size="glyph" tone="pass" /> Keep{:else}<Icon name="cross" size="glyph" tone="fail" /> Drop{/if}</span
+					>
+					<span><code><Text text={e.entry} /></code>{#if e.why}<span class="muted"> {e.why}</span>{/if}</span>
+				</li>
+			{/each}
+		</ul>
+		{#snippet footer()}
 			<span class="spacer"></span>
 			<button class="btn" type="button" onclick={() => (preview = null)}>Cancel</button>
-			<!-- svelte-ignore a11y_autofocus -->
-			<button class="btn primary" type="button" onclick={apply} autofocus>Save PATH</button>
-		</div>
-	</div>
+			<button class="btn primary" type="button" onclick={apply}>Save PATH</button>
+		{/snippet}
+	</Dialog>
 {/if}
 
 <style>
