@@ -1,0 +1,24 @@
+# JS supply-chain policy (ADR-024, SR-61, AC-M0-17). pnpm 12 fails on unknown keys here
+# (ERR_PNPM_UNRECOGNIZED_WORKSPACE_SETTINGS), so a misspelled policy key can't silently drop policy.
+packages:
+  - .
+
+# 7 days, in minutes. Strict once set explicitly: a too-new version fails the install.
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+# Exact-version exceptions to no-downgrade, each with a reason (ADR-024 log):
+# - undici-types@6.21.0: type declarations only (no runtime code, no scripts), required by
+#   @types/node 22.x; published before npm provenance existed for that line. Reviewed 2026-10-20.
+trustPolicyExclude:
+  - undici-types@6.21.0
+saveExact: true
+engineStrict: true
+# An unapproved dependency build script fails the install (ERR_PNPM_IGNORED_BUILDS).
+strictDepBuilds: true
+# Build-script allowlist; default deny. Each entry needs a reviewed reason and a line in ADR-024's log.
+# Empty at M0: no package in the tree needs a build script (Vite 8 bundles with rolldown, not esbuild).
+allowBuilds: {}
+
+# ADR-019: exactly one TypeScript in the tree.
+overrides:
+  typescript: 6.0.3

@@ -1,0 +1,28 @@
+:root {
+	color-scheme: light dark;
+	--fm-bg: #f6f1e7;
+	--fm-fg: #1f2430;
+	--fm-muted: #5b6170;
+	font-family:
+		system-ui,
+		-apple-system,
+		sans-serif;
+	background: var(--fm-bg);
+	color: var(--fm-fg);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--fm-bg: #161a22;
+		--fm-fg: #ece2cc;
+		--fm-muted: #a3a9b6;
+	}
+}
+
+body {
+	margin: 0;
+}
+
+#app {
+	display: contents;
+}

@@ -1,0 +1,24 @@
+{
+	"extends": "$app/tsconfig",
+	"compilerOptions": {
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true,
+		"verbatimModuleSyntax": true,
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"resolveJsonModule": true
+	},
+	"include": ["src", "tests", "scripts", "*.ts", "*.js"],
+	"exclude": [
+		"node_modules",
+		"build",
+		".svelte-kit",
+		"src-tauri",
+		"target",
+		"scripts/lint-plants/fixtures"
+	]
+}
