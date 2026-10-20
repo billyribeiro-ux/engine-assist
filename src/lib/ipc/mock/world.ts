@@ -1147,6 +1147,7 @@ export function projectFilePending(): PendingChange {
 
 // ---------------------------------------------------------------- runs
 export const TRANSCRIPT_23 = [
+	'\x1b[2m── 2.3 Feature specifications · Fable 5.1 · high · Accept edits · permission grants reset ──\x1b[0m\r\n',
 	'\x1b[2m> \x1b[0multrathink. For each v1 feature, write a specification a senior engineer could build from…\r\n',
 	'\r\n',
 	'\x1b[32m⏺\x1b[0m Read(\x1b[34mcouncil/r5-resolution.md\x1b[0m) \x1b[2m⎿ 618 lines\x1b[0m\r\n',

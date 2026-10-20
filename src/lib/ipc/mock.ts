@@ -130,6 +130,8 @@ export class MockIpcClient implements IpcClient {
 		this.previews.clear();
 		this.counter = 0;
 		this.picks = 0;
+		this.overrides.clear();
+		this.outputs.clear();
 		this.emit('projects:changed', { rev: ++this.revCounter });
 		this.emit('settings:changed', { rev: this.world.settings.rev });
 	}
@@ -3207,12 +3209,13 @@ export function mockClient(): MockIpcClient {
 	return shared;
 }
 
-/** Resets the shared instance (component tests). */
+/** Resets the shared instance's world (component tests); event subscriptions stay. */
 export function resetMock(scenario: Scenario = 'happy'): MockIpcClient {
-	shared = new MockIpcClient(scenario);
-	if (typeof window !== 'undefined')
-		(window as unknown as { __foremanMock?: MockIpcClient }).__foremanMock = shared;
-	return shared;
+	const m = mockClient();
+	m.setScenario(scenario);
+	m.setDialogAnswer('ok');
+	m.streamDelayMs = 0;
+	return m;
 }
 
 /** Type check: every command in COMMAND_MAP is a method here (tsc proves it via `implements`). */

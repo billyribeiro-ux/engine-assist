@@ -15,3 +15,4 @@ scripts/lint-plants/fixtures/
 test-results/
 playwright-report/
 *.md
+src/lib/styles/tokens.css
