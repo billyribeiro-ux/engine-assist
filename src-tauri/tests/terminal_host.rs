@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use common::project::{ProjectApp, collect, req};
-use foreman_app::ipc::commands::launch;
+use foreman_app::ipc::commands::launch as launch_cmd;
 use foreman_app::ipc::commands::settings as settings_cmd;
 use foreman_app::ipc::commands::terminal as term_cmd;
 use foreman_app::ipc::dto::launch::{LaunchPreview, PrepareOutcome};
@@ -92,6 +92,40 @@ mod terminal {
 mod settings {
     use super::*;
 
+    /// AC-F008-07 on S-7′'s pass branch (M3-03): Claude Code doesn't apply a project's `env` before
+    /// the trust prompt, so there is nothing to approve; the command says so, typed, and a launch
+    /// isn't blocked by a project `env` block that sets no blocked key.
+    #[test]
+    fn project_env_approval_not_needed_on_the_s7_pass_branch() {
+        let p = ProjectApp::new(json!({}));
+        std::fs::create_dir_all(p.project.join(".claude")).unwrap();
+        std::fs::write(
+            p.project.join(".claude/settings.json"),
+            r#"{ "env": { "TRADELOG_COLOR": "blue" } }"#,
+        )
+        .unwrap();
+        let e = launch_cmd::project_env_approve(
+            &p.t.app,
+            req(json!({ "projectId": p.id, "cwd": "project", "sha256": "a".repeat(64) })),
+        )
+        .unwrap_err();
+        assert_eq!(e.code, IpcErrorCode::Unsupported);
+        assert!(
+            matches!(&e.detail, Some(foreman_app::ipc::error::IpcErrorDetail::Unsupported { why, .. }) if why == "s7-passed"),
+            "{e:?}"
+        );
+        match p.prepare("2.2") {
+            PrepareOutcome::Ready(_) => {}
+            PrepareOutcome::Blocked { blockers, .. } => assert!(
+                !blockers.iter().any(|b| {
+                    let k = serde_json::to_value(b).unwrap()["kind"].clone();
+                    k == "projectEnvUnapproved" || k == "authKeyBlocked"
+                }),
+                "{blockers:?}"
+            ),
+        }
+    }
+
     /// SR-24a, AC-F008-05 (allowlisted hashes): allowing an auth-changing key from
     /// `~/.claude/settings.json`, and removing it from the allowlist, each ask in a native dialog
     /// first; Cancel changes nothing, and only the value's hash is stored.
@@ -114,7 +148,8 @@ mod settings {
             .find(|b| b["kind"] == "authKeyBlocked")
             .unwrap_or_else(|| panic!("{blockers:?}"));
         assert_eq!(hit["allowlistable"], true, "{hit}");
-        let allow = || launch::auth_key_allowlist_add(&p.t.app, req(json!({ "hit": hit["hit"] })));
+        let allow =
+            || launch_cmd::auth_key_allowlist_add(&p.t.app, req(json!({ "hit": hit["hit"] })));
 
         // Cancel in the native dialog: nothing stored.
         let asked = p.t.os.asked().len();
@@ -198,7 +233,7 @@ mod ipc {
 
         let pv = ready(&p, "2.2");
         let (ch, buf) = collect();
-        let run = launch::launch_start(app, req(json!({ "planId": pv.plan_id })), ch).unwrap();
+        let run = launch_cmd::launch_start(app, req(json!({ "planId": pv.plan_id })), ch).unwrap();
         wait_for(&buf, "FAKE-CLAUDE READY");
 
         p.t.os.answer_next(false);
@@ -255,7 +290,7 @@ mod output_tail {
         let app = &p.t.app;
         let pv = ready(&p, "2.2");
         let (ch, buf) = collect();
-        let run = launch::launch_start(app, req(json!({ "planId": pv.plan_id })), ch).unwrap();
+        let run = launch_cmd::launch_start(app, req(json!({ "planId": pv.plan_id })), ch).unwrap();
         wait_for(&buf, "FAKE-CLAUDE READY");
         term_cmd::pty_write(
             app,
@@ -281,5 +316,39 @@ mod output_tail {
             std::fs::metadata(&log).unwrap().permissions().mode() & 0o777,
             0o600
         );
+    }
+}
+
+mod launch {
+    use super::*;
+
+    /// EX-M3-02, AC-F009-01 (M3-10): the argv Billy is shown is the argv spawned, and the tab is
+    /// named `fm-<project>-s<NN>-<step>`.
+    #[test]
+    fn argv_shown_is_argv_spawned() {
+        let p = ProjectApp::new(json!({}));
+        let pv = ready(&p, "2.2");
+        let (ch, buf) = collect();
+        let run =
+            launch_cmd::launch_start(&p.t.app, req(json!({ "planId": pv.plan_id })), ch).unwrap();
+        wait_for(&buf, "FAKE-CLAUDE READY");
+        assert_eq!(run.tab_name, "fm-tradelog-s02-2-2");
+        let rec: Value =
+            serde_json::from_str(&std::fs::read_to_string(&p.record).unwrap()).unwrap();
+        // The preview shows the program and every argument with control characters made
+        // visible (SR-26); the same rendering of what fake-claude received is identical.
+        let spawned: Vec<String> = rec["argv"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| foreman_app::render::escape_visible(a.as_str().unwrap()))
+            .collect();
+        assert_eq!(spawned[1..], pv.argv[1..], "the preview's argv is what ran");
+        assert_eq!(
+            std::path::Path::new(&pv.argv[0]).file_name(),
+            Some(std::ffi::OsStr::new("claude"))
+        );
+        assert!(pv.argv.iter().any(|a| a == "fm-tradelog-s02-2-2"));
+        let _ = term_cmd::pty_terminate(&p.t.app, req(json!({ "runId": run.run_id })));
     }
 }
