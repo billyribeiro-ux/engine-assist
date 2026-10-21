@@ -1,12 +1,12 @@
 <script lang="ts">
 	// Sidebar (components.md "Layout"): Today, projects (the open one expands to its stage list, the
 	// P1 stage navigation), and the footer: Run log, Template health, Doctor, Settings. Every status
-	// is a glyph plus words (AC-XC-25); the Doctor dot shows its last level (AC-F019-07).
+	// is a glyph plus words (AC-XC-25); the Doctor mark shows its last level (AC-F019-07).
 	import { page } from '$app/state';
 	import type { InboxItem, ProjectSummary, StageView } from '#lib/ipc/types.ts';
 	import { projectLevel } from '#lib/nav/inbox.ts';
 	import { to } from '#lib/nav/routes.ts';
-	import { DOCTOR, SHEET } from '#lib/nav/status.ts';
+	import { DOCTOR, PROJECT, SHEET } from '#lib/nav/status.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
 
@@ -36,8 +36,10 @@
 	const inbox: InboxItem[] = $derived(today.value?.inbox ?? []);
 	const openId = $derived(page.params.projectId ?? null);
 
-	// AC-F017-10: every project shows a status dot, as a shape and words (AC-XC-25): a problem (cross),
-	// something waiting on Billy (attention dot) or all clear (pass dot).
+	// AC-F017-10: every project shows a status mark, as a shape and words (AC-XC-25): a problem
+	// (cross), something waiting on Billy (clock) or all clear (check). The mockups draw the last two
+	// as bare colored dots; two dots differ by color alone, so the shapes win (AC-XC-25 outranks the
+	// drawing; docs/design/parity.md).
 	function level(p: ProjectSummary): { kind: 'problem' | 'waiting' | 'clear'; word: string } {
 		const kind = projectLevel(inbox, p.id, p.readOnly !== null);
 		if (kind === 'problem') return { kind, word: p.readOnly ? 'Read-only' : 'Has a problem' };
@@ -130,13 +132,11 @@
 									class="meta pin"
 									aria-label="Pinned: press Command {p.pinned} to open">⌘{p.pinned}</span
 								>{/if}<span class="badge" role="img" aria-label={lv.word}
-								>{#if lv.kind === 'problem'}<Icon
-										name="cross"
-										size="glyph"
-										tone="fail"
-									/>{:else if lv.kind === 'waiting'}<span class="dot attention"></span>{:else}<span
-										class="dot pass"
-									></span>{/if}</span
+								><Icon
+									name={PROJECT[lv.kind].icon}
+									size="glyph"
+									tone={PROJECT[lv.kind].tone}
+								/></span
 							></span
 						></a
 					>
@@ -174,15 +174,9 @@
 		>
 		<a class="side-item" href={to.doctor()} aria-current={path === '/doctor' ? 'page' : undefined}
 			><Icon name="pulse" /><span class="label">Doctor</span>
-			{#if doctorLevel === 'failing'}
-				<span class="badge" aria-label="Doctor: {doctorLook.word}"
-					><Icon name="cross" size="glyph" tone="fail" /></span
-				>
-			{:else if doctorLevel === 'warning'}
-				<span class="badge" aria-label="Doctor: warnings"><span class="dot attention"></span></span>
-			{:else if doctorLevel === 'ok'}
-				<span class="badge" aria-label="Doctor: all checks pass"
-					><span class="dot pass"></span></span
+			{#if doctorLevel !== 'unknown'}
+				<span class="badge" role="img" aria-label="Doctor: {doctorLook.word}"
+					><Icon name={doctorLook.icon} size="glyph" tone={doctorLook.tone} /></span
 				>
 			{/if}</a
 		>

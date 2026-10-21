@@ -268,23 +268,6 @@ textarea {
 	border-top: var(--hairline) solid var(--rule);
 	padding: var(--space-3) var(--space-3) var(--space-5);
 }
-.dot {
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	display: inline-block;
-	flex: none;
-}
-.dot.pass {
-	background: var(--pass);
-}
-.dot.fail {
-	background: var(--fail);
-}
-.dot.attention {
-	background: var(--attention);
-}
-
 /* Small status glyphs used outside the strip */
 .icon.glyph {
 	width: 12px;

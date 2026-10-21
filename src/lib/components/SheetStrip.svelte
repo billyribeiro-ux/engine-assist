@@ -311,7 +311,9 @@
 		color: var(--strip-muted);
 		line-height: 1;
 		white-space: nowrap;
-		overflow: hidden;
+		/* Clip sideways only: the line is 9 px tall, and the label's descenders (y, p) hang below it. */
+		overflow-x: clip;
+		overflow-y: visible;
 		border-left: 1px solid var(--phase);
 		border-right: 1px solid var(--phase);
 		height: 9px;

@@ -62,6 +62,12 @@
 	} = $props();
 
 	const pid = $derived(project.summary.id);
+	/** The callout holds a number, not an ID: an added step's key (`x-2-1`, DR-059) is wider than the
+	 * circle, so it shows its sequence in the stage as "+1". The title row still names the full number. */
+	const calloutText = $derived.by(() => {
+		const n = /^x-\d+-(\d+)$/.exec(step.key)?.[1];
+		return n === undefined ? step.number : `+${n}`;
+	});
 	const sid = $derived(step.key.replace(/[^a-z0-9]/gi, '-'));
 	const view = resource(
 		() => (expanded ? { projectId: pid, step: step.key, rev: project.summary.rev } : null),
@@ -363,7 +369,7 @@
 	]}
 	aria-current={selected ? 'step' : undefined}
 >
-	<span class="callout" aria-hidden="true">{step.number}</span>
+	<span class="callout" aria-hidden="true">{calloutText}</span>
 	<div class="step-head">
 		<h2 class="step-title">
 			{#if isNa || step.state === 'needsAnnotation'}

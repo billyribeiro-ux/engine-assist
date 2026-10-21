@@ -51,5 +51,12 @@ export const DOCTOR: Record<DoctorLevel, Look> = {
 	unknown: { icon: 'ring', tone: 'muted', word: 'Not run yet' }
 };
 
+/** A sidebar project's level (AC-F017-10): a problem, something waiting on Billy, or all clear. */
+export const PROJECT: Record<'problem' | 'waiting' | 'clear', Look> = {
+	problem: { icon: 'cross', tone: 'fail', word: 'Has a problem' },
+	waiting: { icon: 'clock', tone: 'attention', word: 'Waiting on you' },
+	clear: { icon: 'check', tone: 'pass', word: 'No problems' }
+};
+
 /** "fm-tradelog-s02-2-3" style stage number with two digits. */
 export const nn = (n: number): string => String(n).padStart(2, '0');

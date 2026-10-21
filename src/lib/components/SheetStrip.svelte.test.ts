@@ -56,6 +56,27 @@ afterEach(() => {
 });
 
 describe('SheetStrip', () => {
+	// M5-07: the 9 px dimension line clips sideways only; the descenders of "Systems", "Occupancy"
+	// and "Ownership" hang below it.
+	it('phase labels: descenders are not clipped by the 9 px dimension line', async () => {
+		const s = await render(SheetStrip, {
+			projectId: PID,
+			projectName: 'TradeLog',
+			stages: stages(ALL),
+			open: 2
+		});
+		const dims = [...s.container.querySelectorAll<HTMLElement>('.phase-dim')];
+		expect(dims).toHaveLength(6);
+		for (const d of dims) {
+			const st = getComputedStyle(d);
+			expect(st.overflowY, d.textContent ?? '').toBe('visible');
+			const label = d.querySelector('span');
+			// A label that is hidden at this width (the last one, below 920 px) has no box.
+			const h = label?.getBoundingClientRect().height ?? 0;
+			if (h > 0) expect(h).toBeGreaterThan(d.clientHeight);
+		}
+	});
+
 	it('primary: 19 sheets in six phase groups, each group named with its stage range', async () => {
 		const s = await render(SheetStrip, {
 			projectId: PID,

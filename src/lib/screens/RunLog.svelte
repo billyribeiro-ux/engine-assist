@@ -239,36 +239,39 @@
 								{#if r.error}<div class="muted tiny">{r.error}</div>{/if}
 							</td>
 							<td>{r.timeToStartMs === null ? '—' : sec(r.timeToStartMs)}</td>
-							<td class="act">
-								{#if r.status === 'running' || r.status === 'idle' || r.status === 'blocked'}
-									<button class="btn ghost" type="button" onclick={() => showTerminal(r)}
-										>Show terminal</button
+							<td>
+								<div class="act">
+									{#if r.status === 'running' || r.status === 'idle' || r.status === 'blocked'}
+										<button class="btn ghost" type="button" onclick={() => showTerminal(r)}
+											>Show terminal</button
+										>
+									{:else if r.status === 'interrupted' && !r.resumable}
+										<span class="reason">{r.whyNotResumable}</span>
+										{#if r.step}<button
+												class="btn ghost"
+												type="button"
+												onclick={() =>
+													runStep({
+														projectId: r.project,
+														step: r.step ?? '',
+														surface: 'cli',
+														entry: 'stageView',
+														mode: 'freshWithContext'
+													}).then(report)}>Start a fresh chain with context</button
+											>{/if}
+									{:else if r.resumable && r.status !== 'errored'}
+										<button class="btn ghost" type="button" onclick={() => resume(r)}>Resume</button
+										>
+									{/if}
+									<button
+										class="btn ghost"
+										type="button"
+										aria-expanded={isOpen}
+										aria-controls="argv-{r.runId}"
+										onclick={() => (openId = isOpen ? null : r.runId)}
+										>{isOpen ? 'Hide command' : 'Show command'}</button
 									>
-								{:else if r.status === 'interrupted' && !r.resumable}
-									<span class="reason">{r.whyNotResumable}</span>
-									{#if r.step}<button
-											class="btn ghost"
-											type="button"
-											onclick={() =>
-												runStep({
-													projectId: r.project,
-													step: r.step ?? '',
-													surface: 'cli',
-													entry: 'stageView',
-													mode: 'freshWithContext'
-												}).then(report)}>Start a fresh chain with context</button
-										>{/if}
-								{:else if r.resumable && r.status !== 'errored'}
-									<button class="btn ghost" type="button" onclick={() => resume(r)}>Resume</button>
-								{/if}
-								<button
-									class="btn ghost"
-									type="button"
-									aria-expanded={isOpen}
-									aria-controls="argv-{r.runId}"
-									onclick={() => (openId = isOpen ? null : r.runId)}
-									>{isOpen ? 'Hide command' : 'Show command'}</button
-								>
+								</div>
 							</td>
 						</tr>
 						{#if isOpen}
@@ -347,8 +350,21 @@
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 	}
+	/* One action or two, plus the reason a run can't resume: they stack when the column is narrow
+	   instead of pushing the table past the window (parity with the Run log mockup at 1280). */
 	.act {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-start;
+		gap: var(--space-1) var(--space-2);
+		min-width: 150px;
+	}
+	.act :global(.btn) {
 		white-space: nowrap;
+	}
+	.act .reason {
+		flex-basis: 100%;
 	}
 	.small {
 		font-size: var(--text-12);

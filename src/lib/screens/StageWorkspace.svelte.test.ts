@@ -34,6 +34,24 @@ describe('StageWorkspace', () => {
 		await expect.element(s.getByText(/TradeLog isn't sold.*commercial = no/)).toBeVisible();
 	});
 
+	// M5-07: an added step's key (`x-2-1`) is wider than the callout circle; the circle shows its
+	// number in the stage ("+1") and the title row still names the whole key for a screen reader.
+	it('added step: the callout shows its display number and fits its circle', async () => {
+		const m = fresh('happy');
+		const p = await project(m, IDS.tradelog);
+		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
+		const row = s.getByRole('listitem').filter({ hasText: 'Added for this project' });
+		const callout = row.element().querySelector<HTMLElement>('.callout');
+		expect(callout?.textContent).toBe('+1');
+		const text = document.createRange();
+		text.selectNodeContents(callout as HTMLElement);
+		expect(text.getBoundingClientRect().width).toBeLessThan(callout?.clientWidth ?? 0);
+		expect(row.element().querySelector('.vh')?.textContent).toContain('x‑2‑1');
+		// A template step keeps its number.
+		const plain = s.getByRole('listitem').filter({ hasText: 'Stack decision, evidence first' });
+		expect(plain.element().querySelector('.callout')?.textContent).toBe('2.4');
+	});
+
 	it('config changed: Acknowledge records it', async () => {
 		const m = fresh('happy');
 		const ack = vi.spyOn(m, 'configAck');

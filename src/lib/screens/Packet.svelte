@@ -452,6 +452,8 @@
 		margin-top: var(--space-4);
 	}
 	.raw {
+		/* The visually hidden "(problem)" marks position against this scroller, not the window. */
+		position: relative;
 		margin: 0;
 		font-family: var(--font-mono);
 		font-size: var(--text-11);
