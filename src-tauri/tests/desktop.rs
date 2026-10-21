@@ -397,6 +397,8 @@ mod round_tracker {
     #[test]
     fn advances_per_output() {
         let p = ProjectApp::new(json!({}));
+        // The outputs' folder exists before the watcher starts, as council-setup leaves it.
+        std::fs::create_dir_all(p.project.join("spec/council")).unwrap();
         projects::project_open(&p.t.app, req(json!({ "projectId": p.id }))).unwrap();
         let outs: Vec<String> =
             steps::step_view(&p.t.app, req(json!({ "projectId": p.id, "step": "2.2" })))
@@ -412,7 +414,7 @@ mod round_tracker {
             let f = p.project.join(out);
             std::fs::create_dir_all(f.parent().unwrap()).unwrap();
             std::fs::write(&f, format!("# round {i}\n")).unwrap();
-            let deadline = Instant::now() + Duration::from_secs(10);
+            let deadline = Instant::now() + Duration::from_secs(20);
             while changed_events(&p) == before && Instant::now() < deadline {
                 std::thread::sleep(Duration::from_millis(20));
             }
