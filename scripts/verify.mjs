@@ -50,6 +50,8 @@ const steps = [
 	{ name: 'prettier', run: ['pnpm', 'exec', 'prettier', '--check', '--log-level', 'warn', '.'] },
 	{ name: 'tsc', fast: true, run: ['pnpm', 'exec', 'tsc', '--noEmit', '-p', 'tsconfig.json'] },
 	{ name: 'vitest', run: ['pnpm', 'exec', 'vitest', 'run'] },
+	// AC-XC-20: axe (a11y), color-only status, keyboard, layout and mockup-parity flows fail verify.
+	{ name: 'flows', run: ['pnpm', 'exec', 'playwright', 'test'] },
 	{ name: 'release-bundle', run: ['node', 'scripts/check-release-bundle.mjs'] },
 	{ name: 'rustfmt', run: ['cargo', 'fmt', '--all', '--', '--check'] },
 	{
