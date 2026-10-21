@@ -44,8 +44,9 @@ describe('StageWorkspace', () => {
 		const callout = row.element().querySelector<HTMLElement>('.callout');
 		expect(callout?.textContent).toBe('+1');
 		const text = document.createRange();
-		text.selectNodeContents(callout!);
-		expect(text.getBoundingClientRect().width).toBeLessThan(callout?.clientWidth ?? 0);
+		if (!callout) throw new Error('the added step has no callout');
+		text.selectNodeContents(callout);
+		expect(text.getBoundingClientRect().width).toBeLessThan(callout.clientWidth);
 		expect(row.element().querySelector('.vh')?.textContent).toContain('x‑2‑1');
 		// A template step keeps its number.
 		const plain = s.getByRole('listitem').filter({ hasText: 'Stack decision, evidence first' });
