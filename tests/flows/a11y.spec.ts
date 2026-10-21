@@ -59,6 +59,18 @@ for (const scheme of ['dark', 'light'] as const) {
 				.analyze();
 			expect(axe.violations.map((v) => v.id)).toEqual([]);
 		});
+		test('Template health with a stage of runnable steps open: no axe violations', async ({
+			page
+		}) => {
+			await page.goto('/template-health');
+			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+			await page.getByRole('button', { name: /^Stage 2/ }).click();
+			await expect(page.getByText('Convene the council')).toBeVisible();
+			const axe = await new AxeBuilder({ page })
+				.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+				.analyze();
+			expect(axe.violations.map((v) => v.id)).toEqual([]);
+		});
 		test('Command palette open: no axe violations', async ({ page }) => {
 			await page.goto(`/projects/${TL}/stages/2`);
 			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

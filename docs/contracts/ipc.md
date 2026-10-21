@@ -286,8 +286,10 @@ export type ProjectView = { summary: ProjectSummary, conditions: { [key in Condi
 export type NextStepRow = { project: ProjectSummary, next: StepSummary | null, whyNone: string | null, strip: Array<SheetStatus>, stageTitle: string | null, };
 export type DoctorReport = { level: DoctorLevel, checks: Array<DoctorCheck>, capabilities: Array<CapabilityRow>, probes: Array<ProbeOutcome>, probeNote: string | null, ranAt: Timestamp, };
 export type Diagnostic = { severity: Severity, rule: string, file: string, line: number, column: number, message: Array<TextSpan>, stage: Stage, };
-export type TemplateHealth = { version: string, grammarVersion: number, counts: Counts, stages: Array<StageHealth>, diagnostics: Array<Diagnostic>, commit: string, file: string, };
-export type StepView = { summary: StepSummary, prompt: Array<PromptSegment>, inputs: Array<RunInputView>, start: Explained<Start> | null, switches: Array<SwitchCue>, chips: ChatChips | null, argvPreview: Array<string> | null, envNames: Array<EnvName>, blockers: Array<Blocker>, warnings: Array<string>, remaps: Array<string>, outs: Array<OutView>, override: RunOverride | null, parts: Array<StepPart>, copiedAt: Timestamp | null, };
+export type TemplateHealth = { version: string, grammarVersion: number, counts: Counts, stages: Array<StageHealth>, diagnostics: Array<Diagnostic>, commit: string, file: string, steps: Array<StepHealth>, };
+export type StepHealth = { key: StepKey, stage: Stage, number: string, title: string, annotation: string, warnings: Array<Diagnostic>, outs: Array<string>, };
+export type StepView = { summary: StepSummary, prompt: Array<PromptSegment>, inputs: Array<RunInputView>, start: Explained<Start> | null, switches: Array<SwitchCue>, chips: ChatChips | null, argvPreview: Array<string> | null, envNames: Array<EnvName>, blockers: Array<Blocker>, warnings: Array<string>, remaps: Array<string>, outs: Array<OutView>, override: RunOverride | null, parts: Array<StepPart>, copiedAt: Timestamp | null, live: LiveMode | null, };
+export type LiveMode = { mode: string, expected: string | null, };
 export type PendingChange = { id: ChangeId, file: DecisionFileKind, detectedAt: Timestamp, seenSha256: Sha256, diff: RedactedDiff, effect: ChangeEffect, consequences: Array<Consequence>, context: ChangeContext, };
 export type PacketView = { path: RepoPath, exists: boolean, sha256: Sha256 | null, header: PacketHeader | null, fields: Array<PacketFieldView>, problems: Array<Problem>, normalization: Array<NormalizationNote>, signed: Signature | null, tamper: Diff | null, raw: Array<RawLine>, writtenBy: string | null, summary: string, };
 export type MetricsView = { perSurface: Array<SurfaceMetrics>, manualEditsByStage: Array<StageEdits>, stagesThroughForeman: number, baseline: BaselineComparison | null, runsCounted: number, p95AllMs: number, };
@@ -404,7 +406,7 @@ TS    { expectRev: number; patch: { driName: string | null;
 Res   SettingsView
 Err   Stale · Cancelled · Conflict · Io
 ```
-F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". A patch that sets `env_passthrough`, `reset_tool` or `remove_allowlist_entry` is applied only after a native confirmation listing the change (SR-24a); declining returns `Cancelled` and nothing in the patch is saved. `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32. `screen_reader_mode` is the Settings "Screen reader mode" toggle (stored, default off): when on, CLI launches add `--ax-screen-reader` and xterm gets `screenReaderMode: true` (AC-XC-22). `os_display` is what the webview's `prefers-reduced-transparency: reduce` and `prefers-contrast: more` media queries currently report; it isn't stored, and Rust turns the window's vibrancy off when either is true (ADR-014, AC-XC-23). As built (M5-04): `osDisplay` is sent by the webview at start and on every change of `prefers-reduced-transparency` or `prefers-contrast: more` (`src/lib/os-display.ts`); it is not stored. Rust passes `reduceTransparency || increaseContrast` to `Os::set_window_reduced_effects`, which records it (`window::reduced_effects`) and clears the main window's effects.
+F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". A patch that sets `env_passthrough`, `reset_tool` or `remove_allowlist_entry` is applied only after a native confirmation listing the change (SR-24a); declining returns `Cancelled` and nothing in the patch is saved. `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32. `screen_reader_mode` is the Settings "Screen reader mode" toggle (stored, default off): when on, CLI launches add `--ax-screen-reader` and xterm gets `screenReaderMode: true` (AC-XC-22). `os_display` is what the webview's `prefers-reduced-transparency: reduce` and `prefers-contrast: more` media queries currently report; it isn't stored, and Rust turns the window's vibrancy off when either is true (ADR-014, AC-XC-23). As built (M5-04): `osDisplay` is sent by the webview at start and on every change of `prefers-reduced-transparency` or `prefers-contrast: more` (`src/lib/os-display.ts`); it is not stored. Rust passes `reduceTransparency || increaseContrast` to `Os::set_window_reduced_effects`, which records it (`window::reduced_effects`) and clears the main window's effects. As built (M4-34): the confirmation lists the pass-through names that will be passed and, separately, the always-removed names in the list ("Foreman always removes ANTHROPIC_API_KEY; listing it changes nothing."); the stored list keeps them (sorted, deduplicated) and `build_env` still removes them.
 
 **`settings_pick_tool`** · P1 · M2 · **app**
 ```text
@@ -460,7 +462,7 @@ Res   TemplateHealth { version: String, grammar_version: u32, counts: Counts, st
       Diagnostic { severity: "error" | "warning", rule: String, file: String, line: u32, column: u32, message: String }
 Err   NotFound · ReadOnly · Io
 ```
-F-001, F-003 · AC-F001-06, -15, AC-F003-05, -06, AC-F019-02 · SR-27.
+F-001, F-003 · AC-F001-06, -15, AC-F003-05, -06, AC-F019-02 · SR-27. As built (M4-06): `steps` lists every runnable template step in order with its `fm:step` annotation rendered on one line (`fm:step id=2.2 surface=cli …`, canonical key order), its lint warnings (the stage's warnings at the annotation's line or naming the step's ID first) and its declared `out=` paths (AC-F003-05).
 
 **`doctor_run`** · P1 (version, auth, git) + P2 (full) · M2/M4 · **spawn** (`claude -v`, `claude auth status` in `<app-data>/probe/` after its fingerprint passes, `git --version`, P2 toolchain `--version`)
 ```text
@@ -632,7 +634,7 @@ Res   StepView { summary: StepSummary, prompt: Vec<PromptSegment>, inputs: Vec<R
                  warnings: Vec<String>, remaps: Vec<String>, outs: Vec<OutView>, override_: Option<RunOverride> }
 Err   NotFound · Io
 ```
-F-005, F-006, F-030 · AC-F005-03, -04, AC-F006-12, -13, AC-F008-17, AC-F030-01, -04, AC-XC-32 · SR-19, SR-26. `argv_preview` is the argv the next launch would use (prompt shown in full here; the run log stores only its hash, SR-52).
+F-005, F-006, F-030 · AC-F005-03, -04, AC-F006-12, -13, AC-F008-17, AC-F030-01, -04, AC-XC-32 · SR-19, SR-26. `argv_preview` is the argv the next launch would use (prompt shown in full here; the run log stores only its hash, SR-52). As built (M4-11): `live` is the P2 sensor's live mode while the step's last run is live (`sensor_ingest::live_mode`): `mode` is its display name, and `expected` (the step's start mode) is set only when the live mode is neither the start mode nor a switch target; `null` without the sensor or a live run. The Now/Next strip shows it (AC-F009-11). The watcher's `out` paths (the round tracker, AC-F009-12) bump the project's revision, so `project:changed` refreshes `outs`.
 
 **`run_input_set`** · P1 · M2 · **app** (`progress.json`; `remember` inputs per project)
 ```text
@@ -1199,7 +1201,7 @@ TS    { projectId: string; path: string; inProject: boolean }
 Res   Manifest
 Err   NotFound
 ```
-F-023 · AC-F023-01.
+F-023 · AC-F023-01. As built (M4-27): the rows are every **signed** packet (`docs/handoff/stage-NN.md`, and its `-attachments.md` when declared) and every declared `out=` of a **chat** step on the applicable path, in template order, each with the first step that declares it (`producer`); `exists` is a regular file at the path; `ready` counts files that exist and are marked. With no rows, `firstProducer` names the first step on the path that will produce one (AC-F023-02). The "in the claude.ai Project" marks are kept in memory for the app session: `progress.json` v1 has no field for them ([CR-014](../change-requests/CR-014-knowledge-marks-and-desktop-closed.md), part A). `manifest_mark` refuses a path the manifest doesn't list (`NotFound`).
 
 **`assembler_view`** · M4 · **no**
 ```text
@@ -1209,7 +1211,7 @@ Res   Assembler { rows: Vec<AssemblerRow>, complete: bool, late_conditions: Vec<
       AssemblerRow { path: String, state: "exists" | "missing" | "empty" | "refused", rule: Option<String> }
 Err   NotFound · NotAllowed ("no-stage-4-packet")
 ```
-F-023 · AC-F023-03…-06 · SR-30.
+F-023 · AC-F023-03…-06 · SR-30. As built (M4-28): REPO FILES is read from the Stage 4 packet's `REPO FILES (create exactly these):` field (`foreman_core::assembler::repo_files`: one entry per line, the first word, remarks such as `(SR/PR/LC lists)` and `…` dropped, duplicates removed, at most 200); `NotAllowed("no-repo-files")` when the packet has none. Each entry is checked by the write policy first: root `CLAUDE.md` with `WritePurpose::AssemblerClaudeMd`, every other path as an ordinary repo write (`docs/`, `spec/`), and a secret-file name (SR-50) is refused too; a refused row carries the policy `rule` and a sentence in `note` and is never written. A folder entry (`docs/migrations/`) exists when it has an entry and is empty when it has none. `complete` is true when every row that isn't refused exists (a refused row never blocks it; an empty list is never complete). `lateConditions` lists the four late conditions while any is undecided and Stage 4 isn't signed: an undecided one gets `proposed: "yes"` and `evidence` from DR-063 over the REPO FILES paths first, then the paths in the project (names only: depth ≤ 6, ≤ 5,000 entries, hidden entries, `node_modules`, `target`, `dist`, `build` and symlinks skipped); a decided one has `decided` ("Decided by you on <date> ("<note>")."). Confirming is `condition_set` with the note `from evidence: <path>`.
 
 **`assembler_paste_preview`** · M4 · reads the clipboard, **mem**
 ```text
@@ -1218,7 +1220,7 @@ TS    { projectId: string; path: string }
 Res   PastePreview
 Err   Clipboard · PolicyViolation · NotFound (not a REPO FILES row)
 ```
-F-023 · AC-F023-03, -04, AC-F021-06 · SR-30, SR-35, SR-56.
+F-023 · AC-F023-03, -04, AC-F021-06 · SR-30, SR-35, SR-56. As built (M4-28): the policy check runs before the clipboard is read; a folder row is `NotAllowed("folder-row")`; the text is normalized like a paste-back (BOM, line ends, a wrapping code fence) and ends with one newline; `kind` is `output`, `targets` the one diff, and `notes` say "Overwrites the current file" and, for `CLAUDE.md`, "Claude Code loads this file in every session…".
 
 **`assembler_paste_apply`** · M4 · **repo**
 ```text
@@ -1227,7 +1229,7 @@ TS    { previewId: string }
 Res   Assembler
 Err   Expired · Cancelled · Conflict
 ```
-F-023, F-021 · AC-F021-06 · SR-30 (`WritePurpose::AssemblerClaudeMd`).
+F-023, F-021 · AC-F021-06 · SR-30 (`WritePurpose::AssemblerClaudeMd`). As built (M4-28): apply re-checks that the path is still a REPO FILES row and passes the policy, compares the file's stamp with the preview's (`Conflict`, nothing written), then, for root `CLAUDE.md` only, raises the native dialog "Write CLAUDE.md?" whose text says Claude Code loads the file in every session (Cancel → `Cancelled`, nothing written), and writes by compare-and-swap. The preview ID is single use.
 
 ### 4.14 Desktop, overlay additions, run sheet (P2)
 
@@ -1238,7 +1240,7 @@ TS    { projectId: string; step: string }
 Res   DesktopOpened { chips: ChatChips }
 Err   ToolMissing · NotAllowed ("not-desktop-step") · ToolFailed
 ```
-`progress: Channel<LaunchProgress>` · F-024 · AC-F024-01, -04 · SR-01, SR-05, SR-08.
+`progress: Channel<LaunchProgress>` · F-024 · AC-F024-01, -04 · SR-01, SR-05, SR-08. As built (M4-29): the order is `claude -v` (the `--desktop` floor, 2.1.285 from ADR-017's table: below it `NotAllowed("version-below-floor")`), the launch environment (`foreman_sys::launch::child_env`: the same allowlist, pass-through and PATH as a CLI launch), `claude auth status` in the step's cwd with that environment (a failure is `NotAllowed("auth-failed")`, fail closed), then the resolved prompt is sanitized (SR-28) and copied, and `claude --desktop` runs in the step's cwd (`foreman_sys::spawn::SpawnRequest::ClaudeDesktop`, argv `["--desktop"]` only, 30 s timeout; a non-zero exit is `ToolFailed`). A prompt that doesn't resolve is `NotAllowed("prompt-unresolved")`. The step becomes `copied` like Copy and open. `chips`: the session chip, then model, effort and mode to pick in Desktop. Progress: `version`, `auth`, `spawning`, `done`.
 
 **`desktop_handoff`** · M4 · **spawn** (`claude --desktop --resume <uuid>`), **app** (chain `handed-off`)
 ```text
@@ -1247,7 +1249,7 @@ TS    { chain: string }
 Res   ()
 Err   NotFound · ToolMissing · NotAllowed ("chain-live": end it first)
 ```
-F-024, F-010 · AC-F024-02, -03 · SR-14.
+F-024, F-010 · AC-F024-02, -03 · SR-14. As built (M4-29): the chain must be a CLI chain (`NotAllowed("not-cli-chain")`) that isn't live; the floor, environment and auth checks are `desktop_open`'s, in the chain's cwd; argv `--desktop --resume <uuid>` (`foreman_core::launch::argv::desktop`). After a successful handoff the chain follows S-23's branch as an explicit input (`foreman_core::chain::DesktopShare`; the app passes `Shared`, the specified branch, until S-23 is recorded): shared → `handedOff`, so the next continuing step forks (`--resume <old> --fork-session --session-id <new>` on S-8's pass branch, a new chain with `forkedFrom`, AC-F010-15); copied → the chain is left as it was. Called for a chain that is already `handedOff`, it spawns nothing and raises the native dialog "Is Claude Desktop closed?"; OK opens the chain again so the next continuing step resumes it without a fork (DR-110's "unless Billy confirms Desktop is closed"), Cancel → `Cancelled` ([CR-014](../change-requests/CR-014-knowledge-marks-and-desktop-closed.md), part B).
 
 **`add_step`** · M4 · **repo** (`overlay.json`)
 ```text
@@ -1276,7 +1278,7 @@ TS    { projectId: string; stage: number }
 Res   ExportResult
 Err   NotFound · Io
 ```
-F-027 · AC-F027-01…-03 · NFR-14, SR-30 (`WritePurpose::UserExport`).
+F-027 · AC-F027-01…-03 · NFR-14, SR-30 (`WritePurpose::UserExport`). As built (M4-32): the Markdown is `foreman_core::runsheet::run_sheet` (golden `runsheet::stage_2_golden`): a header, then per applicable step its surface, chat chips or the exact argv one argument per line (the session IDs and the run-settings path shown as placeholders, the prompt as "<the prompt above>"), switch cues, `out=` paths, the run inputs as filled, and the resolved prompt in a fence; then the stage's inspection items with their kinds. Unresolved tokens are marked in place (`⟦UNRESOLVED [APP_NAME]⟧`) and listed under the step; the export is never refused for them. The file is written only to the path from the Rust save dialog (`<slug>-stage-NN-run-sheet.md` suggested) through `store::export::write_user_export`, the policy `metrics_export` uses; Cancel → `{ kind: "cancelled" }`.
 
 ### 4.15 Command count by group
 
