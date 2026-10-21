@@ -120,7 +120,32 @@ Deviations from the mockups, with reasons:
 - The mock's TradeLog world follows the mockups (commercial = no, payments undecided), not ipc.md §7.2's "all yes".
 - Terminal dim text (SGR 2) uses `--term-muted` instead of 50% alpha, so it passes AA.
 
-## Left for Billy's Mac
+## Handoff to the Mac (2026-10-21)
+
+Everything that can be built and tested in a Linux container is on `stage/05-site-prep`. The authoritative ticket state is in `docs/progress.md`.
+
+- **Milestones:**
+  - M1, M2 and M3 are `done` except for their exit gates (`billy`).
+  - M4 has every ticket done except M4-03's mockup cross-check (Mac check 7) and the M4-35 gate.
+  - M5's build tickets (M5-01…M5-07) are done; M5-08…M5-14 are Billy's stages.
+- **What only Billy can do:**
+  - "Waiting on Billy" in `docs/progress.md` lists every open CR and decision.
+  - "Mac checks" in `docs/progress.md` lists 29 checks, each with the exact command or steps.
+  - The runbooks are `docs/runbooks/p1-kill-check.md` (M3-29 Stage 8 inspection, M3-30 TradeLog Stages 1–2, M3-31 kill check) and `docs/runbooks/p2-finishes.md` (M5-08…M5-14).
+- **Reviews:** an independent security review and code review ran on 2026-10-20. Every finding is fixed with a failing-first test or recorded as a follow-up; see the "Security review" and "Code review" sections of `docs/progress.md`.
+- **`pnpm verify`:** has 20 steps. The `flows` step runs Playwright on WebKit and Chromium on macOS, and Chromium only elsewhere. On the Mac, run `pnpm exec playwright install chromium webkit` once.
+- **Branches and PRs:**
+  - PRs #1–#3 (Stages 2–4 docs) are still unmerged. Merge them in order before this branch.
+  - `stage/05-site-prep` is based on `stage/04-drawings`.
+  - The `stage/05-*` working branches are all merged into it, and none needs merging separately.
+- **First session on the Mac:**
+  1. `rustup show`, which installs 1.99.1.
+  2. `pnpm install --frozen-lockfile`.
+  3. `pnpm verify`.
+  4. `pnpm tauri dev`.
+  5. Then work the "Mac checks" list, then the spikes (`pnpm spikes`), then `docs/runbooks/p1-kill-check.md`.
+
+## Left for Billy's Mac (M0 list)
 
 1. **Rust 1.99.1**: `rustup show` in the repo installs it from `rust-toolchain.toml`. Then run `pnpm verify` without `RUSTUP_TOOLCHAIN`; fix anything new that 1.99.1's clippy reports.
 2. **`pnpm tauri dev`** (AC-M0-01): first real launch. Watch for (a) the dev CSP: `devCsp` keeps `style-src 'self'`, and Vite's dev server injects `<style>` tags from JS, so dev styling may be blocked. That's an S-0 finding to record, not a reason to loosen the production CSP. (b) The overlay title bar and the window builder on macOS.
