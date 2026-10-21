@@ -47,7 +47,7 @@ mod pasteback {
         for input in [
             "\u{feff}# A\r\nline  \r\n",
             "\n\n```\n# A\nbody\n```\n\n",
-            "```markdown\r\n# A\r\n\r\nbody\t\r\n```",
+            "```text\r\n# A\r\n\r\nbody\t\r\n```",
             "plain\rold mac\r",
             "# A\n\n\nkept   \n",
         ] {
@@ -55,6 +55,12 @@ mod pasteback {
             let (b, _) = foreman_core::packet::normalize_paste(input);
             assert_eq!(a, b, "{input:?}");
         }
+        // The one deliberate difference: a fence with another info string (```markdown) wraps a
+        // lessons or ADR paste and is removed; files.md §5.2 removes only ``` and ```text around
+        // a packet.
+        let md = "```markdown\n# A\n```";
+        assert_eq!(prepare(md).0, "# A");
+        assert_eq!(foreman_core::packet::normalize_paste(md).0, md);
     }
 
     use super::*;

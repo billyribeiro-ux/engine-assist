@@ -116,8 +116,9 @@ pub type Normalize<'a> = &'a dyn Fn(&str) -> (String, Vec<String>);
 /// that aren't packets (lessons, ADR sets, the assembler's package), whose text must not be
 /// touched beyond that; packet pastes get the field-level normalization too (unsigned forms,
 /// `none`, smart quotes, NBSP, header variants) from `packet::normalize_paste` (M3-20), which
-/// `paste_back_preview` passes. The two agree on every structural step
-/// (`pasteback::structural_steps_match_packet_normalizer`), so they can't drift apart.
+/// `paste_back_preview` passes. The two agree on every structural step but one, pinned by
+/// `pasteback::structural_steps_match_packet_normalizer`: this one also removes a fence with
+/// another info string (```` ```markdown ````), which files.md §5.2 doesn't for packets.
 #[must_use]
 pub fn prepare(text: &str) -> (String, Vec<String>) {
     let mut notes = Vec::new();

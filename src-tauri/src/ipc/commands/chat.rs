@@ -488,12 +488,12 @@ fn adr_preview(
     let mut held = Vec::new();
     let mut diffs = Vec::new();
     for t in &targets {
+        // `plan` leaves `rel` empty only when the write policy refused the path: the refusal is
+        // a `PolicyViolation` naming it (N4; there is no other outcome).
         let Some(rel) = t.rel.as_ref() else {
-            pathpolicy::check_write(&t.part.path, WritePurpose::Repo)?;
-            return Err(IpcError::not_allowed(
-                "policy",
-                escape_visible(t.refused.as_deref().unwrap_or_default()),
-            ));
+            return Err(pathpolicy::check_write(&t.part.path, WritePurpose::Repo)
+                .err()
+                .map_or_else(|| IpcError::policy(&t.part.path, "write"), IpcError::from));
         };
         diffs.push(diff(rel.as_str(), t.current.as_deref(), &t.part.text));
         held.push(HeldTarget {

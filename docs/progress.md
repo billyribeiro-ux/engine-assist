@@ -45,6 +45,7 @@ releases) is approved; there is no CR-005 in `docs/change-requests/`.
 | 14 | [CR-013](change-requests/CR-013-runtime-styles-under-the-strict-csp.md): xterm's runtime styles take Tauri's style nonce and SvelteKit's announcer loses its inline style, so `style-src` stays strict (no S-0 fallback). | M3-08 | **Proposed.** Approve or reject; the WKWebView check is Mac checks, item 14. |
 | 15 | M4 tickets are being built before the kill check (M3-31), while AC-KC-05 says no M4 ticket starts until it passes. | M3-31, M4 | Decide: keep building M4 in parallel, or hold M4 until the runbook's section 3 passes. |
 | 16 | [CR-014](change-requests/CR-014-knowledge-marks-and-desktop-closed.md): knowledge-manifest marks kept in memory (`progress.json` v1 has no field), and "Desktop is closed" asked natively by a second `desktop_handoff` on a handed-off chain. | M4-27, M4-29 | **Proposed.** Approve or amend. |
+| 17 | [CR-017](change-requests/CR-017-code-review-fixes.md): behavior the code review fixes changed: Desktop steps copy and mark done (DR-065 addition), `tamper:detected` once per tampered version from `project_open`, pending-change IDs derived from the file. | Code review 2026-10-20 | **Proposed.** Approve or amend. |
 
 ## Mac checks
 
@@ -76,6 +77,8 @@ Everything that only Billy's Mac can settle, to record in the Stage 5 packet.
 | 22 | NFR-01, NFR-02 and NFR-07 in the real app: after launching, read `perf: startup` and `perf: project switch` in `~/Library/Application Support/<app>/logs/foreman.log` and the `fm:cold-start`, `fm:project-switch`, `fm:long-task` and `fm:input` User Timing entries. Also run `tests/flows/perf.spec.ts` and `a11y.spec.ts` in the WebKit project (not installed in the sandbox; chromium passes). Targets are enforced in M5-09. | M2-27 |
 | 23 | AC-XC-22 (VoiceOver) and AC-XC-21 in the real app: with VoiceOver on, walk Today, a stage workspace, the Gate, the sign sheet, the palette, Settings and Doctor: every control and status has a name, status changes are announced through the live region, and nothing is skipped. Turn on Settings → Screen reader mode: xterm's `screenReaderMode` is on and a CLI launch's argv has `--ax-screen-reader` (Mac check 15 covers the real TUI). Then do the full v1 workflow keyboard-only in the built app (⌘N through to signing a packet) with the ring visible everywhere; also run `pnpm test:flows --project=webkit` for `keyboard.spec.ts` and `a11y.spec.ts`. The Playwright keyboard spec runs in Chromium here. | M5-06 |
 | 24 | WebKit pixel parity (AC-XC-26): run `pnpm test:flows --project=webkit` for `visual.spec.ts` and `layout.spec.ts`, then compare every screen in both themes with `docs/design/mockups/` in the built app; record any text or hairline difference WKWebView adds. Chromium passes all 64 pairs. See `docs/design/parity.md`. | M5-07 |
+| 30 | Code review C3 in the real app: with a CLI session running, ⌘Q → Quit, then reopen Foreman. The run is listed interrupted, its step offers Run again (it isn't stuck `running`), and `logs/foreman.log` has no "a session didn't end within 2 s of the quit". | Code review 2026-10-20 |
+| 31 | Code review C1 in the real app: edit a signed packet by hand and open the project. Today shows one tamper item, Activity Monitor shows no `git` processes appearing over and over, and the log shows one `project_open` per screen change. | Code review 2026-10-20 |
 
 ## M1 tickets
 
@@ -339,3 +342,51 @@ Item 3: see [CR-003](change-requests/CR-003-pin-refuses-p1-annotation-errors.md)
 - Item 4 of Known deviations: the `OutsidePending` refusal maps to `Conflict` with the file's path (ipc.md §2.4).
 - `cargo deny`: `thiserror` 1.0.69 / `thiserror-impl` 1.0.69 are skipped in `deny.toml`. `portable-pty` 0.9.0 (newest) needs `filedescriptor` 0.8.3 (newest, crates.io, published 2025-02-11), which requires `thiserror ^1.0`; no release aligns it with the workspace's `thiserror` 2. Drop the skip when `filedescriptor` moves to `thiserror` 2.
 - `.vitest/attachments/` (Vitest browser-mode screenshots) is untracked and in `.gitignore`.
+- (Code review 2026-10-20, maintainability) The biggest files want splitting, outside a fix:
+  `src/lib/ipc/mock.ts` (3,505 lines, plus `mock/world.ts` 1,549 and `mock/template.ts` 639),
+  `src-tauri/src/project.rs` (1,440; suggested split: open, decisions, view; the fixes added
+  `classify_decisions` and `with_project_mut` there as the seams), `ipc/commands/doctor.rs`
+  (1,397), `signing.rs` (1,233), `ipc/commands/steps.rs` (1,162). `src-tauri` has grown a second
+  domain layer and app modules import IPC handler modules (`runs`, `launch`, `watch` call into
+  `ipc::commands::steps`): an app-level steps service with the IPC handlers as thin adapters is
+  the suggested shape. Nothing was split by the fixes (none rewrote a whole file).
+- (Code review N8) `today_get` and the inbox open every project on every event. Fine at 2–3
+  projects; cache the opens if the registry grows.
+- (Code review W1) Mutating commands that take the write lock themselves (`let _w =
+  app.writing(); open; …; save_progress`) are correct but don't retry on a `Conflict`; the
+  handlers the review named and the exit, startup and post-spawn paths are on
+  `project::with_project_mut`. Moving the remaining ~40 handlers is mechanical.
+
+## Code review 2026-10-20
+
+The independent review of `stage/05-site-prep` @ 45c96e7 (branch `stage/05-codefix`). Each finding
+was checked against the code first. "Fixed" means a test that fails on the old behavior and passes
+now (shown by reverting each behavior with the seams kept, one build: all 16 new Rust tests failed,
+as did `steps::transitions_exhaustive`; the Vitest and Playwright tests were run against the old
+files the same way).
+
+| # | Finding | Result | Tests |
+| - | ------- | ------ | ----- |
+| C1 | Endless refresh loop on a tampered packet | Fixed. `project_open` emits `tamper:detected` once per (project, stage, working SHA) (`Inner.tamper_emitted`); the bus applies the rev rule to `packet:changed` (per project) and `tamper:detected` (per project and stage); the mock emits it from `projectOpen` as Rust does and counts calls; ipc.md §6 amended (CR-017 B). | `sign::tamper_event_once_per_version`, `bus::rev_rule_on_packet_and_tamper_events` (Vitest), `tamper::no_refetch_loop` (Playwright: loops 35 s on the old bus and mock) |
+| C2 | `launch_start` checks too early; a post-spawn failure hides a live session | Fixed. Revision checked before the dialog and again after it under the write lock, with the fingerprint (`launch::fingerprint_now`, stat-cached); `launch::start` never errors after the spawn (step and chain to a fresh open via `with_project_mut_locked`, logged on failure); the re-arm relaunch holds the lock (`start` takes `&Writing`); security N-1: `sensor::check()` right before `start_session`, hooks and token dropped on a mismatch. | `ipc::stale_plan_rejected`, `ipc::stale_fingerprint_rejected`, `sensor_recheck::sensor_rechecked_at_spawn` |
+| C3 | Interrupted runs leave their step `running` | Fixed. The startup scan applies `StepEvent::Interrupted` under the lock when `lastRunId` matches (`runs::interrupt_steps`); the quit guard waits up to 2 s for the hung-up runs' exit handlers (`Runs::wait_exits`). Mac check 30. | `lifecycle::crash_leaves_interrupted` (now checks the step), `quit::guard_waits_for_exit_handlers` |
+| W1 | Lock discipline | Fixed. `project::with_project_mut` (lock, open, mutate, save, one retry on `Conflict`); `desktop_open`, both `desktop_handoff` writes, the post-spawn update, `runs::on_exit` and the startup reset use it. A `Read` open writes nothing (`Opened.dirty`; `Full` saves under the lock); change IDs derived from the file so reads agree (CR-017 C). `App::writing` is re-entrant per thread. The remaining handlers are a follow-up. | `writes::read_open_writes_nothing`, `writes::with_project_mut_retries_once_on_conflict` |
+| W2 | Two decision classifiers | Fixed. `project::classify_decisions` serves `open_with` and `refresh_decisions`. | `decisions::watcher_path_other_branch_no_false_drift` |
+| W3 | Write lock held across native dialogs | Fixed for `sign_apply`, `project_remove` and `pending_change_accept`: the dialog first, then lock and re-validate. | `sign::dialog_without_lock_rechecks_after`, `dialogs::accept_dialog_without_write_lock`, `dialogs::remove_dialog_without_write_lock` |
+| W4 | Desktop steps can't progress | Fixed. `steps::cli()` is CLI only; `desktop_open` checks Copy before opening and records it (CR-017 A). | `steps::transitions_exhaustive` (Desktop rows), `desktop_open::desktop_step_copied_then_marked_done` |
+| W5 | Unbounded terminal buffers, leaked flow control | Fixed. Buffers keep whole chunks within the scrollback (lines, and 512 bytes per line); `TerminalView` cleanup calls `terminal.release`, which resets the count and resumes a paused PTY. | `terminal::buffers_capped_at_scrollback`, `terminal::unmount_resumes_paused_pty` (Vitest) |
+| W6 | Errors dropped silently | Fixed. Index append, `run.json` updates and `mark_committed` failures are logged; `blueprint_repin` returns `ToolFailed` for a failed commit; signing's phase-1 conflicts list what was written. | `repin::commit_failure_is_reported`, `sign::conflict_reports_written_targets` (the log-only changes have no test) |
+| W7 | ipc.md and code disagree | Fixed both ways. Added `ipc::preview_single_use`, `ipc::plan_expires_60s`, `ipc::stale_plan_rejected` (+ `ipc::stale_fingerprint_rejected`), `events::payload_snapshot`, `pty::channel_sends_raw_bytes`, `sign::conflict_reports_written_targets`. Amended ipc.md where the code is right: IPC-R5 → `ipc::fixture_responses_roundtrip`, the sign progress test → `sign::pathspec_only`, IPC-R10 → `atomic::refuses_newer_file` + the sign test, the `tamper:detected` source, `desktop_open` writes app state, §6.2 for every event, `launch_start`'s Stale. | as listed |
+| W8 | Tests that can't fail or may flake | Fixed. Both `events_never_act` tests are runtime proofs (trees byte for byte, no `claude` call, no run; the sys one also no child process); condition waits: `Watchers::config_stats` (arms, checks) in `watcher::config_changed_by_watcher_event`, ingest of the new events in `sensor::events_only_update_state`, a probe echo in `steps_m3::followup_copy_or_relaunch`, `PtySession::reader_parked` in `pty::burst_1mb_backpressure`. | the tests named |
+| W9 | Auto-rebuild resets the rev to 0 | Fixed. `project::rebuild_base_rev` (max of the file's and the seen revision, then +1 on save), as the explicit rebuild. | `revision::auto_rebuild_keeps_the_revision_moving` |
+| N1 | `out` write bumps the rev | Fixed: an in-memory outputs counter moves the view revision (`App::view_rev`); `reopen_view`'s doc corrected. | `round_tracker::out_write_keeps_plans_fresh` |
+| N2 | Tokens and session states never forgotten | Fixed: prepared tokens expire in 10 min, started ones go when the ingest thread ends (with the derived state); `acks`, `hits` and `rearms` are `Expiring` maps. | `sensor::tests::prepared_tokens_expire_started_ones_stay`, `state::tests::expiring_entries_go`, `sensor::events_only_update_state` |
+| N3 | Dead code | Fixed (`hang_up`, `let _ = pending`, the always-true `let`). | — |
+| N3b | Two DR-131 normalizers | Kept apart on purpose (packet field normalization must not touch lessons or ADR text); documented, and a test pins their shared steps and their one difference (a `` ```markdown `` fence). | `pasteback::structural_steps_match_packet_normalizer` |
+| N4 | Error mapping | `impl From<DecisionError> for IpcError`, used everywhere; `auth_key_allowlist_add` maps an unreadable configuration to `Io`. `adr_preview`: not a bug (the `check_write(..)?` before it already returned `PolicyViolation`; the `NotAllowed` was unreachable and is gone). | `error::tests::decision_error_maps_once` |
+| N5 | Run-input debounce | Fixed: Run and Copy send what is waiting first; unmount flushes. | `steprow::run_flushes_pending_input` (Vitest) |
+| N6 | Stale selection; palette by name | Fixed. | `workspace::unmount_clears_selection`, `palette::steps_filtered_by_project_id` (Vitest) |
+| N7 | Locks across I/O | Fixed (watcher start, the re-stat's stamps, the summary built before the lock; a replaced watcher thread ends on its closed channel). | — (the watcher tests) |
+| N8 | Opens on every event | Follow-up (Open follow-ups). | — |
+| Maintainability | Big files, second domain layer | Follow-up (Open follow-ups). | — |
+
