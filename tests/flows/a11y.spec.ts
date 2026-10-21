@@ -2,6 +2,7 @@
 // with the mock world that fills each screen.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { SCREENS } from './screens';
 
 const TL = '7a1c3e52-0b9d-4c1e-9f2a-5d6e8b0c4a11';
 const SW = '5e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b';
@@ -39,6 +40,21 @@ for (const scheme of ['dark', 'light'] as const) {
 				await expect(h1).toBeVisible();
 				if (heading) await expect(h1).toContainText(heading);
 				await page.waitForLoadState('networkidle');
+				await page.waitForTimeout(300);
+				const axe = await new AxeBuilder({ page })
+					.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+					.analyze();
+				expect(
+					axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
+				).toEqual([]);
+			});
+		}
+		// Every state the mockups draw over a screen (the sign sheet, the palette) is walked from the shared list.
+		for (const screen of SCREENS.filter((x) => x.open)) {
+			test(`${screen.id} open: no axe violations`, async ({ page }) => {
+				await page.goto(screen.url);
+				await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+				await screen.open?.(page);
 				await page.waitForTimeout(300);
 				const axe = await new AxeBuilder({ page })
 					.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])

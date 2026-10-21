@@ -42,7 +42,7 @@ const PROPS = [
 ] as const;
 
 interface Seen {
-	rect: [number, number, number, number];
+	rect: number[];
 	style: Record<(typeof PROPS)[number], string>;
 	text: string;
 }
@@ -63,8 +63,10 @@ function sample(page: Page): Promise<Sample> {
 				const cs = getComputedStyle(el);
 				out[sel] = {
 					rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
-					style: Object.fromEntries(props.map((p) => [p, cs[p as never] as string])),
-					text: (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)
+					style: Object.fromEntries(
+						props.map((p) => [p, (cs as unknown as Record<string, string>)[p] ?? ''])
+					),
+					text: el.textContent.replace(/\s+/g, ' ').trim().slice(0, 40)
 				};
 			}
 			return out;
@@ -99,11 +101,11 @@ async function pixelDiff(page: Page, a: Buffer, b: Buffer): Promise<number> {
 			const pb = pixels(ib);
 			let sum = 0;
 			for (let i = 0; i < pa.length; i += 4) {
-				sum += Math.abs(pa[i] - pb[i]) + Math.abs(pa[i + 1] - pb[i + 1]) + Math.abs(pa[i + 2] - pb[i + 2]);
+				for (let k = 0; k < 3; k++) sum += Math.abs((pa[i + k] ?? 0) - (pb[i + k] ?? 0));
 			}
 			return sum / ((pa.length / 4) * 3 * 255);
 		},
-		[a.toString('base64'), b.toString('base64')]
+		[a.toString('base64'), b.toString('base64')] as [string, string]
 	);
 }
 
@@ -154,8 +156,10 @@ for (const theme of THEMES) {
 						const a = mock[sel];
 						const b = app[sel];
 						if (!a || !b) continue;
-						if (a.rect.some((v, i) => Math.abs(v - b.rect[i]) > 2)) {
-							problems.push(`${sel} sits at ${b.rect.join(',')}, the mockup has ${a.rect.join(',')}`);
+						if (a.rect.some((v, i) => Math.abs(v - (b.rect[i] ?? 0)) > 2)) {
+							problems.push(
+								`${sel} sits at ${b.rect.join(',')}, the mockup has ${a.rect.join(',')}`
+							);
 						}
 					}
 					// The shell exists in the app wherever the mockup draws it (the strip only on a project).
