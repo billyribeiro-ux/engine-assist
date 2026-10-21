@@ -1,6 +1,6 @@
 //! Settings (`docs/contracts/ipc.md` §4.1; F-029; ticket M2-12). Security-relevant changes (the
-//! env pass-through list, tool paths, allowlisted key hashes) are applied only after a native
-//! confirmation (SR-24a, `settings::security_fields_require_native_confirm`).
+//! editor, the env pass-through list, tool paths, the login PATH, allowlisted key hashes) are
+//! applied only after a native confirmation (SR-24a, `settings::security_fields_require_native_confirm`).
 
 use std::path::Path;
 
@@ -154,9 +154,34 @@ fn global_variable_name(k: &str) -> bool {
         && b.all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == b'_')
 }
 
-/// The security-relevant parts of a patch, as the native dialog lists them (SR-24a).
+/// The editor a patch sets, when it changes the stored one.
+fn new_editor<'a>(p: &'a SettingsPatch, s: &SettingsFile) -> Option<&'a str> {
+    match &p.editor {
+        Some(EditorSetting::Set(e))
+            if s.editor_bundle_id.as_deref() != Some(e.bundle_id.as_str()) =>
+        {
+            Some(e.bundle_id.as_str())
+        }
+        _ => None,
+    }
+}
+
+/// The security-relevant parts of a patch, as the native dialog lists them (SR-24a; T-004: the
+/// editor and the login PATH too, security review 2026-10-20 W-1 and N-8).
 fn security_lines(p: &SettingsPatch, s: &SettingsFile) -> Vec<String> {
     let mut out = Vec::new();
+    if let Some(id) = new_editor(p, s) {
+        out.extend(crate::editor::confirm_lines(id));
+    }
+    if p.clear_login_path == Some(true)
+        && let Some(l) = &s.login_path
+    {
+        out.push(format!(
+            "Forget the login PATH captured {} ({} folders). Launches then use Foreman's fixed PATH only.",
+            escape_visible(&l.captured_at),
+            l.entries.len()
+        ));
+    }
     if let Some(list) = &p.env_passthrough {
         let mut names: Vec<&str> = list.iter().map(EnvName::as_str).collect();
         names.sort_unstable();
@@ -211,12 +236,13 @@ fn security_lines(p: &SettingsPatch, s: &SettingsFile) -> Vec<String> {
 }
 
 /// `settings_update` (P1 DRI, editor; P2 the rest). Every `null` means unchanged. A patch that
-/// sets the pass-through list, resets a tool or removes an allowlisted key is applied only after
-/// a native confirmation listing the change; Cancel saves nothing (SR-24a).
+/// changes the editor, sets the pass-through list, resets a tool, clears a captured login PATH or
+/// removes an allowlisted key is applied only after a native confirmation listing the change;
+/// Cancel saves nothing (SR-24a). An app that runs what it opens is refused as the editor.
 ///
 /// # Errors
 /// `Stale` (with the fresh view) when `expectRev` is old; `Invalid` for out-of-range values;
-/// `Cancelled`; `Conflict`; `Io`.
+/// `NotAllowed("editor-refused")`; `Cancelled`; `Conflict`; `Io`.
 pub fn settings_update(app: &App, req: SettingsUpdateReq) -> Result<SettingsView, IpcError> {
     let _w = app.writing();
     let (mut s, stamp, _) = app.settings()?;
@@ -246,13 +272,32 @@ pub fn settings_update(app: &App, req: SettingsUpdateReq) -> Result<SettingsView
             "That allowlisted key isn't in Settings.",
         ));
     }
+    // W-1: an app that runs what it opens is never the editor (`file_open` checks again).
+    if let Some(EditorSetting::Set(e)) = &p.editor
+        && let Some(name) = crate::editor::refused(e.bundle_id.as_str())
+    {
+        return Err(IpcError::not_allowed(
+            "editor-refused",
+            crate::editor::refusal(name),
+        ));
+    }
     let lines = security_lines(&p, &s);
     if !lines.is_empty() {
-        let ok = app.os().confirm(&Confirm::new(
-            "Change security settings?",
-            lines.join("\n"),
-            "Change",
-        ));
+        // The editor alone asks "Use <app>?"; any other mix asks once for everything.
+        let editor_only =
+            new_editor(&p, &s).filter(|id| lines.len() == crate::editor::confirm_lines(id).len());
+        let confirm = match editor_only {
+            Some(id) => {
+                let name = crate::editor::known_name(id).unwrap_or(id);
+                Confirm::new(
+                    format!("Use {name} to open files?"),
+                    lines.join("\n"),
+                    format!("Use {name}"),
+                )
+            }
+            None => Confirm::new("Change security settings?", lines.join("\n"), "Change"),
+        };
+        let ok = app.os().confirm(&confirm);
         if !ok {
             return Err(IpcError::cancelled());
         }

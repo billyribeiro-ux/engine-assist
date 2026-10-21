@@ -698,10 +698,11 @@ fn path_rows(app: &App, s: &SettingsFile, ctx: &spawn::SpawnCtx) -> Vec<DoctorCh
         .map(|l| l.entries.clone())
         .unwrap_or_default();
     let sources = crate::launch::path_sources(app, login);
-    let built =
-        foreman_core::launch::env::build_path(&sources.candidates(), &ctx.projects, &mut |p| {
-            spawn::path_dir_facts(p)
-        });
+    let built = foreman_core::launch::env::build_path(
+        &sources.candidates(),
+        &spawn::project_roots(&ctx.projects),
+        &mut |p| spawn::path_dir_facts(p),
+    );
     let joined = escape_visible(&built.joined());
     let mut out = vec![tool(DoctorCheck {
         detail: rich(&[
@@ -1169,9 +1170,11 @@ pub fn capture_login_path_with(
             String::new(),
         ));
     }
-    let (entries, checks) = parse_login_path(&out.stdout, &ctx.projects, &mut |p| {
-        spawn::path_dir_facts(p)
-    });
+    let (entries, checks) = parse_login_path(
+        &out.stdout,
+        &spawn::project_roots(&ctx.projects),
+        &mut |p| spawn::path_dir_facts(p),
+    );
     let held = HeldLoginPath {
         shell: shell.to_owned(),
         entries,

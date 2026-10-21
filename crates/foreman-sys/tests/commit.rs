@@ -364,3 +364,100 @@ mod sign {
         );
     }
 }
+
+/// Security review 2026-10-20, N-6 and N-7.
+mod git_temp {
+    use super::*;
+
+    fn one_commit(repo: &Path, app: &Path) -> Result<CommitOutcome, CommitError> {
+        let root = Root::open(repo, RootKind::Project).unwrap();
+        std::fs::create_dir_all(repo.join("docs")).unwrap();
+        let r = write(&root, "docs/handoff/stage-02.md", "packet\n");
+        commit_paths(
+            &root,
+            std::slice::from_ref(&r),
+            "handoff: stage 02",
+            &opts(app),
+            &common::ctx(app),
+        )
+    }
+
+    /// N-6: the temporary index lives in `<app-data>/tmp`, made through the store; a symlinked
+    /// `tmp` is refused (nothing is written through it) and the index file is removed after use.
+    #[test]
+    fn temp_index_never_follows_a_symlinked_tmp() {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        common::init_repo(&repo);
+        common::commit_file(&repo, "README.md", "hi\n");
+        let app = d.path().join("app");
+        std::fs::create_dir_all(&app).unwrap();
+        let elsewhere = d.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        symlink(&elsewhere, app.join("tmp"));
+        let e = one_commit(&repo, &app).unwrap_err();
+        assert!(matches!(e, CommitError::Store(_)), "{e:?}");
+        assert_eq!(std::fs::read_dir(&elsewhere).unwrap().count(), 0);
+        // A real folder works, and keeps no index file afterwards.
+        std::fs::remove_file(app.join("tmp")).unwrap();
+        assert!(matches!(
+            one_commit(&repo, &app).unwrap(),
+            CommitOutcome::Committed { .. }
+        ));
+        assert_eq!(std::fs::read_dir(app.join("tmp")).unwrap().count(), 0);
+    }
+
+    /// N-7: `info/attributes` that isn't a regular file (a FIFO reports size 0, a folder) can't
+    /// be read as "no rules": the real-index refresh stays pending (fails closed, CR-002).
+    #[test]
+    fn info_attributes_not_regular_keeps_refresh_pending() {
+        for kind in ["fifo", "dir"] {
+            let d = tempfile::tempdir().unwrap();
+            let repo = d.path().join("repo");
+            common::init_repo(&repo);
+            common::commit_file(&repo, "README.md", "hi\n");
+            let attrs = repo.join(".git/info/attributes");
+            std::fs::create_dir_all(attrs.parent().unwrap()).unwrap();
+            if kind == "fifo" {
+                rustix::fs::mknodat(
+                    rustix::fs::CWD,
+                    &attrs,
+                    rustix::fs::FileType::Fifo,
+                    rustix::fs::Mode::from_raw_mode(0o600),
+                    0,
+                )
+                .unwrap();
+            } else {
+                std::fs::create_dir(&attrs).unwrap();
+            }
+            let out = one_commit(&repo, d.path()).unwrap();
+            assert!(
+                matches!(
+                    out,
+                    CommitOutcome::Committed {
+                        index_refresh_pending: true,
+                        ..
+                    }
+                ),
+                "{kind}: {out:?}"
+            );
+        }
+        // Control: an empty regular file means no rules, and the refresh runs.
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        common::init_repo(&repo);
+        common::commit_file(&repo, "README.md", "hi\n");
+        std::fs::write(repo.join(".git/info/attributes"), "").unwrap();
+        assert!(matches!(
+            one_commit(&repo, d.path()).unwrap(),
+            CommitOutcome::Committed {
+                index_refresh_pending: false,
+                ..
+            }
+        ));
+    }
+
+    fn symlink(target: &Path, link: impl AsRef<Path>) {
+        std::os::unix::fs::symlink(target, link).unwrap();
+    }
+}

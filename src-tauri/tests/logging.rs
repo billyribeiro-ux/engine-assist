@@ -213,8 +213,14 @@ mod logging {
         if path_env.len() > 8 {
             forbidden.push(path_env.as_str());
         }
+        // The timestamps are left out: "9.99" can be part of one (`…:39.992Z`).
+        let body: String = log
+            .lines()
+            .map(|l| l.split_once(' ').map_or(l, |(_, rest)| rest))
+            .collect::<Vec<_>>()
+            .join("\n");
         for f in &forbidden {
-            assert!(!log.contains(f), "{f:?} reached the log:\n{log}");
+            assert!(!body.contains(f), "{f:?} reached the log:\n{log}");
         }
         // Every line is `<time> <LEVEL> <target>: <fixed message> name=value…`.
         for line in log.lines() {

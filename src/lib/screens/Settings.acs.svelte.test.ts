@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
 import { patch } from '#lib/actions/settings.ts';
+import { ui } from '#lib/stores/ui.svelte.ts';
 import { fresh, IDS, project } from '#lib/test/screen.ts';
 
 import Packet from './Packet.svelte';
@@ -42,6 +43,32 @@ describe('Settings screen (M2-14)', () => {
 		await editor.fill('not a bundle id');
 		await expect.element(s.container.querySelector<HTMLElement>('#s-editor-err')).toBeVisible();
 		expect(update).not.toHaveBeenCalled();
+	});
+
+	it('W-1: a terminal as the editor is refused with the reason; a new editor asks natively', async () => {
+		const m = fresh('happy');
+		const said = vi.spyOn(ui, 'say');
+		const s = await render(Settings);
+		const editor = s.getByLabelText('Editor for Open in editor');
+		const save = () =>
+			(
+				s.container.querySelector('#s-editor')?.closest('form') as HTMLFormElement | null
+			)?.requestSubmit();
+		const before = (await m.settingsGet({})).editorBundleId;
+		await editor.fill('com.apple.Terminal');
+		save();
+		await vi.waitFor(() =>
+			expect(said).toHaveBeenCalledWith(
+				"That app runs the files it opens, so Foreman won't use it as the editor. Choose a text editor."
+			)
+		);
+		expect((await m.settingsGet({})).editorBundleId).toBe(before);
+		// Cancel in the native dialog keeps the old editor.
+		m.setDialogAnswer('cancel');
+		await editor.fill('dev.zed.Zed');
+		save();
+		await vi.waitFor(() => expect(said).toHaveBeenCalledWith('Cancelled. Nothing changed.'));
+		expect((await m.settingsGet({})).editorBundleId).toBe(before);
 	});
 
 	it('AC-F029-07: with no editor set, Open in editor is disabled and says to set one', async () => {

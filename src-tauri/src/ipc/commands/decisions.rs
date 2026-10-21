@@ -174,17 +174,18 @@ pub fn pending_change_accept(
     req: PendingChangeAcceptReq,
 ) -> Result<ProjectView, IpcError> {
     let p = project::open(app, req.project_id.as_str())?;
-    let (x, _, _) = current(&p, req.change.as_str(), req.seen_sha256.as_str())?;
+    let (x, shown, _) = current(&p, req.change.as_str(), req.seen_sha256.as_str())?;
     let keys: Vec<String> = x.diff.iter().map(|e| escape_visible(&e.key_path)).collect();
     let ok = app.os().confirm(&Confirm::new(
         format!("Accept this change to {}?", x.file.repo_path()),
         format!(
-            "It changes: {}.\nForeman will use the file as it is now.",
+            "It changes: {}.\nForeman will use the file as it is now:\n\n{}",
             if keys.is_empty() {
                 "formatting only".to_owned()
             } else {
                 keys.join(", ")
-            }
+            },
+            crate::render::content_summary(&String::from_utf8_lossy(&shown))
         ),
         "Accept change",
     ));

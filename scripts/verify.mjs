@@ -51,7 +51,14 @@ const steps = [
 	{ name: 'tsc', fast: true, run: ['pnpm', 'exec', 'tsc', '--noEmit', '-p', 'tsconfig.json'] },
 	{ name: 'vitest', run: ['pnpm', 'exec', 'vitest', 'run'] },
 	// AC-XC-20: axe (a11y), color-only status, keyboard, layout and mockup-parity flows fail verify.
-	{ name: 'flows', run: ['pnpm', 'exec', 'playwright', 'test'] },
+	// WebKit is the app's engine (WKWebView) and runs on macOS; elsewhere only Chromium is installed.
+	{
+		name: 'flows',
+		run:
+			process.platform === 'darwin'
+				? ['pnpm', 'exec', 'playwright', 'test']
+				: ['pnpm', 'exec', 'playwright', 'test', '--project=chromium']
+	},
 	{ name: 'release-bundle', run: ['node', 'scripts/check-release-bundle.mjs'] },
 	{ name: 'rustfmt', run: ['cargo', 'fmt', '--all', '--', '--check'] },
 	{

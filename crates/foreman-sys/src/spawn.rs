@@ -111,8 +111,9 @@ pub enum SpawnRequest {
     ToolVersion(Program),
     /// git with validated arguments (built by `foreman_core::git`).
     Git {
-        /// Full argument list after the program (`-C <root> -c … <op>`).
-        args: Vec<String>,
+        /// Full argument list after the program (`-C <root> -c … <op>`). Only
+        /// `foreman_sys::git` can make one (N-4).
+        args: GitArgs,
         /// stdin bytes (`hash-object --stdin`).
         stdin: Option<Vec<u8>>,
         /// Extra env (`GIT_INDEX_FILE` for the temporary index only).
@@ -141,12 +142,33 @@ pub enum SpawnRequest {
     },
 }
 
+/// git's argument vector, opaque outside this crate (security review 2026-10-20, N-4): only
+/// `foreman_sys::git` builds one, from `foreman_core::git`'s validated operations and the fixed
+/// `-c` overrides (SR-44, SR-45), so no other code can hand `git::run`'s spawn an arbitrary argv.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitArgs(Vec<String>);
+
+impl GitArgs {
+    /// Wraps an argument list `foreman_sys::git` built.
+    pub(crate) const fn new(args: Vec<String>) -> Self {
+        Self(args)
+    }
+
+    /// The arguments.
+    #[must_use]
+    pub fn as_slice(&self) -> &[String] {
+        &self.0
+    }
+}
+
 /// The login shell's fixed argument vector (SR-02): a login shell that prints `$PATH` and
 /// nothing else. No part of it comes from input.
 pub const LOGIN_SHELL_ARGS: [&str; 3] = ["-l", "-c", "printf %s \"$PATH\""];
 
 /// Proof that Billy consented to the login-shell run in a native dialog (SR-02, SR-24a). Only
-/// `foreman-app`'s `doctor_capture_login_path` makes one, right after the dialog returns OK.
+/// `foreman-app`'s `doctor_capture_login_path` makes one, right after the dialog returns OK. The
+/// constructor has to be public (the dialog lives in another crate), so that rule is held by a
+/// source scan (`login_shell::consent_only_after_the_native_dialog`, N-4).
 #[derive(Debug, Clone)]
 pub struct LoginShellConsent(());
 
@@ -344,7 +366,7 @@ fn program_and_args(req: &SpawnRequest) -> Result<(Program, Vec<String>), SpawnE
             }
             (*p, vec!["--version".into()])
         }
-        SpawnRequest::Git { args, .. } => (Program::Git, args.clone()),
+        SpawnRequest::Git { args, .. } => (Program::Git, args.0.clone()),
         SpawnRequest::OpenReveal(path) => {
             if !path.is_absolute() {
                 return Err(SpawnError::InvalidRequest(
@@ -482,6 +504,25 @@ pub fn check_session_cwd(cwd: &Path) -> Result<(), SpawnError> {
     }
 }
 
+/// How long the output readers may take to finish after the child exits before the rest of its
+/// process group is killed (N-3).
+const SETTLE: Duration = Duration::from_millis(200);
+/// How long they may take after that kill.
+const DRAIN: Duration = Duration::from_secs(2);
+
+/// Waits until every thread has finished or the deadline passes; true when all finished.
+fn wait_finished<T>(threads: &[&std::thread::JoinHandle<T>], deadline: Instant) -> bool {
+    loop {
+        if threads.iter().all(|t| t.is_finished()) {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
 fn reader<R: std::io::Read + Send + 'static>(
     r: Option<R>,
     cap: usize,
@@ -566,7 +607,7 @@ pub fn run(req: &SpawnRequest, opts: &RunOpts, ctx: &SpawnCtx) -> Result<Output,
 
 /// The login shell's checks (SR-01's path rules for a program that isn't on the allowlist by
 /// name): absolute, an executable regular file, not inside a registered project, not in a
-/// world-writable folder.
+/// world-writable folder, and listed in `/etc/shells`.
 fn check_login_shell(shell: &Path, ctx: &SpawnCtx) -> Result<PathBuf, SpawnError> {
     let shown = shell.display().to_string();
     if !shell.is_absolute() {
@@ -590,7 +631,23 @@ fn check_login_shell(shell: &Path, ctx: &SpawnCtx) -> Result<PathBuf, SpawnError
     if world_writable_dir(&target) || world_writable_dir(shell) {
         return Err(SpawnError::WorldWritable(shown));
     }
+    // N-4 (security review 2026-10-20): the `/etc/shells` rule is checked here too, not only by
+    // the caller, so no request can run a shell the system doesn't list.
+    if !listed_in_etc_shells(shell, &ctx.home) {
+        return Err(SpawnError::Unlisted(shown));
+    }
     Ok(shell.to_path_buf())
+}
+
+/// Whether `shell` is a line of `/etc/shells` (read through the store's fixed outside list).
+fn listed_in_etc_shells(shell: &Path, home: &Path) -> bool {
+    use foreman_core::store::outside::{self, OutsideRead};
+    outside::read(&OutsideRead::EtcShells, home, None).is_ok_and(|b| {
+        String::from_utf8_lossy(&b)
+            .lines()
+            .map(str::trim)
+            .any(|l| !l.starts_with('#') && Path::new(l) == shell)
+    })
 }
 
 /// Spawns `exe` with exactly `args`, `opts.env` (after `env_clear`) and `cwd`, in its own process
@@ -622,9 +679,28 @@ fn exec(
         cmd.env("GIT_INDEX_FILE", f);
     }
     let mut child = cmd.spawn().map_err(|e| SpawnError::Spawn(e.to_string()))?;
-    let pid = child.id();
+    let group = i32::try_from(child.id())
+        .ok()
+        .and_then(rustix::process::Pid::from_raw);
+    let kill_group = || {
+        if let Some(pg) = group {
+            let _ = rustix::process::kill_process_group(pg, rustix::process::Signal::KILL);
+        }
+    };
+    // N-3: stdin is written on its own thread, so a child that never reads it can't hold this
+    // call past the timeout (the write ends with EPIPE once the group is killed).
     if let (Some(bytes), Some(mut w)) = (stdin_bytes, child.stdin.take()) {
-        let _ = w.write_all(&bytes);
+        let spawned = std::thread::Builder::new()
+            .name("fm-spawn-stdin".into())
+            .spawn(move || {
+                let _ = w.write_all(&bytes);
+            });
+        if let Err(e) = spawned {
+            kill_group();
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(SpawnError::Spawn(e.to_string()));
+        }
     }
     let out = reader(child.stdout.take(), opts.output_cap);
     let err = reader(child.stderr.take(), opts.output_cap);
@@ -634,13 +710,7 @@ fn exec(
             Ok(Some(s)) => break s,
             Ok(None) => {
                 if start.elapsed() >= opts.timeout {
-                    if let Some(pg) = i32::try_from(pid)
-                        .ok()
-                        .and_then(rustix::process::Pid::from_raw)
-                    {
-                        let _ =
-                            rustix::process::kill_process_group(pg, rustix::process::Signal::KILL);
-                    }
+                    kill_group();
                     let _ = child.kill();
                     let _ = child.wait();
                     return Err(SpawnError::Timeout(opts.timeout));
@@ -650,6 +720,16 @@ fn exec(
             Err(e) => return Err(SpawnError::Spawn(e.to_string())),
         }
     };
+    // N-3: a grandchild that kept stdout or stderr open would keep the readers (and this IPC
+    // handler) waiting forever. Once the child has exited, whatever is left of its process group
+    // is killed, and the readers get a deadline; one that still hasn't finished (a grandchild
+    // that left the group) fails the call instead of hanging it.
+    if !wait_finished(&[&out, &err], Instant::now() + SETTLE) {
+        kill_group();
+        if !wait_finished(&[&out, &err], Instant::now() + DRAIN) {
+            return Err(SpawnError::Timeout(opts.timeout));
+        }
+    }
     let (stdout, o1) = out.join().unwrap_or_default();
     let (stderr, o2) = err.join().unwrap_or_default();
     if o1 || o2 {
@@ -677,12 +757,94 @@ pub fn path_dir_facts(p: &Path) -> foreman_core::launch::env::DirFacts {
     foreman_core::launch::env::DirFacts {
         is_dir,
         world_writable: is_dir && p.ancestors().any(world),
+        canonical: std::fs::canonicalize(p).ok(),
     }
+}
+
+/// Every registered project root as given and resolved (symlinks followed), for SR-01's and
+/// SR-05's "not inside a project" checks.
+#[must_use]
+pub fn project_roots(projects: &[PathBuf]) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = projects.to_vec();
+    for r in projects {
+        if let Ok(c) = std::fs::canonicalize(r)
+            && !out.contains(&c)
+        {
+            out.push(c);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A script run directly by its `#!` line (the no-shell scan forbids naming a shell here).
+    fn script(dir: &Path, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt as _;
+        let p = dir.join("child");
+        std::fs::write(&p, format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        p
+    }
+
+    fn sh_opts(timeout: Duration) -> RunOpts {
+        RunOpts {
+            env: vec![("PATH".into(), "/usr/bin:/bin".into())],
+            timeout,
+            output_cap: 1 << 20,
+            cwd: Cwd::AppData,
+        }
+    }
+
+    /// Security review 2026-10-20, N-3: a child that never reads its stdin (and never exits)
+    /// still times out; writing 1 MB of stdin doesn't block before the timeout loop.
+    #[test]
+    fn stdin_never_blocks_the_timeout() {
+        let d = tempfile::tempdir().unwrap();
+        let child = script(d.path(), "sleep 30");
+        let start = Instant::now();
+        let r = exec(
+            &child,
+            &[],
+            Path::new("/"),
+            &sh_opts(Duration::from_secs(1)),
+            Some(vec![b'x'; 1 << 20]),
+            None,
+        );
+        assert!(matches!(r, Err(SpawnError::Timeout(_))), "{r:?}");
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            start.elapsed()
+        );
+    }
+
+    /// N-3: a grandchild that keeps stdout open after the child exits is killed with the
+    /// child's process group, so the call returns the child's output instead of hanging.
+    #[test]
+    fn grandchild_holding_output_is_reaped() {
+        let d = tempfile::tempdir().unwrap();
+        let child = script(d.path(), "sleep 30 &\necho hi");
+        let start = Instant::now();
+        let out = exec(
+            &child,
+            &[],
+            Path::new("/"),
+            &sh_opts(Duration::from_secs(20)),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(out.stdout, b"hi\n");
+        assert_eq!(out.code, Some(0));
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            start.elapsed()
+        );
+    }
 
     /// SR-25/SR-29: a URL opens as `/usr/bin/open -u <url>` and nothing else.
     #[test]

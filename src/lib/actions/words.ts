@@ -175,6 +175,8 @@ const RULES: Record<string, string> = {
 		'Background tasks are still running in the session. Press Run again when Claude is idle.',
 	'shell-not-listed': "Your login shell isn't listed in /etc/shells, so Foreman won't run it.",
 	'no-editor-set': 'Set an editor in Settings to open files.',
+	'editor-refused':
+		"That app runs the files it opens, so Foreman won't use it as the editor. Choose a text editor.",
 	'not-signable': 'Sign is locked until the gate passes and the packet is valid.',
 	'note-too-short': 'Write at least 15 characters on how you checked.',
 	'note-repeated': "That note repeats another item's. Say how you checked this one.",

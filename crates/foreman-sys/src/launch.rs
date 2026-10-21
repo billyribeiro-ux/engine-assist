@@ -248,9 +248,11 @@ pub fn child_env(
     projects: &[PathBuf],
     run_id: Uuid,
 ) -> ChildEnv {
-    let path = cenv::build_path(&sources.candidates(), projects, &mut |p| {
-        spawn::path_dir_facts(p)
-    });
+    let path = cenv::build_path(
+        &sources.candidates(),
+        &spawn::project_roots(projects),
+        &mut |p| spawn::path_dir_facts(p),
+    );
     cenv::build_env(own, passthrough, &path, &run_id.hyphenated().to_string())
 }
 

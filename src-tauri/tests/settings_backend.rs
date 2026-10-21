@@ -91,12 +91,27 @@ mod settings {
 
         // Ordinary settings: no dialog.
         update(&t, json!({ "driName": "Billy", "theme": "night" })).unwrap();
+        assert!(t.os.asked().is_empty(), "{:?}", t.os.asked());
+        // The editor asks (security review 2026-10-20, W-1;
+        // `settings::editor_change_requires_native_confirm` covers it in full).
         update(
             &t,
             json!({ "editor": { "kind": "set", "bundleId": "com.microsoft.VSCode" } }),
         )
         .unwrap();
-        assert!(t.os.asked().is_empty(), "{:?}", t.os.asked());
+        assert_eq!(t.os.asked().len(), 1, "{:?}", t.os.asked());
+        assert_eq!(
+            t.os.asked()[0].title,
+            "Use Visual Studio Code to open files?"
+        );
+        let t = TestApp::new();
+        let (mut s, stamp, _) = t.app.settings().unwrap();
+        s.auth_key_allowlist.push(AuthKeyAllow {
+            key: "env.FOO".into(),
+            sha256: "ab".repeat(32),
+            added_at: "2026-10-20T12:00:00Z".into(),
+        });
+        t.app.save_settings(&s, &stamp).unwrap();
 
         // Each security field: Cancel changes nothing; OK applies it; the dialog names it.
         let before = view(&t);

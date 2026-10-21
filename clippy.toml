@@ -2,7 +2,8 @@
 # `disallowed-methods` is denied workspace-wide. The ONLY places allowed to opt out with a
 # module-level `#[allow(clippy::disallowed_methods)]` are:
 #   - Command::new / CommandBuilder::new: foreman-sys::spawn
-#   - std::fs: foreman-core::store (incl. store::outside, store::git_exclude),
+#   - std::fs and rustix::fs's open/create/remove/rename/link/chmod calls (N-6):
+#     foreman-core::store (incl. store::outside, store::git_exclude),
 #     foreman-app::logging, the foreman-sensor crate, fake-claude, and test code (#[cfg(test)], tests/).
 # scripts/lint-plants/run.sh proves the rules fire.
 
@@ -54,4 +55,23 @@ disallowed-methods = [
   { path = "tokio::fs::File::open", reason = "SR-31a: std::fs only in foreman-core::store (AC-XC-30)", allow-invalid = true },
   { path = "tokio::fs::File::create", reason = "SR-31a: std::fs only in foreman-core::store (AC-XC-30)", allow-invalid = true },
   { path = "tokio::fs::OpenOptions::open", reason = "SR-31a: std::fs only in foreman-core::store (AC-XC-30)", allow-invalid = true },
+  # Security review 2026-10-20, N-6: rustix's calls that open, create, remove, rename, link or
+  # chmod are held to the same sites as std::fs (the store, the sensor crate, tests). Stats
+  # (stat, lstat, statat, access) stay allowed: they read metadata only.
+  { path = "rustix::fs::open", reason = "N-6: files are opened only in foreman-core::store (SR-31a)" },
+  { path = "rustix::fs::openat", reason = "N-6: files are opened only in foreman-core::store (SR-31a)" },
+  { path = "rustix::fs::mkdir", reason = "N-6: folders are made only in foreman-core::store (SR-30)" },
+  { path = "rustix::fs::mkdirat", reason = "N-6: folders are made only in foreman-core::store (SR-30)" },
+  { path = "rustix::fs::unlink", reason = "N-6: removals go through foreman-core::store::app_dirs" },
+  { path = "rustix::fs::unlinkat", reason = "N-6: removals go through foreman-core::store::app_dirs" },
+  { path = "rustix::fs::rename", reason = "N-6: renames go through foreman-core::store (SR-30)" },
+  { path = "rustix::fs::renameat", reason = "N-6: renames go through foreman-core::store (SR-30)" },
+  { path = "rustix::fs::renameat_with", reason = "N-6: renames go through foreman-core::store (SR-30)" },
+  { path = "rustix::fs::symlink", reason = "N-6: Foreman never makes symlinks outside tests" },
+  { path = "rustix::fs::symlinkat", reason = "N-6: Foreman never makes symlinks outside tests" },
+  { path = "rustix::fs::link", reason = "N-6: Foreman never makes hard links outside tests" },
+  { path = "rustix::fs::linkat", reason = "N-6: Foreman never makes hard links outside tests" },
+  { path = "rustix::fs::chmod", reason = "N-6: modes are set only in foreman-core::store" },
+  { path = "rustix::fs::fchmod", reason = "N-6: modes are set only in foreman-core::store" },
+  { path = "rustix::fs::chmodat", reason = "N-6: modes are set only in foreman-core::store" },
 ]

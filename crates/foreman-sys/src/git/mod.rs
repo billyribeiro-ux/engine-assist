@@ -153,7 +153,7 @@ fn raw(root: &Path, op: &GitOp, opts: &GitOpts, ctx: &SpawnCtx) -> Result<GitOut
     }
     args.extend(a.args);
     let req = SpawnRequest::Git {
-        args,
+        args: spawn::GitArgs::new(args),
         stdin: if a.stdin {
             Some(opts.stdin.clone().unwrap_or_default())
         } else {
@@ -290,7 +290,7 @@ pub fn version(home: &Path, ctx: &SpawnCtx) -> Result<String, GitError> {
     let git = resolve(ctx)?;
     let out = spawn::run(
         &SpawnRequest::Git {
-            args: vec!["--version".to_owned()],
+            args: spawn::GitArgs::new(vec!["--version".to_owned()]),
             stdin: None,
             index_file: None,
         },

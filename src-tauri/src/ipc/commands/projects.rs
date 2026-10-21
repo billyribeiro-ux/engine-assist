@@ -774,23 +774,46 @@ pub fn variable_set(app: &App, req: VariableSetReq) -> Result<ProjectView, IpcEr
 /// (DR-155). Allowed on a read-only project (IPC-R9: it is how a lock mismatch is fixed).
 ///
 /// # Errors
+/// `Cancelled` (the native confirmation, N-8),
 /// `NotAllowed("repin-after-stage-1-signed" | "blueprint-dirty" | "no-blueprint")`,
 /// `ToolMissing`, `Conflict`.
 pub fn blueprint_repin(app: &App, req: BlueprintRepinReq) -> Result<ProjectView, IpcError> {
-    let _w = app.writing();
-    let mut p = project::open(app, req.project_id.as_str())?;
-    let (s, _, _) = app.settings()?;
-    let Some(repo) = s.blueprint_repo else {
-        return Err(IpcError::not_allowed(
-            "no-blueprint",
-            "Choose the blueprint repo first (Settings).",
-        ));
+    let read = || -> Result<(project::Opened, String, BlueprintState), IpcError> {
+        let p = project::open(app, req.project_id.as_str())?;
+        let (s, _, _) = app.settings()?;
+        let Some(repo) = s.blueprint_repo else {
+            return Err(IpcError::not_allowed(
+                "no-blueprint",
+                "Choose the blueprint repo first (Settings).",
+            ));
+        };
+        let ctx = app.spawn_ctx_now()?;
+        let state: BlueprintState =
+            foreman_sys::lock::blueprint_state(Path::new(&repo.path), BLUEPRINT_FILE, &ctx)
+                .map_err(|e| {
+                    IpcError::tool_failed("git", None, false, escape_visible(&e.to_string()))
+                })?;
+        Ok((p, repo.path, state))
     };
+    let (p, repo, shown) = read()?;
+    // N-8 (security review 2026-10-20, SR-24a): a re-pin changes the text every later step is
+    // resolved from and commits the lock, so Billy confirms it natively, seeing what is pinned.
+    // W3 (code review): the dialog is shown without the write lock.
+    if !app.os().confirm(&repin_confirm(&p, &repo, &shown)) {
+        return Err(IpcError::cancelled());
+    }
+    // Under the lock: the project and the blueprint again; a blueprint that moved while the
+    // dialog was open isn't what Billy confirmed.
+    let _w = app.writing();
+    let (mut p, _, state) = read()?;
+    if state.commit != shown.commit || state.bytes != shown.bytes {
+        return Err(IpcError::stale(
+            crate::ipc::error::StaleWhat::ReadStamp,
+            "The blueprint changed while you were confirming. Re-pin again to see the new commit.",
+            None,
+        ));
+    }
     let ctx = app.spawn_ctx_now()?;
-    let state: BlueprintState =
-        foreman_sys::lock::blueprint_state(Path::new(&repo.path), BLUEPRINT_FILE, &ctx).map_err(
-            |e| IpcError::tool_failed("git", None, false, escape_visible(&e.to_string())),
-        )?;
     let stage1 = p.signed().contains(&1);
     let now = app.now();
     let root = p.root()?;
@@ -802,8 +825,7 @@ pub fn blueprint_repin(app: &App, req: BlueprintRepinReq) -> Result<ProjectView,
         app: &p.app_root,
         project_id: &p.entry.project_id,
     };
-    d.approve(DecisionFileKind::BlueprintLock, bytes.as_bytes(), false)
-        .map_err(|e| IpcError::io(e.to_string()))?;
+    d.approve(DecisionFileKind::BlueprintLock, bytes.as_bytes(), false)?;
     let sha256 = foreman_core::store::sha256_hex(bytes.as_bytes());
     let change = OwnChange::CommitNow {
         file: DecisionFileKind::BlueprintLock,
@@ -837,6 +859,38 @@ pub fn blueprint_repin(app: &App, req: BlueprintRepinReq) -> Result<ProjectView,
         ));
     }
     project::reopen_view(app, req.project_id.as_str())
+}
+
+/// The native confirmation before a re-pin (N-8): the blueprint file and commit that will be
+/// pinned, the pin it replaces, and that the lock is written and committed.
+fn repin_confirm(p: &project::Opened, repo: &str, state: &BlueprintState) -> Confirm {
+    let short = |s: &str| s.chars().take(12).collect::<String>();
+    let mut msg = format!(
+        "Foreman pins {}/{BLUEPRINT_FILE} at commit {} (file SHA-256 {}, {} bytes)",
+        escape_visible(repo),
+        short(&state.commit),
+        short(&foreman_core::store::sha256_hex(&state.bytes)),
+        state.bytes.len()
+    );
+    if let Some(lk) = &p.lock {
+        msg.push_str(&format!(
+            " in place of commit {}, pinned {}",
+            short(&lk.blueprint_repo_commit),
+            escape_visible(&lk.pinned_at)
+        ));
+    }
+    msg.push_str(
+        ".\n\nIt writes .foreman/blueprint.lock.json and commits it (before Stage 5 is signed). \
+         Steps that haven't run yet use the newly pinned text.",
+    );
+    Confirm::new(
+        format!(
+            "Re-pin the blueprint for {}?",
+            escape_visible(&p.entry.name)
+        ),
+        msg,
+        "Re-pin",
+    )
 }
 
 /// `project_remove` (P1 registry, P2 deletion): after a native confirmation naming what goes,
