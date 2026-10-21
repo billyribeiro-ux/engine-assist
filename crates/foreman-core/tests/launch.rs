@@ -524,6 +524,7 @@ mod env {
         let built = fenv::build_path(&src.candidates(), &projects, &mut |p: &Path| DirFacts {
             is_dir: p != Path::new("/missing"),
             world_writable: p == Path::new("/tmp/ww"),
+            canonical: None,
         });
         assert_eq!(
             built.joined(),

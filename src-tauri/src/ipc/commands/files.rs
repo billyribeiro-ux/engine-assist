@@ -42,7 +42,8 @@ fn opener(app: &App, req: &SpawnRequest) -> Result<(), IpcError> {
 /// `file_open` (P1): `/usr/bin/open -b <editor> <file>` for `.md`, `.json` and `.txt` only.
 ///
 /// # Errors
-/// `PolicyViolation` (read policy, extension, symlink), `NotAllowed("no-editor-set")`,
+/// `PolicyViolation` (read policy, extension, symlink), `NotAllowed("no-editor-set" |
+/// "editor-refused")`,
 /// `NotFound`, `ToolFailed`.
 pub fn file_open(app: &App, req: FileOpenReq) -> Result<(), IpcError> {
     let ext = Path::new(req.path.as_str())
@@ -59,6 +60,13 @@ pub fn file_open(app: &App, req: FileOpenReq) -> Result<(), IpcError> {
             "Choose your editor in Settings first.",
         ));
     };
+    // W-1: a settings file edited outside Foreman can't make a terminal the editor either.
+    if let Some(name) = crate::editor::refused(&bundle) {
+        return Err(IpcError::not_allowed(
+            "editor-refused",
+            crate::editor::refusal(name),
+        ));
+    }
     let abs = checked(app, req.project_id.as_str(), req.path.as_str())?;
     // AC-F007-04: Open file on a manual step's file starts that step.
     {

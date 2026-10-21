@@ -136,13 +136,17 @@ pub enum CommitError {
     TempIndex(String),
 }
 
-fn temp_index(app_data: &Path) -> Result<PathBuf, CommitError> {
-    let dir = app_data.join("tmp");
-    match rustix::fs::mkdir(&dir, rustix::fs::Mode::from_raw_mode(0o700)) {
-        Ok(()) | Err(rustix::io::Errno::EXIST) => {}
-        Err(e) => return Err(CommitError::TempIndex(e.to_string())),
-    }
-    Ok(dir.join(format!("git-index-{}", uuid::Uuid::new_v4())))
+/// Foreman's temporary index: `<app-data>/tmp/git-index-<uuid>`. The folder is made through the
+/// store (security review 2026-10-20, N-6): walked from the app-data root's fd, created `0700`,
+/// never through a symlink; the path handed to git is under the resolved root. Returns the root,
+/// the app-data-relative name (for the removal) and the absolute path.
+fn temp_index(app_data: &Path) -> Result<(Root, String, PathBuf), CommitError> {
+    let root = Root::open_app_data(app_data)?;
+    let tmp = foreman_core::pathpolicy::check_app_data("tmp").map_err(StoreError::from)?;
+    foreman_core::store::dirs::ensure_dir(&root, &tmp)?;
+    let rel = format!("tmp/git-index-{}", uuid::Uuid::new_v4());
+    let abs = root.path().join(&rel);
+    Ok((root, rel, abs))
 }
 
 /// Verifies each committed path hashes to the expected SHA-256 (`cat-file blob <commit>:<path>`).
@@ -292,7 +296,7 @@ pub fn commit_bytes(
         opts.step(CommitStep::HashObject(p));
         entries.push((oid, p.clone()));
     }
-    let index = temp_index(&opts.app_data)?;
+    let (app_root, index_rel, index) = temp_index(&opts.app_data)?;
     let with_index = GitOpts {
         index_file: Some(index.clone()),
         ..GitOpts::default()
@@ -346,7 +350,7 @@ pub fn commit_bytes(
         opts.step(CommitStep::UpdateRef);
         Ok(commit)
     })();
-    let _ = rustix::fs::unlink(&index);
+    let _ = foreman_core::store::app_dirs::remove_file(&app_root, &index_rel);
     let commit = result?;
 
     let expected: Vec<(String, String)> = changed
@@ -376,6 +380,22 @@ pub fn commit_bytes(
     })
 }
 
+/// Whether `$GIT_DIR/info/attributes` may hold rules, so the real-index refresh must wait
+/// (CR-002). Only a missing file (or a missing folder on the way) means none; a non-empty regular
+/// file means some; anything else (a FIFO, which reports size 0, a folder, a device, an
+/// unreadable entry) fails closed and counts as present (security review 2026-10-20, N-7). It is
+/// a `stat` only, never an open; git follows a symlink there, and so does this check.
+fn info_attributes_present(path: &Path) -> bool {
+    match rustix::fs::stat(path) {
+        Ok(st) => {
+            rustix::fs::FileType::from_raw_mode(st.st_mode) != rustix::fs::FileType::RegularFile
+                || st.st_size > 0
+        }
+        Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR) => false,
+        Err(_) => true,
+    }
+}
+
 /// The real index, exactly those paths, retried on `index.lock`. Attributes are neutralized
 /// (T-040). `$GIT_DIR/info/attributes` can't be neutralized that way, so a repo that has one
 /// keeps the refresh pending (the banner tells Billy) rather than risk running a filter.
@@ -401,7 +421,7 @@ fn refresh_index(
     } else {
         repo.join(&info_attr)
     };
-    let has_info_attributes = rustix::fs::stat(&info_attr_path).is_ok_and(|st| st.st_size > 0);
+    let has_info_attributes = info_attributes_present(&info_attr_path);
     let refresh = GitOpts {
         neutralize_attributes: true,
         ..GitOpts::default()

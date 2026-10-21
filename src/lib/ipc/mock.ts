@@ -91,6 +91,27 @@ const notAllowed = (rule: string, message?: string) =>
 		detail: { kind: 'notAllowed', rule }
 	});
 const notFound = () => fail('notFound');
+/** Mirrors `foreman-app::editor::REFUSED` (W-1): apps that run what they open. */
+const REFUSED_EDITORS = [
+	'com.apple.terminal',
+	'com.googlecode.iterm2',
+	'com.apple.scripteditor2',
+	'com.apple.scripteditor.id.',
+	'com.apple.automator',
+	'com.apple.automator.',
+	'com.apple.shortcuts',
+	'org.python.pythonlauncher',
+	'net.kovidgoyal.kitty',
+	'org.alacritty',
+	'com.github.wez.wezterm',
+	'dev.warp.',
+	'com.mitchellh.ghostty',
+	'co.zeit.hyper'
+];
+const refusedEditor = (id: string): boolean => {
+	const l = id.toLowerCase();
+	return REFUSED_EDITORS.some((e) => (e.endsWith('.') ? l.startsWith(e) : l === e));
+};
 
 /** CR-003: the pin refused for annotation errors in Stages 1–2 and F.2 (`annotationErrors` world). */
 function annotationErrors(): IpcFailure {
@@ -777,7 +798,20 @@ export class MockIpcClient implements IpcClient {
 			if (req.expectRev !== s.rev)
 				throw fail('stale', { kind: 'stale', what: 'readStamp', fresh: this.settingsView() });
 			const pt = req.patch;
-			if (pt.envPassthrough !== null || pt.resetTool !== null || pt.removeAllowlistEntry !== null)
+			// W-1 (security review 2026-10-20): an app that runs what it opens is never the editor;
+			// a new editor and clearing a captured login PATH ask natively, like Rust.
+			const newEditor =
+				pt.editor?.kind === 'set' && pt.editor.bundleId !== s.editorBundleId
+					? pt.editor.bundleId
+					: null;
+			if (newEditor !== null && refusedEditor(newEditor)) throw notAllowed('editor-refused');
+			if (
+				pt.envPassthrough !== null ||
+				pt.resetTool !== null ||
+				pt.removeAllowlistEntry !== null ||
+				newEditor !== null ||
+				(pt.clearLoginPath === true && s.loginPath !== null)
+			)
 				this.ask();
 			if (pt.driName !== null) s.driName = pt.driName.trim() || null;
 			if (pt.editor) s.editorBundleId = pt.editor.kind === 'set' ? pt.editor.bundleId : null;
@@ -2329,6 +2363,7 @@ export class MockIpcClient implements IpcClient {
 					rule: 'extension'
 				});
 			if (!this.world.settings.editorBundleId) throw notAllowed('no-editor-set');
+			if (refusedEditor(this.world.settings.editorBundleId)) throw notAllowed('editor-refused');
 			return null;
 		});
 	}

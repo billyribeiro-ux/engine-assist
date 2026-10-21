@@ -376,14 +376,19 @@ pub fn assembler_paste_preview(
     })
 }
 
-/// The native confirmation before root `CLAUDE.md` is written (AC-F021-06, SR-24a).
+/// The native confirmation before root `CLAUDE.md` is written (AC-F021-06, SR-24a). It shows
+/// what will be written (security review 2026-10-20, W-2): the text came from the clipboard,
+/// which the webview can set, so the dialog itself carries the hash, size and first lines.
 #[must_use]
-pub fn claude_md_confirm() -> Confirm {
+pub fn claude_md_confirm(text: &str) -> Confirm {
     Confirm::new(
         "Write CLAUDE.md?",
-        "Claude Code loads this file in every session in this project, so whatever it says \
-         steers every Claude Code run here. Foreman writes the text you previewed to CLAUDE.md \
-         at the repo root.",
+        format!(
+            "Claude Code loads this file in every session in this project, so whatever it says \
+             steers every Claude Code run here. Foreman writes this text to CLAUDE.md at the repo \
+             root:\n\n{}",
+            crate::render::content_summary(text)
+        ),
         "Write CLAUDE.md",
     )
 }
@@ -419,7 +424,9 @@ pub fn assembler_paste_apply(
     if now != held.stamp {
         return Err(IpcError::conflict(rel.as_str(), Vec::new()));
     }
-    if purpose == WritePurpose::AssemblerClaudeMd && !app.os().confirm(&claude_md_confirm()) {
+    if purpose == WritePurpose::AssemblerClaudeMd
+        && !app.os().confirm(&claude_md_confirm(&held.text))
+    {
         return Err(IpcError::cancelled());
     }
     root.write(&rel, held.text.as_bytes(), &held.stamp)

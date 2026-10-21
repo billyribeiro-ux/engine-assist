@@ -316,19 +316,36 @@ mod login_shell {
             shell: s,
             consent: sp::LoginShellConsent::granted_in_native_dialog(),
         };
-        let mut o = opts(vec![("PATH".into(), "/usr/bin:/bin".into())]);
+        let mut o = opts(vec![
+            ("PATH".into(), "/usr/bin:/bin".into()),
+            ("HOME".into(), d.path().display().to_string()),
+        ]);
         o.cwd = Cwd::Dir(project.clone());
-        let out = sp::run(&req(shell.clone()), &o, &ctx).unwrap();
-        let text = String::from_utf8(out.stdout).unwrap();
-        let (args, rest) = text.split_once('\n').unwrap();
-        assert_eq!(
-            args,
-            format!(
-                "-l|-c|printf %s \"$PATH\"|{}",
-                sp::canonical(&app).display()
-            )
-        );
-        assert_eq!(rest, "/usr/bin:/bin");
+        // N-4 (security review 2026-10-20): a shell that /etc/shells doesn't list is refused by
+        // the spawn module itself, whatever the caller checked.
+        assert!(matches!(
+            sp::run(&req(shell.clone()), &o, &ctx),
+            Err(SpawnError::Unlisted(_))
+        ));
+        // A listed shell runs in app data (whatever cwd was asked) with the fixed argv: its login
+        // start-up file records the folder it started in, and the output is `$PATH`.
+        let listed = std::fs::read_to_string("/etc/shells")
+            .unwrap_or_default()
+            .lines()
+            .any(|l| l.trim() == "/bin/sh");
+        if listed {
+            std::fs::write(d.path().join(".profile"), "pwd > \"$HOME/started-in\"\n").unwrap();
+            let out = sp::run(&req(PathBuf::from("/bin/sh")), &o, &ctx).unwrap();
+            assert_eq!(
+                std::fs::read_to_string(d.path().join("started-in"))
+                    .unwrap()
+                    .trim_end(),
+                sp::canonical(&app).display().to_string()
+            );
+            assert!(!String::from_utf8(out.stdout).unwrap().is_empty());
+        } else {
+            eprintln!("/bin/sh isn't in /etc/shells here; the listed-shell half needs it");
+        }
         // SR-01 checks on the shell path.
         assert!(matches!(
             sp::run(&req(PathBuf::from("bin/sh")), &o, &ctx),
@@ -344,5 +361,111 @@ mod login_shell {
             sp::run(&req(d.path().join("missing")), &o, &ctx),
             Err(SpawnError::NotExecutable(_))
         ));
+    }
+
+    /// N-4: `LoginShellConsent` must be public (the dialog is in foreman-app), so a source scan
+    /// holds the rule that only `capture_login_path_with` makes one, right after the native
+    /// dialog. Tests are the only other callers.
+    #[test]
+    fn consent_only_after_the_native_dialog() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut found = Vec::new();
+        let mut stack = vec![root.join("crates"), root.join("src-tauri/src")];
+        while let Some(dir) = stack.pop() {
+            for e in std::fs::read_dir(&dir).unwrap() {
+                let p = e.unwrap().path();
+                if p.is_dir() {
+                    if p.file_name().is_some_and(|n| n != "tests" && n != "target") {
+                        stack.push(p);
+                    }
+                } else if p.extension().is_some_and(|x| x == "rs")
+                    && std::fs::read_to_string(&p)
+                        .unwrap()
+                        .contains("granted_in_native_dialog()")
+                {
+                    found.push(p.strip_prefix(&root).unwrap().display().to_string());
+                }
+            }
+        }
+        found.sort();
+        assert_eq!(
+            found,
+            [
+                "crates/foreman-sys/src/spawn.rs",
+                "src-tauri/src/ipc/commands/doctor.rs"
+            ]
+        );
+        let doctor =
+            std::fs::read_to_string(root.join("src-tauri/src/ipc/commands/doctor.rs")).unwrap();
+        let at = doctor.find("granted_in_native_dialog()").unwrap();
+        let before = &doctor[..at];
+        let dialog = before.rfind("app.os().confirm(").unwrap();
+        let cancel = before.rfind("return Err(IpcError::cancelled());").unwrap();
+        assert!(
+            dialog < cancel,
+            "the consent follows the dialog and its Cancel"
+        );
+    }
+}
+
+/// Security review 2026-10-20, N-2 (SR-05): "not inside a project" is checked on each PATH entry
+/// as written and as resolved, with the project roots in both forms too.
+mod env {
+    use super::*;
+    use foreman_core::launch::env::PathSources;
+
+    #[test]
+    fn path_symlink_into_project_is_dropped() {
+        let d = tempfile::tempdir().unwrap();
+        let root = std::fs::canonicalize(d.path()).unwrap();
+        let project = root.join("work/tradelog");
+        std::fs::create_dir_all(project.join("node_modules/.bin")).unwrap();
+        let usr = root.join("usr-bin");
+        std::fs::create_dir_all(&usr).unwrap();
+        // A folder outside the project that is a symlink into it.
+        let link = root.join("tool-bin");
+        symlink(project.join("node_modules/.bin"), &link).unwrap();
+        // The project registered through a symlinked path.
+        let alias = root.join("alias");
+        symlink(&project, &alias).unwrap();
+        let path_of = |projects: &[PathBuf], login: Vec<String>| {
+            let sources = PathSources {
+                etc_paths: vec![usr.display().to_string()],
+                etc_paths_d: Vec::new(),
+                home: root.join("home"),
+                pnpm_home: None,
+                login,
+            };
+            foreman_sys::launch::child_env(&[], &[], &sources, projects, uuid::Uuid::new_v4())
+                .get("PATH")
+                .unwrap()
+                .to_owned()
+        };
+        let p = path_of(
+            std::slice::from_ref(&project),
+            vec![link.display().to_string()],
+        );
+        assert_eq!(
+            p,
+            usr.display().to_string(),
+            "the symlink into the project is dropped"
+        );
+        let p = path_of(
+            std::slice::from_ref(&alias),
+            vec![project.join("node_modules/.bin").display().to_string()],
+        );
+        assert_eq!(
+            p,
+            usr.display().to_string(),
+            "a project known by its alias still counts"
+        );
+        // Control: a symlink to a folder outside every project stays.
+        let ok = root.join("ok-bin");
+        symlink(&usr, &ok).unwrap();
+        let p = path_of(
+            std::slice::from_ref(&project),
+            vec![ok.display().to_string()],
+        );
+        assert_eq!(p, format!("{}:{}", usr.display(), ok.display()));
     }
 }

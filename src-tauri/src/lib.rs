@@ -5,10 +5,12 @@
 pub mod closeout;
 pub mod convert;
 pub mod diff;
+pub mod editor;
 pub mod inbox;
 pub mod ipc;
 pub mod launch;
 pub mod logging;
+pub mod menu;
 pub mod notify;
 pub mod os;
 pub mod preview;
@@ -138,6 +140,14 @@ pub fn builder<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder
 }
 
+/// C-1: Foreman's own app menu on macOS, not Tauri's default (`menu::MENU`; ADR-006 amendment
+/// 2026-10-20). Only the real app gets it; the mock-runtime tests use [`builder`] alone.
+fn with_menu<R: Runtime>(builder: Builder<R>) -> Builder<R> {
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(menu::build);
+    builder
+}
+
 /// Runs the app.
 ///
 /// # Errors
@@ -145,7 +155,7 @@ pub fn builder<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 pub fn run() -> tauri::Result<()> {
     logging::mark_process_start();
     logging::install();
-    builder(Builder::default())
+    with_menu(builder(Builder::default()))
         .setup(|app| {
             let paths = state::Paths {
                 app_data: app.path().app_data_dir()?,

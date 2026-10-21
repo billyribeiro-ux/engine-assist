@@ -45,6 +45,58 @@ pub fn escape_visible(text: &str) -> String {
     out
 }
 
+/// How many lines of text about to be written a native dialog shows.
+pub const EXCERPT_LINES: usize = 15;
+/// How many characters of each of those lines it shows.
+pub const EXCERPT_WIDTH: usize = 100;
+
+/// What a native dialog shows of text Foreman is about to write (security review 2026-10-20,
+/// W-2; SR-24a, SR-56): the SHA-256 prefix, the size in bytes and lines, and the first
+/// [`EXCERPT_LINES`] lines with every control, bidi, zero-width or invisible character shown as
+/// `‹U+XXXX›` (TAB and CR too), each cut at [`EXCERPT_WIDTH`] characters. Billy sees what will
+/// be written, not only that something will be.
+#[must_use]
+pub fn content_summary(text: &str) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut out = format!(
+        "SHA-256 {} · {} bytes · {} {}",
+        &foreman_core::store::sha256_hex(text.as_bytes())[..12],
+        text.len(),
+        lines.len(),
+        if lines.len() == 1 { "line" } else { "lines" }
+    );
+    if lines.is_empty() {
+        out.push_str("\n(empty)");
+        return out;
+    }
+    out.push_str(&format!(
+        "\n{}:",
+        if lines.len() > EXCERPT_LINES {
+            format!("First {EXCERPT_LINES} lines")
+        } else {
+            "The text".to_owned()
+        }
+    ));
+    for line in lines.iter().take(EXCERPT_LINES) {
+        let shown = escape_visible(line)
+            .replace('\t', "‹U+0009›")
+            .replace('\r', "‹U+000D›");
+        let mut cut: String = shown.chars().take(EXCERPT_WIDTH).collect();
+        if shown.chars().count() > EXCERPT_WIDTH {
+            cut.push('…');
+        }
+        out.push_str("\n│ ");
+        out.push_str(&cut);
+    }
+    if lines.len() > EXCERPT_LINES {
+        out.push_str(&format!(
+            "\n… and {} more lines.",
+            lines.len() - EXCERPT_LINES
+        ));
+    }
+    out
+}
+
 /// A packet field's text as block nodes (SR-26): paragraphs, `- `/`* ` and `1. ` lists, fenced
 /// code. Inline Markdown stays literal text; nothing becomes HTML.
 #[must_use]
@@ -133,6 +185,18 @@ pub fn doc_nodes(text: &str) -> Vec<DocNode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn content_summary_shows_hash_size_and_visible_lines() {
+        let s = content_summary("a\tb\r\n\u{1b}[31mred\n");
+        assert!(s.starts_with("SHA-256 "), "{s}");
+        assert!(s.contains(" · 14 bytes · 2 lines\nThe text:"), "{s}");
+        assert!(s.contains("│ a‹U+0009›b"), "{s}");
+        assert!(s.contains("│ ‹U+001B›[31mred"), "{s}");
+        assert_eq!(content_summary("").lines().nth(1), Some("(empty)"));
+        let long = "x".repeat(150);
+        assert!(content_summary(&long).contains(&format!("│ {}…", "x".repeat(100))));
+    }
 
     #[test]
     fn escapes_bidi() {

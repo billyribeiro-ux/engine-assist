@@ -158,12 +158,16 @@ pub fn build_env(
 }
 
 /// What is known about a `PATH` candidate (gathered by `foreman-sys` with `stat`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DirFacts {
     /// It exists and is a directory.
     pub is_dir: bool,
     /// It or an ancestor is world-writable without the sticky bit.
     pub world_writable: bool,
+    /// Its resolved path (every symlink followed), when it resolves. SR-05's not-in-a-project rule
+    /// is checked on this form too (security review 2026-10-20, N-2): a folder outside every
+    /// project that is a symlink into one is dropped.
+    pub canonical: Option<PathBuf>,
 }
 
 /// Why a `PATH` entry was dropped.
@@ -240,7 +244,9 @@ impl PathSources {
 }
 
 /// SR-05: keeps absolute, existing, non-project, non-world-writable directories, in order,
-/// without duplicates. `facts` answers for each absolute candidate.
+/// without duplicates. `facts` answers for each absolute candidate. "Inside a project" is checked
+/// on the path as written and on its resolved form; `projects` should hold each root in both
+/// forms (`foreman_sys::spawn::project_roots`).
 pub fn build_path(
     candidates: &[String],
     projects: &[PathBuf],
@@ -261,7 +267,12 @@ pub fn build_path(
                 Some(PathDrop::InProject)
             } else {
                 let f = facts(p);
-                if !f.is_dir {
+                if f.canonical
+                    .as_deref()
+                    .is_some_and(|c| projects.iter().any(|r| c.starts_with(r)))
+                {
+                    Some(PathDrop::InProject)
+                } else if !f.is_dir {
                     Some(PathDrop::Missing)
                 } else if f.world_writable {
                     Some(PathDrop::WorldWritable)

@@ -12,6 +12,7 @@ import TerminalDrawer from '#lib/components/TerminalDrawer.svelte';
 import TerminalView from '#lib/components/TerminalView.svelte';
 import { requests } from '#lib/ipc/fixtures/requests.ts';
 import { terminal } from '#lib/stores/terminal.svelte.ts';
+import { ui } from '#lib/stores/ui.svelte.ts';
 import { IDS, fresh } from '#lib/test/screen.ts';
 
 import packageJson from '../../../package.json';
@@ -283,6 +284,94 @@ describe('terminal', () => {
 		);
 		expect(sent.mock.calls.map((c) => c[1]).join('')).not.toContain('\x1b[201~text');
 		window.removeEventListener('keydown', onWindow);
+	});
+
+	it('terminal::paste_events_go_through_rust', async () => {
+		// C-1 (security review 2026-10-20; SR-28, T-091, AB-02): Edit → Paste, the context menu's
+		// Paste and a drop reach xterm as DOM events with the text in the event. None of that text
+		// may reach the PTY: a paste reads the clipboard in Rust (pty_paste, sanitized) and a drop or
+		// an insertFrom* input is refused.
+		const m = fresh('happy');
+		m.streamDelayMs = 0;
+		const runId = IDS.run23;
+		terminal.add({ runId, chain: 'c1', tabName: 'fm-x-s02-2-3' }, null);
+		const sent = vi.spyOn(terminal, 'write').mockResolvedValue();
+		const pastes = vi.spyOn(m, 'ptyPaste');
+		const said = vi.spyOn(ui, 'say');
+		await render(TerminalView, { runId, live: true, label: 'Terminal output' });
+		await vi.waitFor(() => expect(document.querySelector('.xterm-helper-textarea')).not.toBeNull());
+		const area = document.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+		if (!area) throw new Error('xterm helper textarea');
+		area.focus();
+		const evil = 'evil\x1b[201~\x03!touch /tmp/pwn\r';
+		m.setClipboard('rust\x1b[201~side');
+		const written = () => sent.mock.calls.map((c) => c[1]).join('');
+		const data = () => {
+			const dt = new DataTransfer();
+			dt.setData('text/plain', evil);
+			return dt;
+		};
+
+		// 1. A real `paste` event (Edit → Paste, the context menu) on xterm's helper textarea.
+		const paste = new ClipboardEvent('paste', {
+			clipboardData: data(),
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		});
+		area.dispatchEvent(paste);
+		expect(paste.defaultPrevented).toBe(true);
+		await vi.waitFor(() => expect(written()).toContain('rust[201~side'));
+		expect(pastes).toHaveBeenCalledTimes(1);
+
+		// 2. A `drop` of text: refused, nothing written, a one-line reason.
+		const drop = new DragEvent('drop', {
+			dataTransfer: data(),
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		});
+		area.dispatchEvent(drop);
+		expect(drop.defaultPrevented).toBe(true);
+		expect(said).toHaveBeenCalledWith(
+			"Foreman doesn't take dropped text in the terminal. Copy it and press ⌘V."
+		);
+
+		// 3. `beforeinput` inserting a drop or a paste into the textarea: cancelled; a paste goes
+		// to Rust (deduplicated with a paste event in the same gesture).
+		const dropInput = new InputEvent('beforeinput', {
+			inputType: 'insertFromDrop',
+			data: evil,
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		});
+		area.dispatchEvent(dropInput);
+		expect(dropInput.defaultPrevented).toBe(true);
+		await new Promise((done) => setTimeout(done, 400));
+		const pasteInput = new InputEvent('beforeinput', {
+			inputType: 'insertFromPaste',
+			data: evil,
+			bubbles: true,
+			cancelable: true,
+			composed: true
+		});
+		area.dispatchEvent(pasteInput);
+		expect(pasteInput.defaultPrevented).toBe(true);
+		await vi.waitFor(() => expect(pastes).toHaveBeenCalledTimes(2));
+		// The `input` that would follow an uncancelled insertion is stopped too, and the textarea
+		// keeps nothing for xterm's composition helper to send later.
+		area.value = evil;
+		area.dispatchEvent(
+			new InputEvent('input', { inputType: 'insertFromPaste', data: evil, bubbles: true })
+		);
+		expect(area.value).toBe('');
+
+		await new Promise((done) => setTimeout(done, 50));
+		expect(written()).not.toContain('evil');
+		expect(written()).not.toContain('\x1b');
+		expect(written()).not.toContain('\x03');
+		expect(pastes).toHaveBeenCalledTimes(2);
 	});
 
 	it('terminal::rearm_archives_buffer', async () => {

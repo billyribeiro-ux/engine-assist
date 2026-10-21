@@ -180,12 +180,13 @@ pub fn pending_change_accept(
     let ok = app.os().confirm(&Confirm::new(
         format!("Accept this change to {}?", x.file.repo_path()),
         format!(
-            "It changes: {}.\nForeman will use the file as it is now.",
+            "It changes: {}.\nForeman will use the file as it is now:\n\n{}",
             if keys.is_empty() {
                 "formatting only".to_owned()
             } else {
                 keys.join(", ")
-            }
+            },
+            crate::render::content_summary(&String::from_utf8_lossy(&bytes))
         ),
         "Accept change",
     ));

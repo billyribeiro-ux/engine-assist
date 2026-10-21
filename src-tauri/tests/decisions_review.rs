@@ -187,6 +187,28 @@ mod decisions {
         assert!(list(&p).is_empty());
     }
 
+    /// Security review 2026-10-20, W-2: the Accept dialog shows the content Foreman will
+    /// approve, not only the changed keys: SHA-256 prefix, size and the file's first lines with
+    /// escapes visible.
+    #[test]
+    fn accept_dialog_shows_the_content() {
+        let p = ProjectApp::new(json!({}));
+        git_identity(&p);
+        open(&p);
+        let seen = pending_events(&p);
+        let edited = edit_condition(&p, "yes");
+        wait_pending(&p, seen + 1);
+        let c = list(&p).pop().unwrap();
+        p.t.os.answer_next(false);
+        let _ = dec::pending_change_accept(&p.t.app, req(args(&p, &c)));
+        let asked = p.t.os.asked();
+        let m = &asked[0].message;
+        let sha = foreman_core::store::sha256_hex(&edited);
+        assert!(m.contains(&format!("SHA-256 {}", &sha[..12])), "{m}");
+        assert!(m.contains(&format!("{} bytes", edited.len())), "{m}");
+        assert!(m.contains("│ {"), "{m}");
+    }
+
     /// AC-F022-05: the file changes again while the review is open; Reject and Accept are both
     /// refused with `Stale`, the answer carries the new review, no dialog is raised for Accept,
     /// and neither the file nor the approved copy changed.
