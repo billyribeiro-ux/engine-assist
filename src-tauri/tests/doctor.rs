@@ -316,6 +316,7 @@ mod doctor {
             &mut |p| foreman_core::launch::env::DirFacts {
                 is_dir: p == Path::new("/usr/bin") || p.starts_with("/work"),
                 world_writable: false,
+                canonical: None,
             },
         );
         assert_eq!(kept, ["/usr/bin"]);

@@ -175,3 +175,47 @@ mod project_open {
         }
     }
 }
+
+mod repin {
+    use super::*;
+
+    /// Security review 2026-10-20, N-8 (SR-24a): `blueprint_repin` re-pins and commits the lock
+    /// only after a native dialog naming the blueprint, the commit pinned and the pin it replaces;
+    /// Cancel writes nothing.
+    #[test]
+    fn repin_requires_native_confirm() {
+        let p = ProjectApp::new(json!({}));
+        git_identity(&p);
+        let lock = p.project.join(".foreman/blueprint.lock.json");
+        let before = std::fs::read(&lock).unwrap();
+        let pinned: Value = serde_json::from_slice(&before).unwrap();
+        let commit = pinned["blueprintRepoCommit"].as_str().unwrap().to_owned();
+        let asked = p.t.os.asked().len();
+        p.t.os.answer_next(false);
+        let e = projects::blueprint_repin(&p.t.app, req(json!({ "projectId": p.id }))).unwrap_err();
+        assert_eq!(e.code, IpcErrorCode::Cancelled);
+        let all = p.t.os.asked();
+        assert_eq!(all.len(), asked + 1);
+        let c = &all[asked];
+        assert_eq!(c.title, "Re-pin the blueprint for TradeLog?");
+        assert!(
+            c.message.contains("/claude-build-blueprint.md at commit"),
+            "{c:?}"
+        );
+        assert!(c.message.contains(&commit[..12]), "{c:?}");
+        assert!(
+            c.message
+                .contains(&format!("in place of commit {}", &commit[..12])),
+            "{c:?}"
+        );
+        assert!(c.message.contains("commits it"), "{c:?}");
+        assert_eq!(
+            std::fs::read(&lock).unwrap(),
+            before,
+            "Cancel writes nothing"
+        );
+        p.t.os.answer_next(true);
+        projects::blueprint_repin(&p.t.app, req(json!({ "projectId": p.id }))).unwrap();
+        assert_eq!(p.t.os.asked().len(), asked + 2);
+    }
+}

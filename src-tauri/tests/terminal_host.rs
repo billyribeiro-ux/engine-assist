@@ -352,3 +352,58 @@ mod launch {
         let _ = term_cmd::pty_terminate(&p.t.app, req(json!({ "runId": run.run_id })));
     }
 }
+
+/// Security review 2026-10-20, C-1 (SR-28, T-091; ADR-006 amendment 2026-10-20): Foreman builds
+/// its own app menu. Edit → Paste is the native item, whose DOM `paste` event `TerminalView`
+/// stops in the capture phase and answers with `pty_paste` (proven in the browser by
+/// `terminal::paste_events_go_through_rust`); there is no other paste-like item.
+mod menu {
+    use foreman_app::menu::{Item, MENU};
+
+    #[test]
+    fn edit_paste_is_routed_through_pty_paste() {
+        let edit = MENU.iter().find(|s| s.title == "Edit").unwrap();
+        assert_eq!(
+            edit.items,
+            [
+                Item::Undo,
+                Item::Redo,
+                Item::Separator,
+                Item::Cut,
+                Item::Copy,
+                Item::Paste,
+                Item::SelectAll
+            ]
+        );
+        let pastes = MENU
+            .iter()
+            .flat_map(|s| s.items.iter())
+            .filter(|i| **i == Item::Paste)
+            .count();
+        assert_eq!(pastes, 1, "one Paste, in Edit");
+        // The terminal host stops every paste, drop and insertFrom* input before xterm sees it,
+        // and a paste becomes a Rust paste.
+        let view = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../src/lib/components/TerminalView.svelte"),
+        )
+        .unwrap();
+        for needle in [
+            "['paste', onPaste]",
+            "['drop', onDrop]",
+            "['beforeinput', onBeforeInput]",
+            "host.addEventListener(type, fn as EventListener, true)",
+            "e.stopImmediatePropagation();",
+            "requestPaste();",
+        ] {
+            assert!(view.contains(needle), "TerminalView.svelte: {needle}");
+        }
+        // The menu is installed on macOS (lib.rs).
+        let lib = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs"),
+        )
+        .unwrap();
+        assert!(lib.contains("let builder = builder.menu(menu::build);"));
+        assert!(lib.contains("with_menu(builder(Builder::default()))"));
+    }
+}

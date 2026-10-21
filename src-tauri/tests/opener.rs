@@ -104,6 +104,29 @@ mod opener {
         assert_eq!(e.code, IpcErrorCode::ToolFailed);
     }
 
+    /// Security review 2026-10-20, W-1: a settings file that names a terminal or script host as
+    /// the editor (edited outside Foreman) opens nothing; `file_open` refuses it.
+    #[test]
+    fn refused_editor_never_opens() {
+        let p = ProjectApp::new(json!({}));
+        std::fs::create_dir_all(p.project.join("docs")).unwrap();
+        std::fs::write(
+            p.project.join("docs/notes.md"),
+            "#!/bin/sh\ntouch /tmp/pwn\n",
+        )
+        .unwrap();
+        let (mut s, stamp, _) = p.t.app.settings().unwrap();
+        s.editor_bundle_id = Some("com.apple.Terminal".into());
+        p.t.app.save_settings(&s, &stamp).unwrap();
+        let e = open(&p, "docs/notes.md").unwrap_err();
+        assert_eq!(e.code, IpcErrorCode::NotAllowed);
+        assert!(
+            e.message.contains("Terminal runs the files it opens"),
+            "{e:?}"
+        );
+        assert!(p.t.os.open_requests().is_empty());
+    }
+
     /// AC-XC-28, T-044: executable and application types never open; a `.md` symlink to an `.app`
     /// (or anywhere) is refused; nothing outside the read policy opens; nothing reaches `open`.
     #[test]

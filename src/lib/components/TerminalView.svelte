@@ -95,6 +95,17 @@
 		}
 	}
 
+	// C-1 (SR-28): ⌘V, Edit → Paste and the context menu's Paste can arrive as two signals for one
+	// gesture (the key and the DOM paste event); one Rust paste answers both.
+	const PASTE_ONCE_MS = 300;
+	let lastPaste = -Infinity;
+	function requestPaste(): void {
+		const now = performance.now();
+		if (now - lastPaste < PASTE_ONCE_MS) return;
+		lastPaste = now;
+		void paste();
+	}
+
 	async function paste(): Promise<void> {
 		const client = await ipc();
 		try {
@@ -189,7 +200,7 @@
 		t.attachCustomKeyEventHandler((ev) => {
 			const route = routeKey(ev);
 			if (ev.type === 'keydown') {
-				if (route === 'paste') void paste();
+				if (route === 'paste') requestPaste();
 				else if (route === 'copy') copy();
 				else if (route === 'selectAll') t.selectAll();
 				else if (route === 'find') void openFind();
@@ -220,11 +231,44 @@
 			fit();
 		});
 		ro.observe(host);
-		// xterm's own paste handling is off: ⌘V goes through Rust (SR-28).
-		const block = (e: ClipboardEvent) => {
+		// xterm's own paste handling is off (SR-28, C-1): its listeners read the event's text and
+		// send it unsanitized, so every paste, drop and insertFrom* input is stopped here, in the
+		// capture phase, before xterm sees it. A paste (Edit → Paste, the context menu) becomes a
+		// Rust paste (pty_paste reads and sanitizes the clipboard); dropped text is refused.
+		const stop = (e: Event) => {
 			e.preventDefault();
+			e.stopImmediatePropagation();
 		};
-		host.addEventListener('paste', block, true);
+		const onPaste = (e: ClipboardEvent) => {
+			stop(e);
+			requestPaste();
+		};
+		const onDrag = (e: DragEvent) => {
+			stop(e);
+			if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+		};
+		const onDrop = (e: DragEvent) => {
+			stop(e);
+			ui.say("Foreman doesn't take dropped text in the terminal. Copy it and press ⌘V.");
+		};
+		const onBeforeInput = (e: InputEvent) => {
+			if (!e.inputType.startsWith('insertFrom')) return;
+			stop(e);
+			if (e.inputType.startsWith('insertFromPaste')) requestPaste();
+		};
+		const onInput = (e: Event) => {
+			if (!(e instanceof InputEvent) || !e.inputType.startsWith('insertFrom')) return;
+			e.stopImmediatePropagation();
+			if (e.target instanceof HTMLTextAreaElement) e.target.value = '';
+		};
+		const guards: [string, (e: never) => void][] = [
+			['paste', onPaste],
+			['dragover', onDrag],
+			['drop', onDrop],
+			['beforeinput', onBeforeInput],
+			['input', onInput]
+		];
+		for (const [type, fn] of guards) host.addEventListener(type, fn as EventListener, true);
 		const media = matchMedia('(prefers-color-scheme: dark)');
 		const retheme = () => {
 			t.options.theme = theme();
@@ -240,7 +284,7 @@
 			ro.disconnect();
 			mo.disconnect();
 			media.removeEventListener('change', retheme);
-			host.removeEventListener('paste', block, true);
+			for (const [type, fn] of guards) host.removeEventListener(type, fn as EventListener, true);
 			t.dispose();
 		};
 	});

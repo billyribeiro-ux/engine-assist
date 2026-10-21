@@ -92,3 +92,23 @@ Source checks of `portable-pty` 0.9.0 (22 M downloads, 662 reverse deps; source 
 ## Exit path
 
 `PtySession` is a trait-backed module (`spawn`, `write`, `paste`, `resize`, `signal`, `wait`, `sink`). Swap in `pty-process` or a vendored portable-pty without touching IPC. On a fundamental S-0 failure, ADR-001's SwiftUI + SwiftTerm fallback applies.
+
+## Amendment 2026-10-20: every paste path goes through `pty_paste`; Foreman builds its own app menu (security review C-1)
+
+**Finding.** The independent security review of `stage/05-site-prep` @ 45c96e7 (C-1) showed that SR-28's "xterm's own paste handling is disabled" held only for ⌘V. The terminal host's capture-phase `paste` listener called `preventDefault()` but not `stopImmediatePropagation()`, and xterm 6.0.0's `handlePasteEvent` (`src/browser/Clipboard.ts`) ignores `defaultPrevented`: it reads the event's `clipboardData` and sends it through `triggerDataEvent`, so the text reached `pty_write` unsanitized. Edit → Paste in Tauri's default macOS menu and WKWebView's context-menu Paste both fire that DOM event. `terminal::paste_events_go_through_rust` reproduced it before the fix: `evil\x1b[201~\x03!touch /tmp/pwn\r` arrived at `pty_write` as is.
+
+**Decision.**
+
+1. **The terminal host stops every paste-like event before xterm sees it** (`TerminalView.svelte`, capture phase on the host element, `preventDefault()` and `stopImmediatePropagation()`):
+   - `paste`: answered with a Rust paste (`pty_paste` reads the clipboard in Rust and removes every control, SR-28, then `term.paste` brackets it). The event's own text is never read.
+   - `dragover` and `drop`: refused, with "Foreman doesn't take dropped text in the terminal. Copy it and press ⌘V." A drop's text isn't on the clipboard, so it has no sanitized path.
+   - `beforeinput` with an `insertFrom*` input type (`insertFromPaste`, `insertFromPasteAsQuotation`, `insertFromDrop`, `insertFromYank`): cancelled; the paste types are answered with a Rust paste. The matching `input` event is stopped too, and the helper textarea is emptied, so xterm's composition helper has nothing to send later.
+   - ⌘V, a paste event and a `beforeinput` from one gesture produce one Rust paste (300 ms).
+2. **Foreman builds its own app menu in Rust** (`src-tauri/src/menu.rs`, installed with `tauri::Builder::menu` on macOS) instead of Tauri's default. Every item is native (`PredefinedMenuItem`). Edit holds Undo, Redo, Cut, Copy, Paste and Select All, with no "Paste and Match Style". **Edit → Paste stays the native `paste:` action:** in a text field it pastes as usual; with a terminal focused, WebKit turns it into the DOM `paste` event that point 1 answers with `pty_paste`. This is the preferred design (Paste routed through the sanitized path when a terminal is focused, normal paste in text fields), and it needed no new IPC command.
+
+**Alternatives considered.**
+
+- *A custom Edit → Paste item handled in Rust.* Rust doesn't know which element has focus, and a Rust-handled ⌘V would break paste in every text field: the webview may not read the clipboard (AC-XC-29), and Rust has no way to perform a native paste into a field. Rejected.
+- *Removing Paste from the menu while a terminal is focused.* That needs a new focus-reporting command, and the context-menu Paste would stay open anyway. Point 1 closes both paths with no contract change. Rejected.
+
+**Verification.** `terminal::paste_events_go_through_rust` (Vitest, real Chromium and xterm 6.0.0) dispatches real `paste`, `drop` and `beforeinput` events on `.xterm-helper-textarea` and asserts no ESC or C0 from the event reaches `pty_write`, while the paste reaches it through `pty_paste`. `menu::edit_paste_is_routed_through_pty_paste` (`src-tauri/tests/terminal_host.rs`) pins the menu and the host's listeners. The WKWebView check (Edit → Paste, right-click Paste and a text drop into a terminal tab, with the fixture on the clipboard) is Mac check 25 in `docs/progress.md`, beside S-0's real-TUI paste check.

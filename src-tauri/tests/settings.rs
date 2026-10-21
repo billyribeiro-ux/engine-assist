@@ -165,6 +165,125 @@ mod settings {
         assert_eq!(e.code, IpcErrorCode::Cancelled);
         assert!(t.os.asked()[3].message.contains("Forget the claude path"));
     }
+
+    /// Security review 2026-10-20, W-1 (T-004, SR-24a, SR-25a): a new editor is applied only after
+    /// a native "Use <app>?" dialog naming the app and its ID; Cancel saves nothing; the same
+    /// editor again asks nothing; an app that runs what it opens (Terminal, iTerm2, Script Editor,
+    /// …) is refused before any dialog, in any letter case.
+    #[test]
+    fn editor_change_requires_native_confirm() {
+        let t = TestApp::new();
+        let vscode = json!({ "editor": { "kind": "set", "bundleId": "com.microsoft.VSCode" } });
+        t.os.answer_next(false);
+        let e = settings_cmd::settings_update(&t.app, req(patch(rev(&t), &vscode))).unwrap_err();
+        assert_eq!(e.code, IpcErrorCode::Cancelled);
+        let asked = t.os.asked();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].title, "Use Visual Studio Code to open files?");
+        assert!(
+            asked[0]
+                .message
+                .contains("Visual Studio Code (com.microsoft.VSCode)"),
+            "{:?}",
+            asked[0]
+        );
+        assert!(t.app.settings().unwrap().0.editor_bundle_id.is_none());
+        t.os.answer_next(true);
+        settings_cmd::settings_update(&t.app, req(patch(rev(&t), &vscode))).unwrap();
+        assert_eq!(
+            t.app.settings().unwrap().0.editor_bundle_id.as_deref(),
+            Some("com.microsoft.VSCode")
+        );
+        // Unchanged: no dialog. Clearing: no dialog (it only takes Open in editor away).
+        settings_cmd::settings_update(&t.app, req(patch(rev(&t), &vscode))).unwrap();
+        assert_eq!(t.os.asked().len(), 2);
+        settings_cmd::settings_update(
+            &t.app,
+            req(patch(rev(&t), &json!({ "editor": { "kind": "clear" } }))),
+        )
+        .unwrap();
+        assert_eq!(t.os.asked().len(), 2);
+        // An unknown app is shown by its ID, with a warning line.
+        t.os.answer_next(false);
+        let _ = settings_cmd::settings_update(
+            &t.app,
+            req(patch(
+                rev(&t),
+                &json!({ "editor": { "kind": "set", "bundleId": "com.example.notes" } }),
+            )),
+        );
+        let last = t.os.asked().last().cloned().unwrap();
+        assert_eq!(last.title, "Use com.example.notes to open files?");
+        assert!(
+            last.message.contains("doesn't know this app ID"),
+            "{last:?}"
+        );
+        // Refused hosts: NotAllowed, no dialog, nothing saved.
+        let n = t.os.asked().len();
+        for id in [
+            "com.apple.Terminal",
+            "COM.APPLE.TERMINAL",
+            "com.googlecode.iterm2",
+            "com.apple.ScriptEditor2",
+            "com.apple.ScriptEditor.id.MyApplet",
+            "com.apple.Automator",
+            "net.kovidgoyal.kitty",
+            "dev.warp.Warp-Stable",
+        ] {
+            let e = settings_cmd::settings_update(
+                &t.app,
+                req(patch(
+                    rev(&t),
+                    &json!({ "editor": { "kind": "set", "bundleId": id }, "theme": "night" }),
+                )),
+            )
+            .unwrap_err();
+            assert_eq!(e.code, IpcErrorCode::NotAllowed, "{id}");
+            assert!(e.message.contains("runs the files it opens"), "{id}: {e:?}");
+        }
+        assert_eq!(t.os.asked().len(), n, "a refusal raises no dialog");
+        let (s, _, _) = t.app.settings().unwrap();
+        assert!(s.editor_bundle_id.is_none());
+        assert_ne!(
+            serde_json::to_value(s.theme).unwrap(),
+            "night",
+            "nothing in a refused patch is saved"
+        );
+    }
+
+    /// Security review 2026-10-20, N-8 (SR-24a lists the login PATH): clearing a captured login
+    /// PATH asks natively first; Cancel keeps it. With none captured, nothing is asked.
+    #[test]
+    fn clear_login_path_requires_native_confirm() {
+        let t = TestApp::new();
+        let clear = json!({ "clearLoginPath": true });
+        settings_cmd::settings_update(&t.app, req(patch(rev(&t), &clear))).unwrap();
+        assert!(t.os.asked().is_empty(), "nothing captured: nothing to ask");
+        let (mut s, stamp, _) = t.app.settings().unwrap();
+        s.login_path = Some(foreman_core::schema::settings::LoginPath {
+            entries: vec!["/opt/homebrew/bin".into(), "/usr/bin".into()],
+            shell: "/bin/zsh".into(),
+            captured_at: "2026-10-20T12:00:00Z".into(),
+        });
+        t.app.save_settings(&s, &stamp).unwrap();
+        t.os.answer_next(false);
+        let e = settings_cmd::settings_update(&t.app, req(patch(rev(&t), &clear))).unwrap_err();
+        assert_eq!(e.code, IpcErrorCode::Cancelled);
+        let asked = t.os.asked();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].title, "Change security settings?");
+        assert!(
+            asked[0]
+                .message
+                .contains("Forget the login PATH captured 2026-10-20T12:00:00Z (2 folders)"),
+            "{:?}",
+            asked[0]
+        );
+        assert!(t.app.settings().unwrap().0.login_path.is_some());
+        t.os.answer_next(true);
+        settings_cmd::settings_update(&t.app, req(patch(rev(&t), &clear))).unwrap();
+        assert!(t.app.settings().unwrap().0.login_path.is_none());
+    }
 }
 
 mod env {
