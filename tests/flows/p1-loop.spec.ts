@@ -1,6 +1,7 @@
 // The P1 loop, keyboard only (EX-M2-03, AC-F028-01, A.7): create a project with ⌘N, copy and open
 // chat steps with ⌘↵, mark them done with ⌘D, paste the Stage 1 packet back with ⌘⇧V, then in a
-// Stage 2 project acknowledge the changed Claude Code config, run a CLI step with ⌘↵, move into the
+// Stage 2 project end the live session from the Session menu, acknowledge the changed Claude Code
+// config, run a CLI step with ⌘↵, move into the
 // terminal with ⌘⇧T and back with ⌘⇧E. No mouse events; the native dialogs are the mock's script.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -91,6 +92,19 @@ test('P1 loop, keyboard only: create, chat steps, paste back', async ({ page }) 
 	await toast(page, /^Wrote \d+ files; step done\./);
 });
 
+/** Ends the live 2.3 session from the terminal's Session menu, by keyboard (the mock's native
+ * Terminate dialog answers OK). */
+async function endLiveSession(page: Page): Promise<void> {
+	const label = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? '');
+	for (let i = 0; i < 120 && (await label()) !== 'Session menu'; i++)
+		await page.keyboard.press('Tab');
+	expect(await label()).toBe('Session menu');
+	await page.keyboard.press('Enter');
+	await tabTo(page, /^Terminate…$/);
+	await page.keyboard.press('Enter');
+	await expect(page.getByRole('tab', { name: /2-3.*exited 143/ })).toBeVisible();
+}
+
 test('P1 loop, keyboard only: acknowledge config, run a CLI step, terminal focus', async ({
 	page
 }) => {
@@ -99,8 +113,11 @@ test('P1 loop, keyboard only: acknowledge config, run a CLI step, terminal focus
 		page.getByRole('heading', { level: 1, name: "Architect's Design Studio" })
 	).toBeVisible();
 
+	// x-2-1 continues the 2.2 chain; with its session ended it launches (DR-068), so the changed
+	// config is checked first.
+	await endLiveSession(page);
+
 	// Run is refused until the changed config is acknowledged, and says so.
-	await page.keyboard.press('Tab');
 	await selectStep(page, /^x.2.1/);
 	await page.keyboard.press('Meta+Enter');
 	await page.keyboard.press('Meta+Enter');
@@ -122,11 +139,13 @@ test('P1 loop, keyboard only: acknowledge config, run a CLI step, terminal focus
 	expect(await page.evaluate(() => document.activeElement?.closest('main') !== null)).toBe(true);
 });
 
-test('P1 loop, keyboard only: re-arm a continuing step, terminal focus returns', async ({
+test('P1 loop, keyboard only: a continuing step, live then relaunched, terminal focus returns', async ({
 	page
 }) => {
-	// In Stage 2 the session of 2.3 is still alive, so 2.4 (which continues it) re-arms it: Run
-	// ends the idle session after the native confirmation and resumes the chain (AC-F028-02).
+	// 2.4 continues the 2.2 chain (kind followup in blueprint v2.2). While the 2.3 session is live,
+	// Run copies its prompt and focuses that tab, typing nothing (DR-068); once the session has
+	// ended, Run resumes the chain in a new tab (AC-F028-02). The idle re-arm of a continuing
+	// prompt step is covered by rearm::* (Rust) and terminal::rearm_archives_buffer (Vitest).
 	await page.goto(`/projects/${TRADELOG}/stages/2`);
 	await expect(
 		page.getByRole('heading', { level: 1, name: "Architect's Design Studio" })
@@ -138,7 +157,7 @@ test('P1 loop, keyboard only: re-arm a continuing step, terminal focus returns',
 	await page.keyboard.press('Enter');
 	await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0);
 
-	// The sensor reports the session idle (the mock's stand-in for it), so Run may re-arm it.
+	// The sensor reports the session idle (the mock's stand-in for it), so 2.4 isn't waiting.
 	await page.evaluate((run) => {
 		(
 			window as unknown as { __foremanMock: { setRunIdle(id: string): void } }
@@ -147,7 +166,14 @@ test('P1 loop, keyboard only: re-arm a continuing step, terminal focus returns',
 	await selectStep(page, /^2\.4/);
 	await page.keyboard.press('Meta+Enter');
 	await page.keyboard.press('Meta+Enter');
-	// The idle session ended and the chain resumed in a new tab: no second live session.
+	await toast(page, /Prompt copied\. Paste it into the session/);
+	await expect(page.getByRole('tab', { name: /2-3.* idle/ })).toBeVisible();
+
+	await endLiveSession(page);
+	await selectStep(page, /^2\.4/);
+	await page.keyboard.press('Meta+Enter');
+	await page.keyboard.press('Meta+Enter');
+	// The chain resumed in a new tab: no second live session.
 	await expect(page.getByRole('tab', { name: /2-4|2\.4/ })).toBeVisible();
 	await expect(page.getByRole('tab', { name: /2-3.* running/ })).toHaveCount(0);
 

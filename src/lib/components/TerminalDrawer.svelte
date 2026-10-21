@@ -18,21 +18,31 @@
 		projectName = null,
 		fontSize = 12,
 		scrollback = 10000,
+		macOptionIsMeta = true,
 		screenReaderMode = false
 	}: {
 		projectName?: string | null;
 		fontSize?: number;
 		scrollback?: number;
+		macOptionIsMeta?: boolean;
 		screenReaderMode?: boolean;
 	} = $props();
+
+	$effect(() => {
+		terminal.scrollback = scrollback;
+	});
 
 	const tabs = $derived(terminal.tabs);
 	const active = $derived(tabs.find((t) => t.runId === terminal.active) ?? tabs[0] ?? null);
 	let menuOpen = $state(false);
 	let drag: { y: number; h: number } | null = null;
 
+	function lineCount(n: number): string {
+		return `${n.toLocaleString('en-US')} ${n === 1 ? 'line' : 'lines'}`;
+	}
+
 	function word(t: (typeof tabs)[number]): string {
-		if (t.status === 'exited') return `exited ${t.exitCode ?? 0}`;
+		if (t.status === 'exited') return t.exitCode === null ? 'exited' : `exited ${t.exitCode}`;
 		return RUN[t.status].word;
 	}
 
@@ -230,11 +240,15 @@
 				{#if active.archived}
 					<details class="archived">
 						<summary
-							><Icon name="chev" class="chev" />Earlier in this session: {active.archived.label}, {active.archived.lines.toLocaleString(
-								'en-US'
-							)}
-							lines (archived, read-only)</summary
+							><Icon name="chev" class="chev" />Earlier in this session: {active.archived.label}, {lineCount(
+								active.archived.lines
+							)} (archived, read-only)</summary
 						>
+						<!-- svelte-ignore a11y_no_noninteractive_tabindex (a scrollable region must be keyboard-reachable) -->
+						<pre
+							class="archive-text"
+							tabindex="0"
+							aria-label="Archived output, {active.archived.label}">{active.archived.text}</pre>
 					</details>
 				{/if}
 				{#key active.runId}
@@ -247,6 +261,7 @@
 						label="Terminal output, {active.tabName}"
 						{fontSize}
 						{scrollback}
+						{macOptionIsMeta}
 						{screenReaderMode}
 					/>
 				{/key}
@@ -352,6 +367,15 @@
 	}
 	.archived summary::-webkit-details-marker {
 		display: none;
+	}
+	.archive-text {
+		margin: var(--space-2) var(--space-5) 0;
+		max-height: 40vh;
+		overflow: auto;
+		font-family: var(--font-mono);
+		font-size: var(--text-12);
+		color: var(--term-muted);
+		white-space: pre;
 	}
 	.menu-wrap {
 		position: relative;

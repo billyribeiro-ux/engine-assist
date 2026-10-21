@@ -32,6 +32,11 @@ serde_json = "=1.0.154"
 tauri-plugin-dialog = "=2.8.3"
 tauri-plugin-clipboard-manager = "=2.5.0"
 tauri-plugin-notification = "=2.7.0"
+# Diagnostic log (ADR-018 §6, design doc §3.2; checked against crates.io on 2026-10-20: tracing
+# 0.1.44 and tracing-subscriber 0.3.23 are the newest stable). Only the registry and Foreman's own
+# redacting layer: no fmt, ansi, env-filter or appender features.
+tracing = { version = "=0.1.44", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "=0.3.23", default-features = false, features = ["registry", "std"] }
 # Same exact pins as foreman-core (design doc §3.2).
 jiff = "=0.2.38"
 uuid = { version = "=1.28.0", features = ["v4"] }

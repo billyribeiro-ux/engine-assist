@@ -225,6 +225,58 @@ fn size_of(dir: &std::os::fd::OwnedFd, rel: &str, depth: usize) -> Result<u64, S
     Ok(total)
 }
 
+/// The size in bytes of one app-data regular file (never following a link). Missing is `None`.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused, is not a regular file, or can't be read.
+pub fn file_len(root: &Root, rel: &str) -> Result<Option<u64>, StoreError> {
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Ok(None);
+    };
+    match rustix::fs::statat(&dir, name.as_str(), AtFlags::SYMLINK_NOFOLLOW) {
+        Err(e) if e == rustix::io::Errno::NOENT => Ok(None),
+        Err(e) => Err(StoreError::io(rel, e)),
+        Ok(st) => {
+            if rustix::fs::FileType::from_raw_mode(super::stat_mode(&st))
+                != rustix::fs::FileType::RegularFile
+            {
+                return Err(StoreError::NotRegular(rel.to_owned()));
+            }
+            Ok(Some(u64::try_from(st.st_size).unwrap_or(0)))
+        }
+    }
+}
+
+/// Size rotation for an app-data log (ADR-018 §6, files.md §2 row 25: `name`, `name.1` …
+/// `name.<keep>`): `name.<keep-1>` replaces `name.<keep>`, and so on down, then `name` becomes
+/// `name.1`. Renames happen inside the folder reached by the no-symlink walk; a missing file is
+/// skipped. The next append creates `name` afresh.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused or a rename fails.
+pub fn rotate(root: &Root, rel: &str, keep: u32) -> Result<(), StoreError> {
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    for i in 1..=keep {
+        crate::pathpolicy::check_app_data(&format!("{rel}.{i}"))?;
+    }
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Ok(());
+    };
+    let step = |from: &str, to: &str| match rustix::fs::renameat(&dir, from, &dir, to) {
+        Ok(()) => Ok(()),
+        Err(e) if e == rustix::io::Errno::NOENT => Ok(()),
+        Err(e) => Err(StoreError::io(rel, e)),
+    };
+    for i in (1..keep).rev() {
+        step(&format!("{name}.{i}"), &format!("{name}.{}", i + 1))?;
+    }
+    if keep > 0 {
+        step(&name, &format!("{name}.1"))?;
+    }
+    Ok(())
+}
+
 /// Installs an executable into app data (ADR-009: `bin/foreman-sensor-<sha256-12>`, files.md §2
 /// row 24, mode `0700`): whatever is at `rel` (a file or a symlink, never followed) is removed,
 /// `bytes` are written through the atomic writer (`O_EXCL`, never replacing), and the new file is
@@ -256,6 +308,34 @@ pub fn install_executable(root: &Root, rel: &str, bytes: &[u8]) -> Result<(), St
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt as _;
+
+    #[test]
+    fn rotate_keeps_the_newest_files() {
+        let d = tempfile::tempdir().unwrap();
+        let app = d.path().join("app");
+        let root = Root::open_app_data(&app).unwrap();
+        let rel = crate::pathpolicy::check_app_data("logs/x.log").unwrap();
+        crate::store::dirs::ensure_dir(&root, &crate::pathpolicy::check_app_data("logs").unwrap())
+            .unwrap();
+        assert_eq!(file_len(&root, "logs/x.log").unwrap(), None);
+        for n in 0..6_u8 {
+            root.append_line(&rel, &[b'a' + n, b'\n']).unwrap();
+            assert_eq!(file_len(&root, "logs/x.log").unwrap(), Some(2));
+            rotate(&root, "logs/x.log", 4).unwrap();
+            assert_eq!(file_len(&root, "logs/x.log").unwrap(), None);
+        }
+        // Six generations, four kept: the newest is .1.
+        for (i, want) in [(1, "f"), (2, "e"), (3, "d"), (4, "c")] {
+            assert_eq!(
+                std::fs::read_to_string(app.join(format!("logs/x.log.{i}"))).unwrap(),
+                format!("{want}\n")
+            );
+        }
+        assert!(!app.join("logs/x.log.5").exists());
+        // A symlink in place of the log is not a regular file.
+        std::os::unix::fs::symlink(d.path(), app.join("logs/x.log")).unwrap();
+        assert!(file_len(&root, "logs/x.log").is_err());
+    }
 
     #[test]
     fn install_executable_is_0700_and_replaces_links() {

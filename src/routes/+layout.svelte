@@ -57,26 +57,15 @@
 			// sidebar's status dot. Nothing waits for it and a failure is only a missing dot.
 			void client.doctorRun({ scope: 'p1' }).catch(() => undefined);
 			await client.listen('run:status', (p) => {
-				terminal.setStatus(p.runId, p.status, p.status === 'exited' ? 0 : null);
+				void terminal.statusChanged(client, p.runId, p.status);
 			});
 			const runs = await client.runsSearch({ query: '', projectId: null, cursor: null, limit: 50 });
+			// A re-attached run starts with an empty archive: the earlier run's buffer lived in
+			// memory only (its output.log tail stays in app data).
 			for (const r of runs.runs.filter((x) =>
 				['running', 'idle', 'blocked', 'starting'].includes(x.status)
-			)) {
-				const before = runs.runs.find(
-					(x) => x.chain === r.chain && x.runId !== r.runId && x.startedAt < r.startedAt
-				);
+			))
 				await terminal.attach(client, r.runId, r.project, r.chain);
-				if (before?.step)
-					terminal.tabs = terminal.tabs.map((t) =>
-						t.runId === r.runId
-							? {
-									...t,
-									archived: { label: `${before.step ?? ''} ${before.stepTitle}`, lines: 1842 }
-								}
-							: t
-					);
-			}
 		})();
 
 		const stopDisplay = watchOsDisplay();
@@ -201,6 +190,7 @@
 				projectName={current.project?.summary.name ?? null}
 				fontSize={settings.value?.terminal.fontSize ?? 12}
 				scrollback={settings.value?.terminal.scrollback ?? 10000}
+				macOptionIsMeta={settings.value?.terminal.macOptionIsMeta ?? true}
 				screenReaderMode={settings.value?.screenReaderMode ?? false}
 			/>
 		{/if}

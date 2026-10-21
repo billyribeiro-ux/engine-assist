@@ -3,13 +3,14 @@
 //   node scripts/check-required-tests.mjs [--milestone=M1] [--list-file=<cargo test --list output>]
 //
 // Reads every ticket's "Required tests:" lines from docs/tickets.md, takes the `module::name`
-// test names (a `module::*` entry needs at least one test in that module), and checks them against
-// `cargo test --workspace -- --list`. A name matches a listed test that equals it or ends with
-// `::<name>`. A name ending in `_` or `_*` (`ipc::fuzz_*`, `confirm_required_for_{a,b}`) is a prefix:
-// at least one test must start with it. Tests written in Vitest (`it('render::escapes_html', …)`
-// under src/ or tests/, ticket files "src/lib/render/…") count too, by their quoted title; they are
-// found by reading the test files, not by running them (`pnpm test` runs them). Missing names are printed for every milestone; the step fails only for milestones
-// marked `done` in docs/progress.md.
+// test names (a `module::*` entry needs at least one test in that module; `name_*`, `name_<key>`
+// and `name_{a,b}` need at least one test whose name starts with `name_`), and checks them against
+// `cargo test --workspace -- --list` plus the Vitest and Playwright tests whose title starts with
+// the name (`it('terminal::options_snapshot', …)` in `src/**/*.test.ts`, `tests/**/*.test.ts`,
+// `tests/flows/*.spec.ts`). A name matches a listed test that equals it or ends with `::<name>`.
+// Missing names are printed for every milestone. The step fails for a ticket marked `done` in
+// docs/progress.md, and for every ticket of a milestone marked `done` except those marked `billy`
+// (left for Billy's Mac: manual runs and macOS-only checks).
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -45,9 +46,9 @@ function requiredTests() {
 		// Names outside parentheses only (parentheticals explain, they don't add tests).
 		const bare = line.replace(/\([^)]*\)/g, '');
 		for (const m of bare.matchAll(
-			/\b([a-z_][a-z0-9_]*(?:::[a-z_][a-z0-9_]*)*::(?:[a-z_][a-z0-9_]*\*?|\*))/g
+			/\b([a-z_][a-z0-9_]*(?:::[a-z_][a-zA-Z0-9_]*)*::(?:[a-zA-Z_][a-zA-Z0-9_]*|\*))(\*|<[^>]*>|\{[^}]*\})?/g
 		))
-			out.get(ticket).push(m[1]);
+			out.get(ticket).push(m[2] ? `${m[1]}*` : m[1]);
 	}
 	return out;
 }
@@ -63,7 +64,7 @@ function progress() {
 		return s;
 	}
 	for (const line of text.split('\n')) {
-		const m = /^\|\s*(M\d+(?:-\d+)?)\s*\|\s*([a-z-]+)\s*\|/.exec(line);
+		const m = /^\|\s*(M\d+(?:-\d+)?)\s*\|\s*([a-z-]+)[^|]*\|/.exec(line);
 		if (m) s.set(m[1], m[2]);
 	}
 	return s;
@@ -96,37 +97,45 @@ function listedTests() {
 		.map((l) => l.slice(0, -': test'.length));
 }
 
-/** Quoted `module::name` titles of Vitest `it(...)`/`test(...)` calls under src/ and tests/. */
-function vitestTitles() {
-	const out = [];
+/** Titles of Vitest and Playwright tests that start with a `module::name` test name. */
+function jsTests() {
+	/** @type {string[]} */
+	const files = [];
 	/** @param {string} dir */
 	const walk = (dir) => {
-		for (const name of readdirSync(dir)) {
-			if (name === 'node_modules' || name.startsWith('.')) continue;
-			const p = join(dir, name);
+		let names;
+		try {
+			names = readdirSync(dir);
+		} catch {
+			return;
+		}
+		for (const n of names) {
+			if (n === 'node_modules' || n.startsWith('.')) continue;
+			const p = join(dir, n);
 			if (statSync(p).isDirectory()) walk(p);
-			else if (/\.(test|spec)\.ts$/.test(name)) {
-				const text = readFileSync(p, 'utf8');
-				for (const m of text.matchAll(
-					/\b(?:it|test)(?:\.\w+)*\(\s*['"`]([a-z_][a-z0-9_]*(?:::[a-z_][a-z0-9_]*)+)['"`]/g
-				))
-					out.push(m[1]);
-			}
+			else if (/\.(test|spec)\.ts$/.test(n)) files.push(p);
 		}
 	};
-	for (const d of ['src', 'tests']) walk(join(root, d));
+	walk(join(root, 'src'));
+	walk(join(root, 'tests'));
+	const out = [];
+	for (const f of files)
+		for (const m of readFileSync(f, 'utf8').matchAll(
+			/\b(?:it|test)(?:\.\w+)?\(\s*['"`]([a-z_][a-z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)+)/g
+		))
+			if (m[1]) out.push(m[1]);
 	return out;
 }
 
-const tests = [...listedTests(), ...vitestTitles()];
+const tests = [...listedTests(), ...jsTests()];
 /** @param {string} name */
 const present = (name) => {
 	if (name.endsWith('::*')) {
 		const mod = name.slice(0, -1);
 		return tests.some((t) => t.startsWith(mod) || t.includes(`::${mod}`));
 	}
-	if (name.endsWith('*') || name.endsWith('_')) {
-		const prefix = name.replace(/\*$/, '');
+	if (name.endsWith('*')) {
+		const prefix = name.slice(0, -1);
 		return tests.some((t) => t.startsWith(prefix) || t.includes(`::${prefix}`));
 	}
 	return tests.some((t) => t === name || t.endsWith(`::${name}`));
@@ -140,7 +149,9 @@ for (const [ticket, names] of requiredTests()) {
 	const missing = names.filter((n) => !present(n));
 	const entry = byMilestone.get(ms) ?? { total: 0, missing: [] };
 	entry.total += names.length;
-	for (const n of missing) entry.missing.push(`${ticket} ${n}`);
+	const ts = status.get(ticket);
+	const enforced = ts === 'done' || (status.get(ms) === 'done' && ts !== 'billy');
+	for (const n of missing) entry.missing.push({ text: `${ticket} ${n}`, enforced, ts });
 	byMilestone.set(ms, entry);
 }
 
@@ -150,9 +161,11 @@ for (const [ms, { total, missing }] of byMilestone) {
 	process.stdout.write(
 		`${ms}: ${total - missing.length}/${total} required tests present${done ? ' (milestone done)' : ''}\n`
 	);
-	if (missing.length) {
-		for (const m of missing) process.stdout.write(`  missing ${m}\n`);
-		if (done) failed = true;
+	for (const m of missing) {
+		process.stdout.write(
+			`  missing ${m.text}${m.ts === 'billy' ? " (left for Billy's Mac)" : ''}\n`
+		);
+		if (m.enforced) failed = true;
 	}
 }
 process.exit(failed ? 1 : 0);

@@ -355,6 +355,7 @@ pub struct ScriptedOs {
     picks: Mutex<VecDeque<Option<PathBuf>>>,
     saves: Mutex<VecDeque<Option<PathBuf>>>,
     clipboard: Mutex<Option<String>>,
+    clipboard_reads: Mutex<u32>,
     events: Mutex<Vec<Event>>,
     opened: Mutex<Vec<String>>,
     terminals: Mutex<Vec<PathBuf>>,
@@ -376,6 +377,7 @@ impl Default for ScriptedOs {
             picks: Mutex::new(VecDeque::new()),
             saves: Mutex::new(VecDeque::new()),
             clipboard: Mutex::new(None),
+            clipboard_reads: Mutex::new(0),
             events: Mutex::new(Vec::new()),
             opened: Mutex::new(Vec::new()),
             terminals: Mutex::new(Vec::new()),
@@ -425,6 +427,11 @@ impl ScriptedOs {
     #[must_use]
     pub fn clipboard(&self) -> Option<String> {
         lock(&self.clipboard).clone()
+    }
+    /// How many times a command read the clipboard (SR-56: only on Billy's explicit action).
+    #[must_use]
+    pub fn clipboard_reads(&self) -> u32 {
+        *lock(&self.clipboard_reads)
     }
     /// Every event emitted so far.
     #[must_use]
@@ -491,6 +498,7 @@ impl Os for ScriptedOs {
     }
 
     fn clipboard_read(&self) -> Result<String, ClipboardProblem> {
+        *lock(&self.clipboard_reads) += 1;
         check_clipboard(lock(&self.clipboard).clone().unwrap_or_default())
     }
 

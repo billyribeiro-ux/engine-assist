@@ -231,6 +231,39 @@ fn changed(p: &Prepared) -> Option<String> {
 mod launch {
     use super::*;
 
+    /// AC-F008-13, NFR-04 (M3-05): `prepare_launch` with cached data (fingerprint cache and auth
+    /// cache warm, nothing changed) has p95 ≤ 50 ms. The `claude -v` spawn runs in parallel with
+    /// the fingerprint (NFR-05), so it is inside these wall times, which makes them an upper bound.
+    /// The 50 ms budget is checked on macOS (Mac checks); on this shared Linux container the run
+    /// only has to stay under 250 ms, and the measured p95 is printed.
+    #[test]
+    fn prepare_launch_p95_cached() {
+        let mut w = world(json!({}));
+        assert!(is_ready(&w.ready()), "warm-up reaches a ready plan");
+        let _ = w.prepare();
+        let mut ms: Vec<f64> = (0..40)
+            .map(|_| {
+                let t = std::time::Instant::now();
+                let (p, _) = w.prepare();
+                let took = t.elapsed().as_secs_f64() * 1000.0;
+                assert!(is_ready(&p));
+                took
+            })
+            .collect();
+        ms.sort_by(f64::total_cmp);
+        let p95 = ms[(ms.len() * 95).div_ceil(100) - 1];
+        eprintln!(
+            "prepare_launch cached: p50 {:.1} ms, p95 {p95:.1} ms",
+            ms[ms.len() / 2]
+        );
+        let budget = if cfg!(target_os = "macos") {
+            50.0
+        } else {
+            250.0
+        };
+        assert!(p95 <= budget, "p95 {p95:.1} ms > {budget} ms");
+    }
+
     /// DR-120 / ipc.md §5: phases and progress messages in the fixed order; a first launch in a
     /// cwd stops at the acknowledgement (auth never runs); a cache hit still reports `Auth`.
     #[test]
