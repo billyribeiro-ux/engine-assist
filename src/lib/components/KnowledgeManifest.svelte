@@ -117,7 +117,7 @@
 	.check {
 		width: 16px;
 		height: 16px;
-		margin: 2px 0 0;
+		margin: var(--space-1) 0 0;
 		accent-color: var(--accent);
 	}
 	.row-actions {

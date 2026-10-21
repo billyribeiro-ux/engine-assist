@@ -3,6 +3,7 @@
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
+    clippy::panic,
     reason = "integration-test code (tests/): unwrap/expect are denied only outside tests (SR-62)"
 )]
 #![allow(
@@ -130,7 +131,9 @@ mod manifest {
         assert!(m.first_producer.is_none());
         let m = asm::manifest_mark(
             &p.t.app,
-            req(json!({ "projectId": p.id, "path": "docs/handoff/stage-01.md", "inProject": true })),
+            req(
+                json!({ "projectId": p.id, "path": "docs/handoff/stage-01.md", "inProject": true }),
+            ),
         )
         .unwrap();
         assert_eq!(m.ready, 1);
@@ -151,7 +154,9 @@ mod manifest {
         assert_eq!(m.ready, 0);
         let e = asm::manifest_mark(
             &p.t.app,
-            req(json!({ "projectId": p.id, "path": "docs/handoff/stage-02.md", "inProject": true })),
+            req(
+                json!({ "projectId": p.id, "path": "docs/handoff/stage-02.md", "inProject": true }),
+            ),
         )
         .unwrap_err();
         assert_eq!(e.code, IpcErrorCode::NotFound);
@@ -227,10 +232,15 @@ mod assembler_view {
             .unwrap();
         assert_eq!(db.value, TriState::Undecided);
         assert_eq!(db.proposed, Some(TriState::Yes));
-        assert_eq!(db.evidence.as_deref(), Some("docs/migrations/0001_init.sql"));
-        for c in a.late_conditions.iter().filter(|c| {
-            c.condition != foreman_app::ipc::types::ConditionId::HasDatabase
-        }) {
+        assert_eq!(
+            db.evidence.as_deref(),
+            Some("docs/migrations/0001_init.sql")
+        );
+        for c in a
+            .late_conditions
+            .iter()
+            .filter(|c| c.condition != foreman_app::ipc::types::ConditionId::HasDatabase)
+        {
             assert_eq!(c.value, TriState::Undecided);
             assert_eq!(c.proposed, None, "{:?}", c.condition);
             assert_eq!(c.evidence, None);
@@ -254,8 +264,10 @@ mod assembler_view {
         // Billy confirms through condition_set with the evidence note.
         projects::condition_set(
             &p.t.app,
-            req(json!({ "projectId": p.id, "condition": "has_database", "to": "yes",
-                        "note": "from evidence: docs/migrations/0001_init.sql" })),
+            req(
+                json!({ "projectId": p.id, "condition": "has_database", "to": "yes",
+                        "note": "from evidence: docs/migrations/0001_init.sql" }),
+            ),
         )
         .unwrap();
         let a = view(&p);
@@ -405,7 +417,8 @@ mod ipc {
             "docs/handoff/stage-04.md",
             &stage4_packet(&["CLAUDE.md", "docs/MASTER-SPEC.md"]),
         );
-        p.t.os.set_clipboard(Some("# TradeLog\nNever float money.\n"));
+        p.t.os
+            .set_clipboard(Some("# TradeLog\nNever float money.\n"));
         let preview = || {
             asm::assembler_paste_preview(
                 &p.t.app,

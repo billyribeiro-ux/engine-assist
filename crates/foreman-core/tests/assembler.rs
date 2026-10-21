@@ -83,8 +83,11 @@ mod assembler_parse {
         );
         // No REPO FILES field.
         assert!(
-            asm::repo_files("=== HANDOFF PACKET · Stage 4 → Stage 5 ===\nPROJECT: x\n", &[])
-                .is_none()
+            asm::repo_files(
+                "=== HANDOFF PACKET · Stage 4 → Stage 5 ===\nPROJECT: x\n",
+                &[]
+            )
+            .is_none()
         );
     }
 

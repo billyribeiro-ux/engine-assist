@@ -110,7 +110,10 @@ mod harness_p2 {
             assert!(keys.contains(&format!("{n}:F.2")), "{n}:F.2 in {keys:?}");
         }
         for g in ["A", "B", "C"] {
-            assert!(keys.contains(&format!("5:gate.{g}")), "5:gate.{g} in {keys:?}");
+            assert!(
+                keys.contains(&format!("5:gate.{g}")),
+                "5:gate.{g} in {keys:?}"
+            );
         }
         // Stages 3–5 contribute their own steps, not only the gate and F.2.
         for n in 3..=5u8 {

@@ -75,17 +75,24 @@ mod runsheet {
         assert!(md.contains("[APP_NAME]: the project variable is empty"));
         assert!(md.contains("the Stage 1 packet: not signed yet"));
         // A declared run input left empty is marked in the inputs list.
-        if f.template.steps.iter().any(|s| s.stage == 2 && !s.inputs().is_empty()) {
+        if f.template
+            .steps
+            .iter()
+            .any(|s| s.stage == 2 && !s.inputs().is_empty())
+        {
             assert!(md.contains("⟦UNRESOLVED (not filled in)⟧"));
         }
         // Every applicable step still has its section.
-        for s in f
-            .template
-            .steps
-            .iter()
-            .filter(|s| s.stage == 2 && f.path.step(s.key.as_str()).is_some_and(|a| a.on_path()))
+        for s in
+            f.template.steps.iter().filter(|s| {
+                s.stage == 2 && f.path.step(s.key.as_str()).is_some_and(|a| a.on_path())
+            })
         {
-            assert!(md.contains(&format!("## {} {}", s.id, s.title)), "{}", s.key);
+            assert!(
+                md.contains(&format!("## {} {}", s.id, s.title)),
+                "{}",
+                s.key
+            );
         }
     }
 }

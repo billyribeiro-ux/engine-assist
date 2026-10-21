@@ -36,7 +36,9 @@ pub fn matches(c: ConditionId, path: &str) -> bool {
         ConditionId::HasUploads => comps
             .iter()
             .any(|x| x.contains("upload") || x.contains("attachments-storage")),
-        ConditionId::HasEmail => comps.iter().any(|x| x.contains("email") || x.contains("mail")),
+        ConditionId::HasEmail => comps
+            .iter()
+            .any(|x| x.contains("email") || x.contains("mail")),
         ConditionId::HasIntegrations => {
             under("docs/integrations/")
                 || comps

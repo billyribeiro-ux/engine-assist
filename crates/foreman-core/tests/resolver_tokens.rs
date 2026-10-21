@@ -157,7 +157,10 @@ mod resolver {
             assert!(r.is_ok(), "{key}: {r:?}");
         }
         for n in 3..=5 {
-            assert!(by_stage.get(&n).copied().unwrap_or(0) > 0, "Stage {n}: {by_stage:?}");
+            assert!(
+                by_stage.get(&n).copied().unwrap_or(0) > 0,
+                "Stage {n}: {by_stage:?}"
+            );
         }
     }
 

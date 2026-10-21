@@ -120,7 +120,7 @@
 	.expected {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
+		gap: var(--space-1);
 		margin-left: var(--space-3);
 	}
 	.sep {
@@ -138,6 +138,6 @@
 	.out {
 		color: var(--term-ink);
 		font-size: var(--text-12);
-		padding: 2px 6px;
+		padding: var(--space-1) var(--space-2);
 	}
 </style>

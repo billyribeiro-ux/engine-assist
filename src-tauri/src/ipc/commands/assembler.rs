@@ -83,8 +83,7 @@ fn manifest_of(app: &App, p: &Opened) -> Result<Manifest, IpcError> {
         .collect();
     let ready = files.iter().filter(|f| f.in_project && f.exists).count();
     let first_producer = if files.is_empty() {
-        foreman_core::manifest::first_producer(t, path)
-            .map(|k| StepKey::from_trusted(k.as_str()))
+        foreman_core::manifest::first_producer(t, path).map(|k| StepKey::from_trusted(k.as_str()))
     } else {
         None
     };
@@ -260,7 +259,10 @@ fn late_conditions(p: &Opened, list: &[RepoFile]) -> Vec<LateConditionView> {
             .copied()
             .unwrap_or(CoreTri::Undecided)
     };
-    if p.signed().contains(&4) || evidence::LATE.iter().all(|c| value(*c) != CoreTri::Undecided)
+    if p.signed().contains(&4)
+        || evidence::LATE
+            .iter()
+            .all(|c| value(*c) != CoreTri::Undecided)
     {
         return Vec::new();
     }
@@ -392,7 +394,10 @@ pub fn claude_md_confirm() -> Confirm {
 ///
 /// # Errors
 /// `Expired`, `Cancelled`, `Conflict`, `PolicyViolation`, `ReadOnly`.
-pub fn assembler_paste_apply(app: &App, req: AssemblerPasteApplyReq) -> Result<Assembler, IpcError> {
+pub fn assembler_paste_apply(
+    app: &App,
+    req: AssemblerPasteApplyReq,
+) -> Result<Assembler, IpcError> {
     let _w = app.writing();
     let held = match app.inner().previews.take(req.preview_id.as_str())? {
         Preview::Assembler(h) => h,

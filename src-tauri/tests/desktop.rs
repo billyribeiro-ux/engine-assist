@@ -136,7 +136,10 @@ mod chain {
         assert_eq!(d.len(), 1);
         assert_eq!(args(&d[0]), ["--desktop", "--resume", chain.as_str()]);
         assert!(
-            d[0]["cwd"].as_str().unwrap().ends_with("work/tradelog/spec"),
+            d[0]["cwd"]
+                .as_str()
+                .unwrap()
+                .ends_with("work/tradelog/spec"),
             "{}",
             d[0]["cwd"]
         );
@@ -178,7 +181,11 @@ mod chain {
         let e = desktop::desktop_handoff(&p.t.app, req(json!({ "chain": chain }))).unwrap_err();
         assert_eq!(e.code, IpcErrorCode::Cancelled);
         assert_eq!(p.t.os.asked().len(), asked + 1);
-        assert!(p.t.os.asked()[asked].title.contains("Claude Desktop closed"));
+        assert!(
+            p.t.os.asked()[asked]
+                .title
+                .contains("Claude Desktop closed")
+        );
         assert_eq!(chain_status(&p, &chain).0, ChainStatus::HandedOff);
         p.t.os.answer_next(true);
         desktop::desktop_handoff(&p.t.app, req(json!({ "chain": chain }))).unwrap();
@@ -330,20 +337,14 @@ mod runsheet {
     fn export_through_save_dialog() {
         let p = ProjectApp::new(json!({}));
         p.t.os.save_next(None);
-        let r = desktop::run_sheet_export(
-            &p.t.app,
-            req(json!({ "projectId": p.id, "stage": 2 })),
-        )
-        .unwrap();
+        let r = desktop::run_sheet_export(&p.t.app, req(json!({ "projectId": p.id, "stage": 2 })))
+            .unwrap();
         assert_eq!(r, ExportResult::Cancelled);
         let out = p.root.join("exports/tradelog-stage-02.md");
         std::fs::create_dir_all(out.parent().unwrap()).unwrap();
         p.t.os.save_next(Some(out.clone()));
-        let r = desktop::run_sheet_export(
-            &p.t.app,
-            req(json!({ "projectId": p.id, "stage": 2 })),
-        )
-        .unwrap();
+        let r = desktop::run_sheet_export(&p.t.app, req(json!({ "projectId": p.id, "stage": 2 })))
+            .unwrap();
         assert!(matches!(r, ExportResult::Saved { .. }), "{r:?}");
         let md = std::fs::read_to_string(&out).unwrap();
         assert!(md.starts_with("# Run sheet: TradeLog · Stage 2 · "), "{md}");
@@ -355,20 +356,14 @@ mod runsheet {
         // Never inside the repo's .git, never a non-Markdown name.
         let bad = p.project.join(".git/sheet.md");
         p.t.os.save_next(Some(bad.clone()));
-        let e = desktop::run_sheet_export(
-            &p.t.app,
-            req(json!({ "projectId": p.id, "stage": 2 })),
-        )
-        .unwrap_err();
+        let e = desktop::run_sheet_export(&p.t.app, req(json!({ "projectId": p.id, "stage": 2 })))
+            .unwrap_err();
         assert_eq!(e.code, IpcErrorCode::PolicyViolation, "{e:?}");
         assert!(!bad.exists());
         let txt = p.root.join("exports/sheet.txt");
         p.t.os.save_next(Some(txt.clone()));
-        let e = desktop::run_sheet_export(
-            &p.t.app,
-            req(json!({ "projectId": p.id, "stage": 2 })),
-        )
-        .unwrap_err();
+        let e = desktop::run_sheet_export(&p.t.app, req(json!({ "projectId": p.id, "stage": 2 })))
+            .unwrap_err();
         assert_eq!(e.code, IpcErrorCode::PolicyViolation);
         assert!(!txt.exists());
     }

@@ -96,7 +96,10 @@ fn resolve_marked(input: &SheetInput<'_>, step: &Step) -> (String, Vec<String>) 
         for g in gaps {
             match g {
                 Unresolved::Variable { token } => {
-                    let name = token.trim_start_matches('[').trim_end_matches(']').to_owned();
+                    let name = token
+                        .trim_start_matches('[')
+                        .trim_end_matches(']')
+                        .to_owned();
                     unresolved.push(format!("{token}: the project variable is empty"));
                     project.variables.insert(name, mark(&token));
                 }

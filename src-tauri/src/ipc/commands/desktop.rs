@@ -314,7 +314,9 @@ pub fn desktop_handoff(app: &App, req: DesktopHandoffReq) -> Result<(), IpcError
         p.save_progress(app)?;
         return Ok(());
     }
-    Err(IpcError::not_found("That session chain isn't in any project."))
+    Err(IpcError::not_found(
+        "That session chain isn't in any project.",
+    ))
 }
 
 /// `add_step` (M4-31): in [`super::overlay`].

@@ -36,7 +36,10 @@ fn stored(t: &TestApp) -> Value {
 }
 
 fn rev(t: &TestApp) -> u32 {
-    settings_cmd::settings_get(&t.app, req(json!({}))).unwrap().rev.0
+    settings_cmd::settings_get(&t.app, req(json!({})))
+        .unwrap()
+        .rev
+        .0
 }
 
 mod settings_p2 {
@@ -94,7 +97,8 @@ mod settings {
     #[test]
     fn security_fields_require_native_confirm() {
         let t = TestApp::new();
-        let names = json!({ "envPassthrough": ["MY_TOOL_HOME", "ANTHROPIC_API_KEY"], "theme": "vellum" });
+        let names =
+            json!({ "envPassthrough": ["MY_TOOL_HOME", "ANTHROPIC_API_KEY"], "theme": "vellum" });
         // An approval field is refused by the request type (IPC-R1, IPC-R11).
         assert!(
             serde_json::from_value::<foreman_app::ipc::dto::requests::SettingsUpdateReq>({
@@ -105,11 +109,7 @@ mod settings {
             .is_err()
         );
         t.os.answer_next(false);
-        let e = settings_cmd::settings_update(
-            &t.app,
-            req(patch(rev(&t), &names)),
-        )
-        .unwrap_err();
+        let e = settings_cmd::settings_update(&t.app, req(patch(rev(&t), &names))).unwrap_err();
         assert_eq!(e.code, IpcErrorCode::Cancelled);
         let asked = t.os.asked();
         assert_eq!(asked.len(), 1, "one native dialog");
@@ -132,14 +132,13 @@ mod settings {
             .ok();
         if let Some(s) = &after_cancel {
             assert_eq!(s["envPassthrough"], json!([]), "nothing saved");
-            assert_ne!(s["theme"], "vellum", "the rest of the patch isn't saved either");
+            assert_ne!(
+                s["theme"], "vellum",
+                "the rest of the patch isn't saved either"
+            );
         }
         t.os.answer_next(true);
-        let v = settings_cmd::settings_update(
-            &t.app,
-            req(patch(rev(&t), &names)),
-        )
-        .unwrap();
+        let v = settings_cmd::settings_update(&t.app, req(patch(rev(&t), &names))).unwrap();
         let listed: Vec<&str> = v.env_passthrough.iter().map(|n| n.as_str()).collect();
         assert_eq!(listed, ["ANTHROPIC_API_KEY", "MY_TOOL_HOME"]);
         assert_eq!(t.os.asked().len(), 2);
@@ -151,7 +150,11 @@ mod settings {
         )
         .unwrap();
         assert_eq!(t.os.asked().len(), 3);
-        assert!(t.os.asked()[2].message.contains("Pass no extra environment variables"));
+        assert!(
+            t.os.asked()[2]
+                .message
+                .contains("Pass no extra environment variables")
+        );
         // A tool reset asks.
         t.os.answer_next(false);
         let e = settings_cmd::settings_update(

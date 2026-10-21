@@ -15,7 +15,8 @@ use crate::store::dirs::EntryKind;
 pub const REPO_FILES_KEYS: [&str; 2] = ["REPO FILES (create exactly these)", "REPO FILES"];
 
 /// The note on root `CLAUDE.md` (AC-F021-06; components.md "Build-package assembler").
-pub const CLAUDE_MD_NOTE: &str = "Claude Code loads this file in every session. Writing it asks you again in a macOS dialog.";
+pub const CLAUDE_MD_NOTE: &str =
+    "Claude Code loads this file in every session. Writing it asks you again in a macOS dialog.";
 
 /// The most entries read from one list.
 pub const MAX_ENTRIES: usize = 200;

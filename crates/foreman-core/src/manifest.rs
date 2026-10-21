@@ -56,7 +56,10 @@ fn source_of(path: &str, chat: bool) -> Option<Source> {
 pub fn entries(t: &Template, path: &ApplicablePath, signed: &BTreeSet<u8>) -> Vec<Entry> {
     let mut out: Vec<Entry> = Vec::new();
     for s in &t.steps {
-        if !path.step(s.key.as_str()).is_some_and(crate::rules::Applicability::on_path) {
+        if !path
+            .step(s.key.as_str())
+            .is_some_and(crate::rules::Applicability::on_path)
+        {
             continue;
         }
         let chat = s.surface == Some(Surface::Chat);
@@ -87,7 +90,10 @@ pub fn entries(t: &Template, path: &ApplicablePath, signed: &BTreeSet<u8>) -> Ve
 pub fn first_producer(t: &Template, path: &ApplicablePath) -> Option<StepKey> {
     t.steps
         .iter()
-        .filter(|s| path.step(s.key.as_str()).is_some_and(crate::rules::Applicability::on_path))
+        .filter(|s| {
+            path.step(s.key.as_str())
+                .is_some_and(crate::rules::Applicability::on_path)
+        })
         .find(|s| {
             let chat = s.surface == Some(Surface::Chat);
             s.out.iter().any(|o| source_of(o, chat).is_some())

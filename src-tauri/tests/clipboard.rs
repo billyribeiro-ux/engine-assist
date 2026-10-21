@@ -77,7 +77,8 @@ fn clip_problem(e: &foreman_app::ipc::IpcError) -> Option<ClipboardProblem> {
 mod clipboard {
     use super::*;
 
-    /// SR-56, AC-XC-29: nothing reads the clipboard except Billy's three explicit actions.
+    /// SR-56, AC-XC-29: nothing reads the clipboard except Billy's four explicit actions (the
+    /// fourth is the assembler's Paste into, M4-28).
     #[test]
     fn read_only_on_user_action() {
         // Source: the clipboard is read in exactly three places, each the clipboard branch of an
@@ -97,6 +98,7 @@ mod clipboard {
         assert_eq!(
             files,
             [
+                "ipc/commands/assembler.rs",
                 "ipc/commands/chat.rs",
                 "ipc/commands/chat.rs",
                 "ipc/commands/terminal.rs"
@@ -106,6 +108,9 @@ mod clipboard {
         let chat_src = src("src/ipc/commands/chat.rs");
         assert!(chat_src.contains("LinkSource::Clipboard(_) => app.os().clipboard_read()"));
         assert!(chat_src.contains("PasteSource::Clipboard => app.os().clipboard_read()"));
+        let asm_src = src("src/ipc/commands/assembler.rs");
+        assert!(asm_src.contains("pub fn assembler_paste_preview("));
+        assert_eq!(asm_src.matches(".clipboard_read()").count(), 1);
         let os_src = src("src/os.rs");
         assert!(os_src.contains(".read_text()"));
         assert!(!os_src.contains("read_image"), "text only");
@@ -203,6 +208,9 @@ mod clipboard {
         );
         assert_eq!(check_clipboard(String::new()), Err(ClipboardProblem::Empty));
         // The real OS path goes through the same check, text only.
+        let asm_src = src("src/ipc/commands/assembler.rs");
+        assert!(asm_src.contains("pub fn assembler_paste_preview("));
+        assert_eq!(asm_src.matches(".clipboard_read()").count(), 1);
         let os_src = src("src/os.rs");
         let at = os_src.find(".read_text()").unwrap();
         let real = &os_src[at..at + 200];

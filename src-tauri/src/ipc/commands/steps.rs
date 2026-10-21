@@ -395,10 +395,11 @@ pub fn view_of(app: &App, p: &Opened, key: &str) -> Result<StepView, IpcError> {
             warnings.push(w);
         }
         // M4-11: the Now/Next strip's live mode (a switch target isn't a mismatch).
-        let targets: Vec<foreman_core::ids::Mode> = policy::effective_switches(s, &project.model_policy)
-            .iter()
-            .filter_map(|w| w.to.mode)
-            .collect();
+        let targets: Vec<foreman_core::ids::Mode> =
+            policy::effective_switches(s, &project.model_policy)
+                .iter()
+                .filter_map(|w| w.to.mode)
+                .collect();
         live = crate::sensor_ingest::live_mode(app, run, intended, &targets);
     }
     Ok(StepView {
