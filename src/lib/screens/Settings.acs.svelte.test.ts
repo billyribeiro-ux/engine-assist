@@ -40,7 +40,7 @@ describe('Settings screen (M2-14)', () => {
 		const s = await render(Settings);
 		const editor = s.getByLabelText('Editor for Open in editor');
 		await editor.fill('not a bundle id');
-		await expect.element(s.container.querySelector('#s-editor-err') as HTMLElement).toBeVisible();
+		await expect.element(s.container.querySelector<HTMLElement>('#s-editor-err')).toBeVisible();
 		expect(update).not.toHaveBeenCalled();
 	});
 

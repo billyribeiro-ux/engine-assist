@@ -9,7 +9,7 @@ import Sidebar from './Sidebar.svelte';
 
 const route = vi.hoisted(() => ({
 	url: new URL('http://localhost/'),
-	params: {} as Record<string, string>
+	params: {}
 }));
 vi.mock('$app/state', () => ({ page: route }));
 

@@ -9,22 +9,19 @@ import { fresh } from '#lib/test/screen.ts';
 import Today from './Today.svelte';
 
 // M2-20 acceptance criteria against the mock (comp): AC-F017-01 to AC-F017-05.
-const topRow = async (container: Element): Promise<Element> => {
-	let row: Element | null = null;
-	await vi.waitFor(() => {
-		row = container.querySelector('li.is-top');
-		expect(row).not.toBeNull();
+const topRow = (container: Element): Promise<Element> =>
+	vi.waitFor(() => {
+		const row = container.querySelector('li.is-top');
+		if (!row) throw new Error('no top row');
+		return row;
 	});
-	if (!row) throw new Error('no top row');
-	return row;
-};
 
 describe('Today (AC-F017)', () => {
 	it('AC-F017-01: each row shows the next step with its spec line and primary action, and the top row has focus', async () => {
 		fresh('happy');
 		const s = await render(Today);
 		const top = await topRow(s.container);
-		expect(top.querySelector('.proj b')?.textContent?.length).toBeGreaterThan(0);
+		expect(top.querySelector('.proj b')?.textContent.length).toBeGreaterThan(0);
 		expect(top.querySelector('.stepname')?.textContent).toMatch(/\d\.\d/);
 		// The spec line: surface, model and effort of the step.
 		expect(top.textContent).toMatch(/Opus|Sonnet|Haiku/);
@@ -129,7 +126,7 @@ describe('Today (AC-F017)', () => {
 		const s = await render(Today);
 		const rows = () => [...s.container.querySelectorAll('ol.next li')];
 		await vi.waitFor(() => expect(rows().length).toBeGreaterThan(1));
-		const missing = rows().find((li) => li.textContent?.includes('Old Notes'));
+		const missing = rows().find((li) => li.textContent.includes('Old Notes'));
 		expect(missing?.textContent).toContain('Project folder not found');
 		expect(missing?.querySelector('button')).toBeNull();
 		expect(missing?.textContent).toContain('Nothing to run');

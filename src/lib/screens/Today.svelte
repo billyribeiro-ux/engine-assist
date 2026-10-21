@@ -15,6 +15,7 @@
 	import type { IconName } from '#lib/components/icons.ts';
 	import type { InboxItem, NextStepRow, RunSummary } from '#lib/ipc/types.ts';
 	import { registerShortcuts } from '#lib/keyboard/registry.ts';
+	import { markColdStart } from '#lib/perf.ts';
 	import { sortInbox } from '#lib/nav/inbox.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import type { Tone } from '#lib/nav/status.ts';
@@ -201,11 +202,12 @@
 	$effect(() => {
 		if (focused || !today.value) return;
 		focused = true;
-		void tick().then(() =>
+		void tick().then(() => {
 			document
 				.querySelector<HTMLElement>('.next [data-today-row], .empty-start [data-today-row]')
-				?.focus()
-		);
+				?.focus();
+			markColdStart();
+		});
 	});
 </script>
 

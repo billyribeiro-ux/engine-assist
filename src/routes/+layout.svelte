@@ -25,6 +25,7 @@
 	} from '#lib/keyboard/registry.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import { watchOsDisplay } from '#lib/os-display.ts';
+	import { observe } from '#lib/perf.ts';
 	import { refresh } from '#lib/stores/bus.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
@@ -49,6 +50,7 @@
 	});
 
 	onMount(() => {
+		observe();
 		void (async () => {
 			const client = await ipc();
 			const boot = await client.appBootstrap({});

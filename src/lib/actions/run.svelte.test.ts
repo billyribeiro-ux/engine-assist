@@ -26,7 +26,11 @@ const addedStep = async () => {
 	// The spec/ configuration notice is its own blocker; acknowledge it so the plan can start.
 	const view = await m.projectOpen({ projectId: IDS.tradelog });
 	if (view.configChanged)
-		await m.configAck({ projectId: IDS.tradelog, fingerprint: view.configChanged.fingerprint });
+		await m.configAck({
+			projectId: IDS.tradelog,
+			cwd: view.configChanged.cwd,
+			fingerprint: view.configChanged.fingerprint
+		});
 	return m;
 };
 

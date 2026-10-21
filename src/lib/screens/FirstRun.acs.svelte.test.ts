@@ -6,7 +6,7 @@ import { failing, fresh } from '#lib/test/screen.ts';
 import FirstRun from './FirstRun.svelte';
 
 // M2-16 acceptance criteria against the mock (comp): AC-F019-01, AC-F019-02, AC-F001-18.
-const titles = (c: Element) => [...c.querySelectorAll('.fr-t')].map((e) => e.textContent?.trim());
+const titles = (c: Element) => [...c.querySelectorAll('.fr-t')].map((e) => e.textContent.trim());
 
 describe('FirstRun (AC-F019, AC-F001-18)', () => {
 	it('AC-F019-01: blueprint repo, template check, your name, Doctor, then Start your first project', async () => {

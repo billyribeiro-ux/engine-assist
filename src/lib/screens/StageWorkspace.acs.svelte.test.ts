@@ -15,8 +15,8 @@ const ADDED_KEY = 'x-2-1';
 const row = (container: Element, number: string): HTMLElement => {
 	const li = [...container.querySelectorAll<HTMLElement>('li.step')].find((l) =>
 		number === ADDED
-			? l.querySelector('.step-title')?.textContent?.includes(ADDED)
-			: l.querySelector('.callout')?.textContent?.trim() === number
+			? l.querySelector('.step-title')?.textContent.includes(ADDED)
+			: l.querySelector('.callout')?.textContent.trim() === number
 	);
 	if (!li) throw new Error(`no row ${number}`);
 	return li;
@@ -26,8 +26,7 @@ const ensureOpen = async (r: HTMLElement): Promise<void> => {
 	if (b && b.getAttribute('aria-expanded') !== 'true') b.click();
 	await vi.waitFor(() => expect(r.querySelector('.step-body .actions')).not.toBeNull());
 };
-const names = (el: Element) =>
-	[...el.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '');
+const names = (el: Element) => [...el.querySelectorAll('button')].map((b) => b.textContent.trim());
 
 describe('StageWorkspace rows (AC-F004, AC-F030)', () => {
 	it('AC-F004-03: a not-applicable row is hatched, names its condition and has no Skip', async () => {
@@ -39,7 +38,7 @@ describe('StageWorkspace rows (AC-F004, AC-F030)', () => {
 		expect(r.textContent).toMatch(/Not applicable: TradeLog isn't sold/);
 		expect(r.textContent).toMatch(/commercial = no/);
 		expect(r.querySelector('button')).toBeNull();
-		expect(names(r).some((n) => /Skip/.test(n))).toBe(false);
+		expect(names(r).some((n) => n.includes('Skip'))).toBe(false);
 	});
 
 	it('AC-F004-04: a step behind an undecided condition says what to decide and cannot run', async () => {
@@ -63,7 +62,7 @@ describe('StageWorkspace rows (AC-F004, AC-F030)', () => {
 		);
 		await ensureOpen(core);
 		expect(core.textContent).toContain('Core: protects production quality.');
-		expect(names(core).some((n) => /Skip/.test(n))).toBe(false);
+		expect(names(core).some((n) => n.includes('Skip'))).toBe(false);
 		// Over IPC: rejected, with a reason, and the step is unchanged.
 		await expect(
 			m.stepSkip({ projectId: IDS.tradelog, step: '2.5', reason: 'not needed' })
@@ -83,7 +82,7 @@ describe('StageWorkspace rows (AC-F004, AC-F030)', () => {
 		for (const r of rows) {
 			expect(r.textContent).toMatch(/needs annotation/i);
 			expect(r.querySelector('.primary')).toBeNull();
-			expect(names(r).some((n) => /Skip/.test(n))).toBe(false);
+			expect(names(r).some((n) => n.includes('Skip'))).toBe(false);
 		}
 	});
 });
@@ -93,13 +92,13 @@ describe('StageWorkspace spec line (AC-F005)', () => {
 		const m = fresh('happy');
 		const p = await project(m, IDS.foreman);
 		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
-		const tips = [...row(s.container, '2.2').querySelectorAll('[role="tooltip"]')].map(
-			(t) => t.textContent?.trim() ?? ''
+		const tips = [...row(s.container, '2.2').querySelectorAll('[role="tooltip"]')].map((t) =>
+			t.textContent.trim()
 		);
 		expect(tips).toContain('Fable 5.1 · high (Max) → Opus 5.5 · xhigh (substituted)');
 		// The edited values are shown, not the template's.
-		const edited = [...row(s.container, '2.2').querySelectorAll('.edited')].map(
-			(b) => b.textContent?.trim() ?? ''
+		const edited = [...row(s.container, '2.2').querySelectorAll('.edited')].map((b) =>
+			b.textContent.trim()
 		);
 		expect(edited).toContain('Opus 5.5');
 		expect(edited).toContain('xhigh');
@@ -120,10 +119,10 @@ describe('StageWorkspace spec line (AC-F005)', () => {
 		});
 		const p2 = await m.projectOpen({ projectId: IDS.tradelog });
 		const s2 = await render(StageWorkspace, { project: p2, stageNo: 2 });
-		const tips = [...row(s2.container, '2.5').querySelectorAll('[role="tooltip"]')].map(
-			(t) => t.textContent?.trim() ?? ''
+		const tips = [...row(s2.container, '2.5').querySelectorAll('[role="tooltip"]')].map((t) =>
+			t.textContent.trim()
 		);
-		expect(tips.some((t) => /your override for this run/.test(t))).toBe(true);
+		expect(tips.some((t) => t.includes('your override for this run'))).toBe(true);
 		// Substitution: reachable by keyboard (a button), described by its tooltip.
 		const pf = await project(m, IDS.foreman);
 		const sf = await render(StageWorkspace, { project: pf, stageNo: 2 });
@@ -159,7 +158,8 @@ describe('StageWorkspace selected step (AC-F030-01, AC-F006, AC-F008)', () => {
 			(input as Node).compareDocumentPosition(prompt as Node) & Node.DOCUMENT_POSITION_FOLLOWING
 		).toBeTruthy();
 		expect(document.querySelector(`label[for="${input?.id}"]`)?.textContent).toMatch(/run input/);
-		expect((input as HTMLTextAreaElement).value.length).toBeGreaterThan(0);
+		if (!(input instanceof HTMLTextAreaElement)) throw new Error('no input');
+		expect(input.value.length).toBeGreaterThan(0);
 	});
 
 	it('AC-F030-01: a chat step’s primary action is Copy and open', async () => {
@@ -174,7 +174,7 @@ describe('StageWorkspace selected step (AC-F030-01, AC-F006, AC-F008)', () => {
 	});
 
 	it('AC-F006-13 / AC-F008-11: an empty required input is an attention pill that focuses its field, and Run stays disabled until it is filled', async () => {
-		const { m, s, r } = await open(ADDED_KEY);
+		const { m, s } = await open(ADDED_KEY);
 		await m.runInputSet({ projectId: IDS.tradelog, step: ADDED_KEY, name: 'notes', value: '' });
 		const p2 = await m.projectOpen({ projectId: IDS.tradelog });
 		await s.unmount();
@@ -194,7 +194,6 @@ describe('StageWorkspace selected step (AC-F030-01, AC-F006, AC-F008)', () => {
 		await m.runInputSet({ projectId: IDS.tradelog, step: ADDED_KEY, name: 'notes', value: 'ok' });
 		const v = await m.stepView({ projectId: IDS.tradelog, step: ADDED_KEY });
 		expect(v.blockers).toEqual([]);
-		void r;
 	});
 
 	it('AC-F006-14: an input over 64 KB is accepted with a warning that chat paste limits may apply', async () => {
@@ -222,7 +221,7 @@ describe('StageWorkspace selected step (AC-F030-01, AC-F006, AC-F008)', () => {
 		const details = r.querySelector('details.argv');
 		expect(details).not.toBeNull();
 		expect((details as HTMLDetailsElement).open).toBe(false);
-		await details?.querySelector('summary')?.click();
+		details?.querySelector('summary')?.click();
 		await vi.waitFor(() => expect((details as HTMLDetailsElement).open).toBe(true));
 		const text = details?.textContent ?? '';
 		expect(text).toMatch(/--name/);

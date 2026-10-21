@@ -21,7 +21,7 @@ describe('Setup form (AC-F018)', () => {
 		for (const c of s.container.querySelectorAll('.cond')) {
 			expect(c.querySelectorAll('[role="radio"], input[type="radio"]').length).toBe(3);
 		}
-		const text = s.container.textContent ?? '';
+		const text = s.container.textContent;
 		expect(text).not.toMatch(/has_database|has_uploads|has_email/);
 		// The blueprint pin appears once a folder is chosen.
 		await s.getByRole('button', { name: 'Choose…' }).click();

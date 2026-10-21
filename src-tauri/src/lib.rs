@@ -143,6 +143,7 @@ pub fn builder<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 /// # Errors
 /// Any error from building or running the Tauri app.
 pub fn run() -> tauri::Result<()> {
+    logging::mark_process_start();
     logging::install();
     builder(Builder::default())
         .setup(|app| {
