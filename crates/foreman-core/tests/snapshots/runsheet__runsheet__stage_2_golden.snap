@@ -1,0 +1,358 @@
+---
+source: crates/foreman-core/tests/runsheet.rs
+expression: md
+---
+# Run sheet: TradeLog · Stage 2 · Architect's Design Studio. Design the entire product
+
+Exported by Foreman on 2026-10-20 from blueprint 2.2. Run the steps in order. Session IDs and the run-settings path are chosen when Foreman launches; by hand, leave out `--settings` and use `--session-id` with a new UUID for a chain start and `--resume <that id>` to continue.
+
+## 2.1 Competitor teardown
+
+- Surface: claude.ai chat
+- Chat setup: New conversation in Project TradeLog · Opus 5.5 · Research ON · adaptive effort
+- Writes: spec/02-teardown.md
+- Run inputs: none
+
+Prompt:
+
+```text
+Here is the approved App Brief:
+=== HANDOFF PACKET · Stage 1 → Stage 2 ===
+PROJECT: TradeLog
+APPROVED BY: Billy Ribeiro on 2026-10-20
+APP: TradeLog — the trade journal that tells you whether you have an edge
+FOR: active retail and prop traders | also: trading coaches
+PROBLEM: "I log trades in a spreadsheet and still can't tell if my setups work" (42 of 60 surveyed)
+DOES:
+  - imports fills from brokers and groups them into trades
+  - computes expectancy, R-multiple and drawdown per setup
+CORE LOOP: log or import the day's trades, tag setups, review the edge report weekly
+WOW MOMENT: the first import shows expectancy per setup in under a minute
+WITH (must integrate): CSV from IBKR, Tradovate, Thinkorswim
+WITH (constraints): $0 cash; 10 hours a week for 12 weeks
+STACK PREFERENCE: Svelte 5 + SvelteKit 3, TypeScript strict, pnpm · Rust + Axum · Postgres (Stage 2 decides on evidence)
+NOT DOING (v1): automated trading, social feeds
+MONETIZATION HYPOTHESIS: $19/month, 14-day trial; 31% of the waitlist said they'd pay
+SUCCESS METRICS: 40% week-4 retention; 5% trial-to-paid
+KILL CRITERION: under 100 waitlist signups in 7 days
+RISKIEST ASSUMPTION: traders will import instead of journaling by hand; the CSV importer tests it
+PRESS RELEASE + FAQ: attached below the packet
+OPEN ITEMS: none
+NEXT: Stage 2 · Architect's Design Studio · chat + Claude Code council
+
+Research every serious competitor for this product, including the
+adjacent tools users cobble together (spreadsheets, scripts, plugins).
+Find the 8-12 most relevant. For each: pricing and tiers (verify on
+their site), the complete feature list grouped by job-to-be-done, what
+users praise most and their top complaints (reviews, Reddit, forums,
+app stores, with links), onboarding friction, performance, design
+quality, integrations, and visible strategic direction (changelog,
+roadmap, job posts).
+Then build:
+1. A feature matrix: competitors × features (has / partial / missing)
+2. A pain map: the 15 most frequent unmet needs, ranked by frequency and
+   intensity, each with source links
+3. Table stakes: the features every serious product has, which we must match
+Cite everything and mark estimates.
+
+```
+
+## council-setup agents in spec/.claude/agents/
+
+- Kind: action (no prompt)
+- Run inputs: none
+
+## 2.2 Convene the council
+
+- Surface: Claude Code CLI in spec/
+- Switch: Next: after you approve the plan, choose Accept edits
+- Writes: spec/council/r1-market.md, spec/council/r1-users.md, spec/council/r2-features.md, spec/council/r2-growth.md, spec/council/r2-feasibility.md, spec/council/r3-synthesis.md, spec/council/r4-redteam.md, spec/council/r5-resolution.md
+- Run inputs: none
+
+Prompt:
+
+```text
+You are the chair of the product design council for TradeLog.
+Read 01-app-brief.md (the approved Stage 1 packet) and 02-teardown.md.
+Goal: define a product clearly better than everything on the market,
+specified completely before any code is written.
+
+Run these rounds, using subagents in parallel wherever a round allows:
+ROUND 1, Evidence (parallel):
+ - market-analyst: fill the gaps in the teardown -> council/r1-market.md
+ - user-advocate: deep pain mining + jobs-to-be-done -> council/r1-users.md
+ROUND 2, Diverge (parallel, after reading Round 1):
+ - product-visionary: the ultimate feature set -> council/r2-features.md
+ - growth-strategist: revenue loops and tier fit -> council/r2-growth.md
+ - principal-engineer: feasibility and cost of every proposed feature
+   -> council/r2-feasibility.md
+ROUND 3, Converge (you): score every feature on user value,
+ differentiation vs. the best competitor, revenue impact, build cost,
+ and risk. Sort into v1 (an MVP that still beats the market), v1.x, v2,
+ and rejected (with the reason). -> council/r3-synthesis.md
+ROUND 4, Attack: red-team attacks r3-synthesis.md -> council/r4-redteam.md
+ROUND 5, Resolve (you): answer every fatal and serious objection, by
+ changing the plan or citing evidence that defeats it.
+ -> council/r5-resolution.md
+
+First show me the plan for the rounds. After each round, give me a
+5-line summary and wait for my "go".
+
+```
+
+Argv (one argument per line):
+
+```text
+claude
+--session-id
+<new session id>
+--model
+fable
+--effort
+high
+--permission-mode
+plan
+--name
+fm-tradelog-s02-2-2
+--settings
+<app data>/runs/<run id>/settings.json
+<the prompt above>
+```
+
+## 2.3 Feature specifications
+
+- Surface: Claude Code CLI in spec/
+- Writes: spec/council/r6-feature-specs.md
+- Run inputs: none
+
+Prompt:
+
+```text
+ultrathink. For each v1 feature, write a specification a senior engineer
+could build from: the user's starting situation, the exact behavior,
+inputs and outputs, every edge case and failure state, and what "done"
+means. Name the competitor whose version it beats and exactly why ours
+is better. Flag anything ambiguous as a numbered question for me.
+-> council/r6-feature-specs.md
+
+```
+
+Argv (one argument per line):
+
+```text
+claude
+--resume
+<chain session id>
+--model
+fable
+--effort
+high
+--permission-mode
+acceptEdits
+--name
+fm-tradelog-s02-2-3
+--settings
+<app data>/runs/<run id>/settings.json
+<the prompt above>
+```
+
+## 2.4 Stack decision, evidence first
+
+- Surface: Claude Code CLI in spec/
+- Writes: spec/council/r7-stack.md
+- Run inputs: none
+
+Prompt:
+
+```text
+Recommend the best stack for TradeLog, layer by layer: frontend,
+backend, data, cache/queue, search, file storage, auth, payments,
+email, hosting, observability, CI/CD.
+
+PART 1, evidence-first (ignore my preferences): for each layer, list the
+requirements it must meet (from the feature specs and non-functional
+needs), the 2-3 strongest candidates, and the winner. Judge on fit,
+performance, maturity and support horizon, ecosystem and hiring pool,
+security record, operating cost, and how well Claude Code works with it
+(docs quality, tooling, training coverage). Have the principal-engineer
+agent verify every version, support horizon, and capability claim
+against current official docs and real adoption evidence, cited.
+
+PART 2, compare with my preference: Svelte 5 + SvelteKit 3, TypeScript strict, pnpm · Rust + Axum · Postgres. For each layer
+where you differ, say what I'd gain, what I'd lose, and your confidence
+(high / medium / low). Where my preference is equal or within noise,
+say so plainly.
+
+PART 3: your final recommendation in one table, one line of reasoning
+per layer. I make the final decision.
+-> council/r7-stack.md
+
+```
+
+Argv (one argument per line):
+
+```text
+claude
+--resume
+<chain session id>
+--model
+fable
+--effort
+high
+--permission-mode
+acceptEdits
+--name
+fm-tradelog-s02-2-4
+--settings
+<app data>/runs/<run id>/settings.json
+<the prompt above>
+```
+
+## 2.4b Record your final choice and reason at the bottom of council/r7-stack.md. Overri
+
+- Kind: manual (no prompt)
+- Writes: spec/council/r7-stack.md
+- Run inputs: none
+
+## 2.5 Non-functional requirements
+
+- Surface: Claude Code CLI in spec/
+- Writes: spec/council/r8-nfr.md
+- Run inputs: none
+
+Prompt:
+
+```text
+Define the non-functional requirements as numbers: latency per endpoint
+class, availability SLO and error budget, backup RPO/RTO, scale targets
+at launch and at 100x, security level (OWASP ASVS level), accessibility
+(WCAG level), browser and device support, data retention, privacy
+requirements, and the maximum infrastructure cost per user per month.
+-> council/r8-nfr.md
+
+```
+
+Argv (one argument per line):
+
+```text
+claude
+--resume
+<chain session id>
+--model
+fable
+--effort
+high
+--permission-mode
+acceptEdits
+--name
+fm-tradelog-s02-2-5
+--settings
+<app data>/runs/<run id>/settings.json
+<the prompt above>
+```
+
+## 2.6 Freeze the Master Spec (the handoff)
+
+- Surface: Claude Code CLI in spec/
+- Writes: spec/MASTER-SPEC.md, docs/handoff/stage-02.md
+- Run inputs: none
+
+Prompt:
+
+```text
+Compile everything into MASTER-SPEC.md v1.0:
+1. Vision and positioning: why we win, in 3 sentences
+2. Competitor matrix (summary) and our differentiation per competitor
+3. Feature catalog: IDs F-001…, each with the problem, the behavior,
+   edge cases, release (v1 / v1.x / v2), and the competitor it beats
+4. Non-goals and rejected ideas, with reasons
+5. The stack decision table, with evidence links and my final choice
+6. Non-functional requirements
+7. Open questions. This list must be EMPTY to freeze; if anything is
+   open, stop and ask me.
+8. Change control: after v1.0, every change requires a Change Request
+   (CR-NNN: what, why, impact on scope, ADRs, timeline, and cost)
+   approved by me.
+Put "Status: FROZEN v1.0 — <date>" at the top.
+
+Then write the MASTER SPEC PACKET to ../docs/handoff/stage-02.md,
+exactly in this format (do not commit it; I sign and commit it):
+
+=== HANDOFF PACKET · Stage 2 → Stage 3 ===
+PROJECT: TradeLog
+APPROVED BY: <blank>
+POSITIONING: <3 sentences>
+V1 FEATURES: <F-IDs + one-line each>
+DIFFERENTIATORS: <what beats which competitor>
+STACK (FINAL): <layer: choice> per line
+NFRs: <the key numbers>
+PRICING SIGNALS: <from teardown + growth round>
+DATA WE HANDLE: <personal data, payment data, sensitive data classes>
+OPEN ITEMS: none
+NEXT: Stage 3 · Permits & Zoning · Claude chat · Opus 5.5
+FILES: spec/MASTER-SPEC.md, spec/council/r1…r8, spec/02-teardown.md
+
+```
+
+Argv (one argument per line):
+
+```text
+claude
+--resume
+<chain session id>
+--model
+fable
+--effort
+high
+--permission-mode
+default
+--name
+fm-tradelog-s02-2-6
+--settings
+<app data>/runs/<run id>/settings.json
+<the prompt above>
+```
+
+## F.2 Lessons in the chat stages (0–4)
+
+- Surface: Claude Code CLI in spec/
+- Run inputs: none
+
+Prompt:
+
+```text
+Before we move on, review this conversation for lessons: questions you
+should have asked earlier, answers I had to correct, output I had to
+redo, and anything in your prompt instructions that was unclear or
+missing. Write lesson entries in the L-NNN format (I'll paste the
+format), each with the exact proposed edit to that stage's prompt in the
+blueprint. If it went cleanly, say so in one line.
+
+```
+
+Argv (one argument per line):
+
+```text
+claude
+--resume
+<chain session id>
+--model
+fable
+--effort
+high
+--permission-mode
+default
+--name
+fm-tradelog-s02-2-f-2
+--settings
+<app data>/runs/<run id>/settings.json
+<the prompt above>
+```
+
+## Inspection items
+
+- [ ] The feature matrix covers every serious competitor, with sources (attest)
+- [ ] Every v1 feature beats a named competitor's version or is table stakes, and the spec says which (attest)
+- [ ] Every fatal or serious red-team objection is resolved in writing (attest)
+- [ ] The evidence-first stack recommendation exists for every layer, plus your recorded final choice (attest)
+- [ ] Open questions: zero. Status: FROZEN v1.0 (attest)

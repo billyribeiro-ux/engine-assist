@@ -59,3 +59,9 @@ Spikes S-3 (effort on resume) and S-8 (graceful end, fork IDs, latency) decide b
 ## Exit path
 
 S-8 fail branch: re-arm becomes "end the session yourself, then press Continue". The relaunch half is unchanged. Chains are plain data, so dropping re-arm entirely degrades to "new session with context" per step.
+
+## Amended 2026-10-20 (M3 runners)
+
+- **Transcript path encoding verified** (the "encoding verified in M3" item of DR-113): Claude Code 2.1.304 names the project folder by replacing every UTF-16 code unit that isn't an ASCII letter or digit with `-` (`replace(/[^a-zA-Z0-9]/g,"-")`), and a name over 200 characters is cut to 200 and suffixed with `-` plus the base-36 absolute value of a Java-style 32-bit string hash (read from the shipped binary). `foreman_core::chain::{project_dir_name, transcript_path}`; test `chain::broken_when_transcript_missing`.
+- **Fork forms** observed with `--init-only` on 2.1.304: `--resume <r> --fork-session --session-id <n>` is accepted and `--resume <r> --session-id <n>` is refused ("--session-id can only be used with --continue or --resume if --fork-session is also specified"), which matches SR-14 and is what contract probe B now checks (ADR-017 amendment). Whether the fork's transcript uses `<n>` is still S-8's question; `ForkIds::Pass` is the specified default and `ForkIds::Fail` drops `--session-id`.
+- **Re-arm** is `foreman_core::rearm` (a pure state machine whose actions contain no signal) driven by `foreman_sys::rearm::{rearm_start, rearm_continue}` with the native dialogs, the re-prepare and the relaunch supplied by `foreman-app`. The only entry is a `UserAction` token constructed by IPC command handlers (`rearm::only_from_user_action` scans the tree).

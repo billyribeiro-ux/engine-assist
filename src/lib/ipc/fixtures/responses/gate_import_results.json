@@ -1,0 +1,52 @@
+[
+	{
+		"item": "feature-matrix",
+		"proposed": "unmatched",
+		"evidence": [
+			{
+				"kind": "plain",
+				"text": "No matching result in the Gate A message."
+			}
+		]
+	},
+	{
+		"item": "beats-competitor",
+		"proposed": "unmatched",
+		"evidence": [
+			{
+				"kind": "plain",
+				"text": "No matching result in the Gate A message."
+			}
+		]
+	},
+	{
+		"item": "red-team",
+		"proposed": "unmatched",
+		"evidence": [
+			{
+				"kind": "plain",
+				"text": "No matching result in the Gate A message."
+			}
+		]
+	},
+	{
+		"item": "stack",
+		"proposed": "unmatched",
+		"evidence": [
+			{
+				"kind": "plain",
+				"text": "No matching result in the Gate A message."
+			}
+		]
+	},
+	{
+		"item": "frozen",
+		"proposed": "unmatched",
+		"evidence": [
+			{
+				"kind": "plain",
+				"text": "No matching result in the Gate A message."
+			}
+		]
+	}
+]

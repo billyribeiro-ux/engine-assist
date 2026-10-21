@@ -1,0 +1,98 @@
+{
+  "chains": [
+    {
+      "cwd": null,
+      "forkedFrom": null,
+      "id": "6f1c2a3b-1d2e-4f50-8a9b-0c1d2e3f4a5b",
+      "lastStart": {
+        "effort": "adaptive",
+        "mode": null,
+        "model": "opus"
+      },
+      "start": "1.1",
+      "status": "open",
+      "steps": [
+        "1.1",
+        "1.2"
+      ],
+      "surface": "chat"
+    }
+  ],
+  "firstLaunchDone": true,
+  "gateRuns": {
+    "5": {
+      "failures": {},
+      "items": {
+        "fresh-clone": {
+          "at": "2026-10-20T09:00:00Z",
+          "outcome": "pass",
+          "text": "clean clone ran"
+        }
+      },
+      "state": "a"
+    }
+  },
+  "indexRefreshPending": null,
+  "optionalParts": {
+    "1.4": {
+      "opt-1": true
+    }
+  },
+  "overrides": {
+    "2.4": {
+      "effort": "max",
+      "mode": null,
+      "model": "opus"
+    }
+  },
+  "pendingOutside": [],
+  "pendingOwn": [
+    {
+      "at": "2026-10-20T09:00:00Z",
+      "file": "project",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "projectId": "3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b",
+  "readStamps": {
+    "docs/handoff/stage-01.md": {
+      "dev": 16777220,
+      "ino": 123456,
+      "mtimeNs": 1760950800000000000,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size": 2048
+    }
+  },
+  "remembered": {
+    "jurisdictions": "US"
+  },
+  "rev": 7,
+  "runInputs": {
+    "1.2": {
+      "X": "B",
+      "changes": "none"
+    }
+  },
+  "schemaVersion": 1,
+  "signing": {
+    "1": {
+      "at": "2026-10-20T09:00:00Z",
+      "branch": "main",
+      "commit": null,
+      "packetSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "state": "handSigned"
+    }
+  },
+  "steps": {
+    "1.1": {
+      "copiedAt": "2026-10-20T09:00:00Z",
+      "lastRunId": "9b2c4d6e-1f3a-4b5c-8d7e-0a1b2c3d4e5f",
+      "runCount": 1,
+      "startedAt": "2026-10-20T09:00:00Z",
+      "state": "done"
+    }
+  },
+  "waits": {
+    "1.3b": "2026-10-26"
+  }
+}

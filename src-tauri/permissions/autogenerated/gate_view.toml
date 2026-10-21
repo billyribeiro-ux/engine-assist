@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-gate-view"
+description = "Enables the gate_view command without any pre-configured scope."
+commands.allow = ["gate_view"]
+
+[[permission]]
+identifier = "deny-gate-view"
+description = "Denies the gate_view command without any pre-configured scope."
+commands.deny = ["gate_view"]

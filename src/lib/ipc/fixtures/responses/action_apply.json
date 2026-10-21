@@ -1,0 +1,51 @@
+{
+	"summary": {
+		"key": "council-setup",
+		"number": "2.0",
+		"title": "Council setup",
+		"state": "done",
+		"tag": "core",
+		"surface": null,
+		"specLine": {
+			"surface": "action",
+			"where": "Action",
+			"model": null,
+			"effort": null,
+			"mode": null,
+			"agents": [],
+			"droppedAgents": [],
+			"note": "Foreman writes spec/.claude/agents/"
+		},
+		"whyNotRunnable": null,
+		"stateText": "Done, wrote 4 agents",
+		"conditionNote": null,
+		"kind": "action",
+		"run": null,
+		"next": false
+	},
+	"prompt": [],
+	"inputs": [],
+	"start": null,
+	"switches": [],
+	"chips": null,
+	"argvPreview": null,
+	"envNames": [],
+	"blockers": [
+		{
+			"kind": "notRunnable",
+			"reason": "done",
+			"text": "Done. This step runs once."
+		},
+		{
+			"kind": "packetUnsigned",
+			"stage": 1
+		}
+	],
+	"warnings": [],
+	"remaps": [],
+	"outs": [],
+	"override": null,
+	"parts": [],
+	"copiedAt": null,
+	"live": null
+}

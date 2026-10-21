@@ -68,3 +68,25 @@ Hooks docs spot-check (code.claude.com/docs/en/hooks, 2026-10-19):
 ## Exit path
 
 S-1′ fail, or a later probe failure: hooks are omitted from run settings, the sensor isn't installed, and every feature falls back to its P1 manual path (idle confirmation, paste-back capture, manual gate marking).
+
+## Amended 2026-10-20 (M4-07…M4-10, as built)
+
+- **Bundle and build-time hash.** The release build embeds the sensor binary in the app binary:
+  `scripts/build-release` builds `foreman-sensor` first and sets `FOREMAN_SENSOR_BIN`, and
+  `src-tauri/build.rs` copies it into `OUT_DIR` for `include_bytes!` (cfg `foreman_sensor_bundled`).
+  The bytes, and so their SHA-256, are fixed when Foreman is built and signed; no separate file in
+  the `.app` is read. A build without `FOREMAN_SENSOR_BIN` (dev) has no sensor: P1 behaviors.
+- **Install** (`foreman-app::sensor`): at startup, and again whenever a check fails, the bytes go to
+  `bin/foreman-sensor-<sha256-12>` through `foreman_core::store::app_dirs::install_executable`
+  (atomic write, then `0700` through an fd opened without following links); other
+  `foreman-sensor-*` files are removed. Before each run settings file the installed file is read back
+  and hashed; a mismatch re-installs once, then the run gets no hooks, no token and a warning.
+- **Ingest** (`foreman-app::sensor_ingest`): one thread per run with hooks, woken by a
+  `foreman_sys::watch::HintWatcher` on `events/<runId>/` (every 500 ms without one); it emits
+  `run:status` (`idle`, `blocked`, `running`) on change and keeps 20 files. `run.json` `observed`
+  is filled at exit from the events. Wrong-token events are counted (`discarded`); the diagnostics log
+  that records the count is M4-01's.
+- **Re-arm** reads the derived state only when Billy presses Run (`sensor_ingest::idle_source`).
+  `SessionEnd` isn't awaited separately: the re-arm waits for the process to exit, which follows it.
+- **Retention:** events go at the stage's sign, or 30 days after the run ended (start plus the exit
+  offset in `run.json`) at the startup scan; event folders with no run record (probe markers) go too.

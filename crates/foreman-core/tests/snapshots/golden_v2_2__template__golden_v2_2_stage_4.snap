@@ -1,0 +1,206 @@
+---
+source: crates/foreman-core/tests/golden_v2_2.rs
+expression: snap
+---
+## 4.1 · Scope, milestones, and acceptance criteria · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=New chain=4.1
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Inputs: [paste the Stage 2 and Stage 3 Handoff Packets]
+Write the SCOPE document for [APP_NAME]:
+1. v1 features (by F-ID), with the non-goals from the Master Spec
+2. Milestones M0-M6, each with a goal, its F-IDs, and a demoable outcome:
+   M0 = repo, CI with security gates, environments, staging deploy
+   M_last = hardening, readiness review, launch
+3. For every feature: user stories with acceptance criteria in
+   Given/When/Then form, covering empty states, errors, permissions,
+   limits, concurrency, and tier entitlements
+4. Map every SR-, PR-, and LC- requirement to the milestone that
+   delivers it
+Quality bar: [QUALITY_BAR]
+
+## 4.2 · Design doc and ADRs · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=New chain=4.2
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Inputs: [paste the Stage 2 and 3 packets] + docs/scope.md (in Project knowledge)
+Act as a principal architect designing for a 20-year product life.
+Treat the final stack in the Stage 2 packet as fixed input.
+
+PART 1: The design doc, in Google's structure:
+- Context and scope
+- Goals and non-goals
+- The design: system-context diagram, components, data flow, trust
+  boundaries, API sketch, data storage approach
+- Alternatives considered, each with why it lost
+- Cross-cutting concerns: security, privacy, observability,
+  accessibility, cost, and migration/exit paths
+
+PART 2: One ADR per significant decision (10-15), in exactly this format:
+# ADR-NNN: <title>
+Status: Proposed
+Date: <today>
+Context: <forces and requirements, including SR/PR/LC IDs>
+Decision: <precise enough to implement>
+Alternatives considered: <each, and why it lost>
+Consequences: <positive, negative, risks, what becomes harder>
+Verification: <how code, tests, or CI prove we follow it>
+Revisit when: <the trigger that reopens it>
+Exit path: <how we'd replace this choice>
+
+Ground every choice in current official docs and verify versions.
+Prefer boring, widely adopted technology with long support horizons.
+Flag any low-confidence decision.
+
+## 4.3 · Threat model · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=New chain=4.3
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Inputs: the design doc, the ADRs, and the Stage 3 packet (Project knowledge).
+Build the threat model, Microsoft SDL style:
+1. Data flow diagrams for each trust boundary (described, plus a diagram)
+2. STRIDE analysis per element: spoofing, tampering, repudiation,
+   information disclosure, denial of service, elevation of privilege
+3. For each threat: likelihood, impact, the mitigating control, the
+   SR/PR requirement it satisfies, and the test that will prove it
+4. Abuse cases specific to this product (e.g., account sharing, scraping,
+   payment fraud, data exfiltration through exports)
+
+## 4.4 · Data model, API contract, domain rules · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=New chain=4.4
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Inputs: the design doc, ADRs, threat model, and scope (Project knowledge).
+Produce:
+1. The Postgres schema as ordered, reversible SQL migrations: tables,
+   constraints, indexes (each with the query it serves), foreign keys,
+   and ownership rules
+2. An OpenAPI 3.1 spec for every v1 endpoint: schemas, the error
+   envelope, auth, pagination, rate limits, and API versioning
+3. Domain invariants, numbered, each assigned to exactly one enforcing layer
+4. Every computed value: the exact formula, units, rounding, edge cases,
+   and a worked numeric example
+
+## 4.5 · Design system and key screens · Runnable
+kind=prompt tag=conditional when=has_ui
+surface=chat cwd=- session=New chain=4.5
+start=opus@adaptive switches=[] alts=[]
+in=[list_screens:Text] out=[] appends=- requires=[]
+--- prompt part ---
+Inputs: the scope and Master Spec (Project knowledge).
+Design the core screens of [APP_NAME]: [list screens], plus pricing,
+upgrade prompts, and onboarding. Make them as a design I can review and
+edit (the Design artifact type if available; otherwise one
+self-contained HTML mockup).
+Requirements: a distinctive, institutional-grade visual direction (never
+a template look), dark mode first, data-dense but readable, WCAG 2.2 AA,
+keyboard-first forms, mobile breakpoints. Show empty, loading, and error
+states for every screen. Then list the design tokens (color, type
+scale, spacing, radius, elevation, motion) as CSS custom properties.
+
+## 4.6 · Tickets · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=New chain=4.6
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Inputs: scope, ADRs, threat model, data model, design (Project knowledge).
+Break every milestone into tickets sized for one Claude Code session
+(1-4 hours of human work). Write each ticket in exactly this format,
+one field per line, in this order, with nothing between tickets but a
+blank line:
+
+### [M#-NN] <Title>
+Class: SPEC-COMPLETE | NEEDS-DESIGN | HARD | MECHANICAL
+Stage: <6-13>
+Depends on: <ticket IDs, comma-separated, or none>
+ADRs: <ADR IDs, or none>
+Threats mitigated: <threat IDs, or none>
+Likely files: <paths, comma-separated>
+Acceptance criteria:
+- Given <…> When <…> Then <…>
+Required tests:
+- <test name>
+Out of scope: <one line, or none>
+
+(The class line lists the allowed values; each ticket uses exactly one.)
+Classify strictly: anything touching money, auth, math, or concurrency
+is HARD.
+
+## 4.7 · Independent design review · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=New chain=4.7
+start=fable@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+You are a senior design reviewer who did not write any of these
+documents. Review the design doc, ADRs, threat model, data model, API
+spec, and tickets in this Project against the Master Spec and the NFRs.
+Find: requirements with no design, designs with no requirement, ADRs
+without real alternatives, threats without tests, schema or API gaps,
+missing failure modes, tickets with untestable acceptance criteria, and
+anything that will hurt in 5 years. Rate each finding BLOCKER / MAJOR /
+MINOR, with the fix. Be specific and unsparing.
+
+## 4.8 · CLAUDE.md and the Build Package (the handoff) · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=New chain=4.8
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[docs/handoff/stage-04.md] appends=- requires=[]
+--- prompt part ---
+Generate the project CLAUDE.md. Keep it under 150 lines; it loads into
+every Claude Code session, so every line costs tokens. Include only: a
+one-line product description; the stack with exact versions; the repo
+layout; exact commands (install, dev, typecheck, lint, unit,
+integration, e2e, build, migrate); repo-specific conventions; the
+definition of done; paths (not contents) to every doc; "never" rules
+(e.g., never float money, never skip authz, never edit an applied
+migration); and the rule "before planning any work, read the latest
+docs/handoff/ packet and docs/lessons.md."
+
+Then output the BUILD PACKAGE packet in one code block:
+
+=== HANDOFF PACKET · Stage 4 → Stage 5 ===
+PROJECT: [APP_NAME]
+APPROVED BY: <blank>
+REPO FILES (create exactly these):
+  CLAUDE.md
+  docs/MASTER-SPEC.md
+  docs/scope.md
+  docs/design-doc.md
+  docs/adr/ADR-001.md …
+  docs/threat-model.md
+  docs/migrations/
+  docs/openapi.yaml
+  docs/domain-rules.md
+  docs/design-tokens.md
+  docs/tickets.md
+  docs/requirements.md   (SR/PR/LC lists)
+  docs/business-model.md
+  docs/lessons.md        (empty, with the template header from Appendix F)
+STACK + VERSIONS: <from ADRs>
+MILESTONES: <M0…M_last, one line each>
+FIRST STAGE: Stage 5 · Site Prep · Claude Code CLI · opusplan · medium · Plan
+BLUEPRINT VERSION: <the version of this blueprint used>
+OPEN ITEMS: none
+
+## 4:F.2 · Lessons in the chat stages (0–4) · Runnable
+kind=followup tag=core when=-
+surface=chat cwd=- session=Continue chain=4.8
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=docs/lessons.md requires=[]
+--- prompt part ---
+Before we move on, review this conversation for lessons: questions you
+should have asked earlier, answers I had to correct, output I had to
+redo, and anything in your prompt instructions that was unclear or
+missing. Write lesson entries in the L-NNN format (I'll paste the
+format), each with the exact proposed edit to that stage's prompt in the
+blueprint. If it went cleanly, say so in one line.

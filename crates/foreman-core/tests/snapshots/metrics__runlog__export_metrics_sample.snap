@@ -1,0 +1,59 @@
+---
+source: crates/foreman-core/tests/metrics.rs
+expression: text
+---
+# Foreman metrics export
+
+Generated 2026-10-20 · 5 runs counted · 2 stages run through Foreman
+
+Both measures are defined as in `docs/metrics-baseline.md`: time to start ends at the spawn (CLI) or when the filled prompt is on the clipboard and the chat is open (chat); active time runs from the same start to the step done. Press Send is not part of either. Medians of an even count are the mean of the middle two; p95 is the nearest rank.
+
+## Summary
+
+| Measure | Surface | By hand (this file) | Foreman (Export metrics) |
+|---|---|---|---|
+| Steps logged | chat | 1 | 1 |
+| Steps logged | CLI | 2 | 3 |
+| Median seconds to start | chat | 45.0 | 8.4 |
+| Median seconds to start | CLI | 110.3 | 5.2 |
+| p95 seconds to start | chat | 45.0 | 8.4 |
+| p95 seconds to start | CLI | 130.5 | 6.1 |
+| Median active minutes per step | chat | 25.0 | 10.1 |
+| Median active minutes per step | CLI | 23.8 | 15.1 |
+| Manual edits per step | all | 1.00 | 0.50 |
+| Mistakes per stage | all | 0.50 | — |
+
+Foreman's manual edits are the proxies it can see: run-input interventions plus every Copy prompt on a CLI step. Foreman builds the command from the template, so it does not log mistakes; overrides applied are listed below.
+
+## Kill check
+
+| Surface | Baseline present | Median to start lower | Median active lower | Manual-edit proxies |
+|---|---|---|---|---|
+| chat | no (1 of 10 steps) | yes | yes | 0 |
+| CLI | yes (2 steps) | yes | yes | 2 |
+
+The check passes only when every row says yes and no step needed a manual prompt edit. Each proxy event needs an explanation in your Stage 9 attestation.
+
+## Foreman by surface
+
+| Surface | Runs | Steps | Median to start (s) | p95 to start (s) | Median elapsed per step (min) | Waits excluded (min) | Median active per step (min) | Interventions | Copy prompt on CLI | Overrides |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CLI | 4 | 3 | 5.2 | 6.1 | 15.1 | 0.0 | 15.1 | 1 | 1 | 1 |
+| chat | 1 | 1 | 8.4 | 8.4 | 10.1 | 0.0 | 10.1 | 0 | 0 | 0 |
+
+## Foreman by stage
+
+| Stage | Steps | Median to start (s) | p95 to start (s) | Median active per step (min) | Manual-edit proxies |
+|---|---|---|---|---|---|
+| 1 | 3 | 6.1 | 8.4 | 10.1 | 1 |
+| 2 | 1 | 4.9 | 4.9 | 15.1 | 1 |
+
+## Run log
+
+| Date | Project | Stage.step | Surface | Entry | Seconds to start | Duration (min) | Waits (min) | Interventions | Copy prompt on CLI | Override | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-19 | TradeLog | 1.1 | CLI | Do next | 5.2 | 20.0 | 0.0 | 0 | no | no | exited |
+| 2026-10-19 | TradeLog | 1.2 | chat | Palette | 8.4 | 10.0 | 0.0 | 0 | no | no | copied |
+| 2026-10-19 | TradeLog | 1.3 | CLI | Stage view | 6.1 | 5.0 | 0.0 | 1 | no | no | exited |
+| 2026-10-19 | TradeLog | 1.3 | CLI | Re-arm | 1.8 | 4.0 | 0.0 | 0 | no | no | exited |
+| 2026-10-19 | TradeLog | 2.1 | CLI | Do next | 4.9 | 15.0 | 0.0 | 0 | yes | yes | exited |

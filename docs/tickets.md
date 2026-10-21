@@ -84,10 +84,10 @@ Stage: 5
 Depends on: M0-01, M0-04
 ADRs: ADR-015, ADR-017
 Threats mitigated: T-010
-Likely files: crates/fake-claude/src/main.rs, crates/fake-claude/scripts/, vitest.config.ts, playwright.config.ts, wdio.conf.ts, src-tauri/Cargo.toml (`e2e` feature with tauri-plugin-wdio-webdriver 1.5.0), crates/foreman-core/benches/, tests/e2e/smoke.e2e.ts
+Likely files: crates/fake-claude/src/main.rs, crates/fake-claude/scripts/, vitest.config.ts, playwright.config.ts, src-tauri/Cargo.toml (`e2e` feature with tauri-plugin-wdio-webdriver 1.5.0), e2e/webdriver.ts, e2e/specs/01-launch.e2e.ts (ADR-015 amendment 2026-10-20: in-repo WebDriver client instead of WDIO, so no wdio.conf.ts), crates/foreman-core/benches/
 Acceptance criteria:
 - Given the fake `claude`, when spawned, then it records argv, environment and cwd to a file named by an env var, plays scripted output and exit codes, and answers `-v` and `auth status` from its script
-- Given Vitest browser mode, Playwright (WebKit) + axe and the WDIO `e2e` feature, then each has one passing example test; criterion, proptest and insta are wired in `foreman-core`
+- Given Vitest browser mode, Playwright (WebKit) + axe and the `e2e` feature smoke (in-repo WebDriver client, ADR-015), then each has one passing example test; criterion, proptest and insta are wired in `foreman-core`
 - Given a release build, then the `e2e` feature and the webdriver plugin are absent
 Required tests:
 - release::no_webdriver
@@ -445,7 +445,7 @@ Stage: 6
 Depends on: M1-07, M0-03
 ADRs: ADR-012
 Threats mitigated: T-039, T-040, T-041, T-042, T-043
-Likely files: crates/foreman-core/src/git.rs (closed `GitOp` enum, arg builders), crates/foreman-sys/src/git.rs, crates/foreman-sys/tests/git.rs, crates/foreman-sys/tests/fixtures/hostile-repo/, the closed `GitOp` enum equal to DR-140's list (no `Status`, `Diff`, `Add`, `Commit`, `LsFiles`; ADR-012 decision 1)
+Likely files: crates/foreman-core/src/git.rs (closed `GitOp` enum, arg builders), crates/foreman-sys/src/git.rs, crates/foreman-sys/tests/git.rs, crates/foreman-sys/tests/common/mod.rs (`hostile_repo`, generated in code each run; no `fixtures/hostile-repo/` directory), the closed `GitOp` enum equal to DR-140's list (no `Status`, `Diff`, `Add`, `Commit`, `LsFiles`; ADR-012 decision 1)
 Acceptance criteria:
 - AC-XC-04
 - Given a folder with no repo of its own inside an enclosing repo, when any git op runs, then `git::run` refuses (rev-parse `--show-toplevel` must equal the project root)
@@ -589,10 +589,10 @@ Stage: 6
 Depends on: M1-16, M1-08
 ADRs: ADR-012, ADR-022
 Threats mitigated: T-064, T-065, T-067
-Likely files: crates/foreman-core/src/lock.rs, crates/foreman-sys/src/git/show.rs, crates/foreman-core/tests/lock.rs, crates/foreman-sys/tests/lock_restore.rs
+Likely files: crates/foreman-core/src/lock.rs, crates/foreman-sys/src/git/show.rs, crates/foreman-core/tests/lock.rs, crates/foreman-sys/tests/lock_restore.rs, crates/foreman-core/src/template/validate.rs (CR-003)
 Acceptance criteria:
 - AC-F002-01
-- AC-F002-02
+- AC-F002-02 (CR-003: also refuses annotation errors in Stages 1–2 and F.2)
 - AC-F002-03
 - AC-F002-04
 - AC-F002-05
@@ -601,6 +601,7 @@ Acceptance criteria:
 - AC-F001-16
 Required tests:
 - lock::pin_contents, lock::repin_window, lock::restore_from_git, lock::hash_mismatch_read_only, lock::dirty_blueprint_refused
+- lock::pin_refuses_p1_annotation_errors, lock::pin_allows_errors_outside_p1, lock::pin_clean_p1 (CR-003)
 - template::swapped_bullets_reconfirm
 Out of scope: re-confirm kind UI (M4-17).
 
@@ -831,7 +832,7 @@ Stage: 6
 Depends on: M1-16, M1-22
 ADRs: ADR-015
 Threats mitigated: none
-Likely files: crates/foreman-core/benches/template.rs, crates/foreman-core/benches/resolver.rs, crates/foreman-core/tests/fixtures/blueprint-20k.md
+Likely files: crates/foreman-core/benches/template.rs, crates/foreman-core/benches/resolver.rs (the 20,000-line blueprint is generated deterministically in `benches/template.rs`, not committed as `tests/fixtures/blueprint-20k.md`)
 Acceptance criteria:
 - AC-F001-07
 - AC-F006-16
@@ -912,7 +913,7 @@ Threats mitigated: none
 Likely files: src/routes/+layout.svelte, src/routes/+page.svelte, src/routes/first-run/+page.svelte, src/routes/setup/+page.svelte, src/routes/doctor/+page.svelte, src/routes/settings/+page.svelte, src/routes/projects/[projectId]/+layout.svelte, src/routes/projects/[projectId]/stages/[stage]/+page.svelte, src/lib/components/ui/, src/lib/stores/, src/lib/nav/, docs/design/tokens.css → src/lib/styles/tokens.css
 Acceptance criteria:
 - EX-M2-01 (routes exist; real data arrives with each screen ticket)
-- Given each P1 route, then it renders under the root layout (sidebar, terminal drawer host, aria-live region) in mock mode, with bits-ui 2.19.5 wrappers styled only by tokens
+- Given each P1 route, then it renders under the root layout (sidebar, terminal drawer host, aria-live region) in mock mode, with hand-built primitives (ADR-020 amendment 2026-10-20; bits-ui is not used) styled only by tokens
 Required tests:
 - none named (one component test per route stub)
 Out of scope: screen content (later M2 tickets).
@@ -1260,7 +1261,7 @@ Stage: 7
 Depends on: M2-14, M2-16, M2-18, M2-20, M2-22, M2-24, M2-26
 ADRs: ADR-015
 Threats mitigated: none
-Likely files: src/routes/**/*.test.ts, tests/flows/*.spec.ts, tests/e2e/smoke.e2e.ts, src/lib/perf.ts
+Likely files: src/routes/**/*.test.ts, tests/flows/*.spec.ts, e2e/specs/*.e2e.ts, src/lib/perf.ts
 Acceptance criteria:
 - EX-M2-03
 - Given the run log and frontend marks, then NFR-01, NFR-02 and NFR-07 are instrumented and reported (targets enforced in M5-09)

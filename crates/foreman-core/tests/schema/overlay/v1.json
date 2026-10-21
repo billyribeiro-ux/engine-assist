@@ -1,0 +1,38 @@
+{
+  "addedItems": [
+    {
+      "id": "xi-5-1",
+      "kind": "attest",
+      "stage": 5,
+      "text": "Billing sandbox keys rotated"
+    }
+  ],
+  "addedSteps": [
+    {
+      "after": "2.6",
+      "copiedFrom": "2.6",
+      "cwd": "spec",
+      "id": "x-2-1",
+      "out": [
+        "spec/review.md"
+      ],
+      "stage": 2,
+      "start": {
+        "effort": "xhigh",
+        "mode": "default",
+        "model": "opus"
+      },
+      "surface": "cli",
+      "tag": "optional",
+      "text": "Review the spec again.",
+      "title": "Extra review"
+    }
+  ],
+  "schemaVersion": 1,
+  "skips": {
+    "0.1": {
+      "at": "2026-10-20T09:00:00Z",
+      "reason": "idea already chosen"
+    }
+  }
+}

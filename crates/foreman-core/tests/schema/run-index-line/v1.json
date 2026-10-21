@@ -1,0 +1,17 @@
+{
+  "copyPromptOnCli": false,
+  "durationMs": 60000,
+  "entryPoint": "doNext",
+  "override": false,
+  "projectId": "3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b",
+  "runId": "9b2c4d6e-1f3a-4b5c-8d7e-0a1b2c3d4e5f",
+  "runInputInterventions": 0,
+  "schemaVersion": 1,
+  "stage": 2,
+  "status": "exited",
+  "stepId": "2.2",
+  "surface": "cli",
+  "timeToStartMs": 950,
+  "waitMs": 0,
+  "wallStart": "2026-10-20T09:00:00Z"
+}

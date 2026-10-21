@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-sheet-export"
+description = "Enables the run_sheet_export command without any pre-configured scope."
+commands.allow = ["run_sheet_export"]
+
+[[permission]]
+identifier = "deny-run-sheet-export"
+description = "Denies the run_sheet_export command without any pre-configured scope."
+commands.deny = ["run_sheet_export"]

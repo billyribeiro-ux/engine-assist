@@ -1,0 +1,300 @@
+/*
+ * Foreman design tokens — Stage 4.5
+ * Source of truth for color, type, space, radius, motion and focus.
+ *
+ * Themes
+ *   Night  (dark, default)   :root, [data-theme="night"]
+ *   Vellum (light)           [data-theme="vellum"], and prefers-color-scheme: light
+ *                            when no explicit theme is set.
+ *   The two Vellum blocks below must stay identical; contrast-check.py fails if they drift.
+ *
+ * Contrast: every text/background pair used by the components is listed in
+ * docs/design/contrast-check.py and must pass WCAG 2.2 AA (4.5:1 text, 3:1 large
+ * text, UI components and focus indicators). Run `python3 docs/design/contrast-check.py`.
+ *
+ * Changes from MASTER-SPEC Appendix A (provisional values), for contrast:
+ *   Night  --fail       #D9534A -> #E17770   (3.88 -> 5.20 on --sheet)
+ *   Night  --pass       #3E9B63 -> #43A86B   (4.46 -> 5.18 on --sheet)
+ *   Vellum --attention  #C65F12 -> #AA520F   (4.16 -> 5.35 on --sheet)
+ *   Vellum --pass       #2E7D4F -> #2C754B   (4.58 -> 5.07 on --ground; 4.72 on --sidebar)
+ *   Night  focus ring   --cyanotype (2.03:1 on --ground) -> --linework (14.5:1)
+ *   Phase colors split: --phase-* (on the cyanotype strip, both themes) are light
+ *   tints that reach 3:1 on --cyanotype; --phase-*-ink are per-theme versions for
+ *   sheet surfaces (Vellum keeps the Appendix A hex values, which already pass 3:1).
+ * New tokens: --sheet-raised, --well, --sidebar, --hatch, --control-edge,
+ *   --accent-ink, --*-wash, --strip-*, --term-*, --primary-*.
+ */
+
+:root,
+[data-theme="night"] {
+  color-scheme: dark;
+
+  /* Brand constants (same in both themes) */
+  --cyanotype: #1E4E8C;          /* sheet strip; primary action */
+  --linework: #E6EEF8;           /* linework and text on cyanotype */
+
+  /* Surfaces */
+  --ground: #191D22;             /* window background */
+  --sidebar: #1D2127;            /* sidebar (solid stand-in for vibrancy) */
+  --sheet: #20252B;              /* content surface, square edges */
+  --sheet-raised: #262C33;       /* selected step, hover rows, dialogs */
+  --well: #1A1E23;               /* prompt and code blocks */
+  --rule: #313841;               /* hairlines, dividers (decorative) */
+  --hatch: #313841;              /* not-applicable hatching */
+  --control-edge: #6E7986;       /* input and toggle borders (3:1 UI) */
+
+  /* Text */
+  --ink: #E4E8ED;
+  --ink-muted: #9AA4B0;
+  --accent-ink: #8DB4E8;         /* resolved tokens, links, selected nav text */
+
+  /* Status (always paired with a shape) */
+  --pass: #43A86B;
+  --fail: #E17770;
+  --attention: #F07A22;
+  --pass-wash: #1E3328;
+  --fail-wash: #3A2427;
+  --attention-wash: #3A2A1D;
+  --selected: #2A3443;           /* selected sidebar row */
+
+  /* Primary action */
+  --primary-bg: var(--cyanotype);
+  --primary-bg-hover: #2A5EA3;
+  --primary-ink: var(--linework);
+  --primary-disabled-bg: #2B323B;
+  --primary-disabled-ink: #9AA4B0;
+
+  /* Sheet strip (identical in both themes: the strip is always cyanotype) */
+  --strip-bg: var(--cyanotype);
+  --strip-line: var(--linework);
+  --strip-muted: #B4C8E4;        /* locked sheet numbers, group labels */
+  --strip-grid: rgba(230, 238, 248, 0.08);
+  --strip-attention: #FFBF86;    /* a packet waiting for your signature */
+  --strip-fail: #FFB0A8;
+  --strip-current-bg: var(--linework);
+  --strip-current-ink: var(--cyanotype);
+
+  /* Phase colors on the strip (tints that reach 3:1 on --cyanotype) */
+  --phase-pre: #A9C8F0;
+  --phase-structure: #F0A97F;
+  --phase-systems: #74D3C9;
+  --phase-finish: #C9B5EE;
+  --phase-co: #93D7A3;
+  --phase-maint: #C7CDD5;
+
+  /* Phase colors on sheet surfaces */
+  --phase-pre-ink: #7FA6DA;
+  --phase-structure-ink: #D08A5E;
+  --phase-systems-ink: #4FB2A9;
+  --phase-finish-ink: #A28AD0;
+  --phase-co-ink: #63B477;
+  --phase-maint-ink: #939CA8;
+
+  /* Terminal drawer */
+  --term-bg: #14171B;
+  --term-ink: #D8DEE6;
+  --term-muted: #8E99A6;
+  --term-rule: #2A3038;
+
+  /* Focus: 2px ring, 2px offset */
+  --focus: var(--linework);
+  --focus-on-strip: var(--linework);
+
+  /* Shadow (dialogs and palette only) */
+  --shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px #313841;
+  --scrim: rgba(10, 12, 15, 0.55);
+}
+
+[data-theme="vellum"] {
+  color-scheme: light;
+  --ground: #F2F4F6;
+  --sidebar: #E9ECEF;
+  --sheet: #FFFFFF;
+  --sheet-raised: #EEF2F7;
+  --well: #F6F8FA;
+  --rule: #D6DBE2;
+  --hatch: #E3E7EC;
+  --control-edge: #7E8996;
+  --ink: #1C232B;
+  --ink-muted: #5A6573;
+  --accent-ink: #1E4E8C;
+  --pass: #2C754B;
+  --fail: #B8352D;
+  --attention: #AA520F;
+  --pass-wash: #E4F2E9;
+  --fail-wash: #FBE8E6;
+  --attention-wash: #FBEDE0;
+  --selected: #DCE5F2;
+  --primary-disabled-bg: #E3E7EC;
+  --primary-disabled-ink: #5A6573;
+  --phase-pre-ink: #4A7CC0;
+  --phase-structure-ink: #B0663A;
+  --phase-systems-ink: #3A938C;
+  --phase-finish-ink: #8064B0;
+  --phase-co-ink: #4A9A5E;
+  --phase-maint-ink: #77808C;
+  --term-bg: #FAFBFC;
+  --term-ink: #1C232B;
+  --term-muted: #5A6573;
+  --term-rule: #D6DBE2;
+  --focus: var(--cyanotype);
+  --shadow-overlay: 0 18px 48px rgba(28, 35, 43, 0.18), 0 0 0 1px #D6DBE2;
+  --scrim: rgba(28, 35, 43, 0.28);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="night"]) {
+    color-scheme: light;
+    --ground: #F2F4F6;
+    --sidebar: #E9ECEF;
+    --sheet: #FFFFFF;
+    --sheet-raised: #EEF2F7;
+    --well: #F6F8FA;
+    --rule: #D6DBE2;
+    --hatch: #E3E7EC;
+    --control-edge: #7E8996;
+    --ink: #1C232B;
+    --ink-muted: #5A6573;
+    --accent-ink: #1E4E8C;
+    --pass: #2C754B;
+    --fail: #B8352D;
+    --attention: #AA520F;
+    --pass-wash: #E4F2E9;
+    --fail-wash: #FBE8E6;
+    --attention-wash: #FBEDE0;
+    --selected: #DCE5F2;
+    --primary-disabled-bg: #E3E7EC;
+    --primary-disabled-ink: #5A6573;
+    --phase-pre-ink: #4A7CC0;
+    --phase-structure-ink: #B0663A;
+    --phase-systems-ink: #3A938C;
+    --phase-finish-ink: #8064B0;
+    --phase-co-ink: #4A9A5E;
+    --phase-maint-ink: #77808C;
+    --term-bg: #FAFBFC;
+    --term-ink: #1C232B;
+    --term-muted: #5A6573;
+    --term-rule: #D6DBE2;
+    --focus: var(--cyanotype);
+    --shadow-overlay: 0 18px 48px rgba(28, 35, 43, 0.18), 0 0 0 1px #D6DBE2;
+    --scrim: rgba(28, 35, 43, 0.28);
+  }
+}
+
+/* Theme-independent tokens */
+:root {
+  /* Type families. SF Pro and SF Mono through the system stacks; the drafting face
+     (IBM Plex Sans Condensed SemiBold) is bundled locally by the app. Mockups fall
+     back to a local condensed face. Never load remote fonts. */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "DejaVu Sans Mono", monospace;
+  --font-drafting: "IBM Plex Sans Condensed", "Avenir Next Condensed", "DejaVu Sans Condensed", "Arial Narrow", sans-serif;
+  --drafting-weight: 600;
+  --drafting-stretch: condensed;
+
+  /* Type scale (pt == CSS px in a macOS webview) */
+  --text-11: 11px;   /* captions, legends, kbd hints */
+  --text-12: 12px;   /* secondary, spec lines */
+  --text-13: 13px;   /* body */
+  --text-15: 15px;   /* step titles, section heads */
+  --text-18: 18px;   /* screen subheads, sheet numbers */
+  --text-22: 22px;   /* stage titles */
+  --text-28: 28px;   /* first-run and empty-state headlines */
+  --text-mono: 12.5px;
+  --leading-body: 1.45;
+  --leading-mono: 1.5;
+  --leading-tight: 1.2;
+  --measure-prompt: 88ch;
+  --measure-prose: 72ch;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Spacing (4px base) */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --inspector-width: 300px;
+  --inspector-width-compact: 264px;
+  --titlebar-height: 38px;
+  --strip-height: 104px;
+  --step-margin: 64px;           /* left margin that holds callout numbers */
+  --drawer-height: 216px;        /* default; the app remembers the user's height */
+
+  /* Radii: 6px on interactive controls only. Sheets and steps are square. */
+  --radius-control: 6px;
+  --radius-pill: 4px;
+  --radius-sheet: 0;
+  --radius-overlay: 10px;        /* palette and dialogs follow macOS sheets */
+
+  /* Lines */
+  --hairline: 1px;
+  --rule-strong: 1.5px;          /* title block outer frame */
+
+  /* Motion. Only the stamp is orchestrated; everything else answers an action. */
+  --dur-stamp: 220ms;
+  --dur-drawer: 160ms;
+  --dur-inspector: 140ms;
+  --dur-micro: 100ms;            /* toggles, disclosure */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-stamp: cubic-bezier(0.34, 1.56, 0.64, 1);  /* settle with a small overshoot */
+
+  /* Focus ring */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-stamp: 0ms;
+    --dur-drawer: 0ms;
+    --dur-inspector: 0ms;
+    --dur-micro: 0ms;
+  }
+}
+
+/* Increase Contrast (AC-XC-23): hairlines and control edges step up, secondary text becomes
+ * primary text, and every text pair in contrast-check.py reaches 7:1 (AAA). Night values apply
+ * to :root; the two Vellum blocks below must stay identical (contrast-check.py fails on drift). */
+@media (prefers-contrast: more) {
+  :root:root {
+    --rule: var(--control-edge);
+    --ink-muted: var(--ink);
+    --accent-ink: #A7C5ED;
+    --pass: #7FCC9E;
+    --fail: #ECA7A2;
+    --attention: #F5A96F;
+    --primary-bg-hover: #1E4B88;
+    --primary-disabled-ink: #B9C0C8;
+    --strip-muted: #E6EDF6;
+    --strip-attention: #FFE9D5;
+    --strip-fail: #FFE7E4;
+    --term-muted: #9AA4B0;
+  }
+  :root:root[data-theme="vellum"] {
+    --accent-ink: #1C4984;
+    --pass: #215738;
+    --fail: #8E2923;
+    --attention: #7C3C0B;
+    --primary-disabled-ink: #434B55;
+    --term-muted: #4D5763;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: light) {
+  :root:root:not([data-theme="night"]) {
+    --accent-ink: #1C4984;
+    --pass: #215738;
+    --fail: #8E2923;
+    --attention: #7C3C0B;
+    --primary-disabled-ink: #434B55;
+    --term-muted: #4D5763;
+  }
+}

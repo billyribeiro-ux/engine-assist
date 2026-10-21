@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-wait-start"
+description = "Enables the wait_start command without any pre-configured scope."
+commands.allow = ["wait_start"]
+
+[[permission]]
+identifier = "deny-wait-start"
+description = "Denies the wait_start command without any pre-configured scope."
+commands.deny = ["wait_start"]

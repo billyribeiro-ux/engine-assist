@@ -1,0 +1,7 @@
+{
+	"pickId": "d0000000-0000-4000-8000-000000000001",
+	"displayPath": "~/Code/tradelog",
+	"isGitRepo": true,
+	"hasForeman": null,
+	"refusal": "~/Code/tradelog is inside another Foreman project (~/Code/swings-platform). Choose a folder outside it, for example ~/Code/tradelog-app."
+}

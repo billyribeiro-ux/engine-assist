@@ -1,0 +1,74 @@
+{
+	"$id": "urn:foreman:run-index-line.v1",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"properties": {
+		"copyPromptOnCli": {
+			"type": "boolean"
+		},
+		"durationMs": {
+			"minimum": 0,
+			"type": ["integer", "null"]
+		},
+		"entryPoint": {
+			"enum": ["doNext", "palette", "stageView", "rearm", "repair"]
+		},
+		"override": {
+			"type": "boolean"
+		},
+		"projectId": {
+			"$ref": "urn:foreman:common#/$defs/uuid"
+		},
+		"runId": {
+			"$ref": "urn:foreman:common#/$defs/uuid"
+		},
+		"runInputInterventions": {
+			"minimum": 0,
+			"type": "integer"
+		},
+		"schemaVersion": {
+			"const": 1
+		},
+		"stage": {
+			"$ref": "urn:foreman:common#/$defs/stage"
+		},
+		"status": {
+			"enum": ["exited", "errored", "interrupted", "copied"]
+		},
+		"stepId": {
+			"$ref": "urn:foreman:common#/$defs/stepKey"
+		},
+		"surface": {
+			"enum": ["chat", "cli", "desktop"]
+		},
+		"timeToStartMs": {
+			"minimum": 0,
+			"type": ["integer", "null"]
+		},
+		"waitMs": {
+			"minimum": 0,
+			"type": "integer"
+		},
+		"wallStart": {
+			"$ref": "urn:foreman:common#/$defs/timestamp"
+		}
+	},
+	"required": [
+		"schemaVersion",
+		"runId",
+		"projectId",
+		"stage",
+		"stepId",
+		"surface",
+		"entryPoint",
+		"wallStart",
+		"timeToStartMs",
+		"durationMs",
+		"waitMs",
+		"status",
+		"runInputInterventions",
+		"copyPromptOnCli",
+		"override"
+	],
+	"type": "object"
+}

@@ -1,0 +1,24 @@
+[package]
+name = "fake-claude"
+description = "Test double for the claude CLI (ADR-015); never bundled"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "fake-claude"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "=1.0.154"
+# M3: raw mode, window size and stdin polling for the interactive TUI emulation (same pin as the
+# product crates).
+rustix = { version = "=1.1.5", features = ["termios", "event", "stdio"] }
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+[lints]
+workspace = true

@@ -15,6 +15,7 @@ src-tauri/gen/
 .env
 .env.*
 !.env.example
+!.env.mock
 
 # Claude Code local-only files
 .claude/settings.local.json
@@ -22,3 +23,13 @@ src-tauri/gen/
 
 # Logs
 *.log
+
+# Playwright
+test-results/
+playwright-report/
+
+# Vitest browser-mode attachments and failure screenshots
+.vitest/attachments/
+
+# Plant scratch
+scripts/plants/__plant-*

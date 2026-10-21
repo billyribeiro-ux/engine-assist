@@ -1,0 +1,302 @@
+[
+  {
+    "path": "spec/council/r6-feature-specs.md",
+    "purpose": "repo",
+    "expect": "ok"
+  },
+  {
+    "path": "docs/handoff/stage-02.md",
+    "purpose": "repo",
+    "expect": "ok"
+  },
+  {
+    "path": "../docs/x.md",
+    "purpose": "repo",
+    "expect": "path.dotdot"
+  },
+  {
+    "path": "docs/../../etc/passwd",
+    "purpose": "repo",
+    "expect": "path.dotdot"
+  },
+  {
+    "path": "/etc/passwd",
+    "purpose": "repo",
+    "expect": "path.absolute"
+  },
+  {
+    "path": "~/.zshrc",
+    "purpose": "repo",
+    "expect": "path.absolute"
+  },
+  {
+    "path": ".git/hooks/pre-commit",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": ".GIT/hooks/pre-commit",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "docs/.GIT/x",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "a/.git/x",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "spec/.claude/settings.json",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "spec/.claude/settings.local.json",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": ".claude/settings.json",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "spec/.mcp.json",
+    "purpose": "repo",
+    "expect": "path.denied-name"
+  },
+  {
+    "path": ".MCP.json",
+    "purpose": "repo",
+    "expect": "path.denied-name"
+  },
+  {
+    "path": "docs/CLAUDE.local.md",
+    "purpose": "repo",
+    "expect": "path.denied-name"
+  },
+  {
+    "path": "docs/.envrc",
+    "purpose": "repo",
+    "expect": "path.denied-name"
+  },
+  {
+    "path": "docs/.gitmodules",
+    "purpose": "repo",
+    "expect": "path.denied-name"
+  },
+  {
+    "path": "spec/.gitattributes",
+    "purpose": "repo",
+    "expect": "path.denied-name"
+  },
+  {
+    "path": "docs/.npmrc",
+    "purpose": "repo",
+    "expect": "path.denied-name"
+  },
+  {
+    "path": "spec/CLAUDE.md",
+    "purpose": "repo",
+    "expect": "path.claude-md"
+  },
+  {
+    "path": "docs/sub/claude.md",
+    "purpose": "repo",
+    "expect": "path.claude-md"
+  },
+  {
+    "path": "CLAUDE.md",
+    "purpose": "repo",
+    "expect": "path.claude-md"
+  },
+  {
+    "path": "Claude.MD",
+    "purpose": "assembler",
+    "expect": "path.claude-md"
+  },
+  {
+    "path": "CLAUDE.md",
+    "purpose": "assembler",
+    "expect": "ok"
+  },
+  {
+    "path": "README.md",
+    "purpose": "repo",
+    "expect": "path.not-allowlisted"
+  },
+  {
+    "path": ".github/workflows/x.yml",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "docs/.husky/pre-commit",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "docs/.husKy/pre-commit",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "docs/.vscode/tasks.json",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "docs/.idea/x.xml",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "docs/.foreman/project.json",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": ".foreman/project.json",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": ".foreman/project.json",
+    "purpose": "decision:project",
+    "expect": "ok"
+  },
+  {
+    "path": ".foreman/stages/stage-02.json",
+    "purpose": "decision:stage-02",
+    "expect": "ok"
+  },
+  {
+    "path": ".foreman/../x",
+    "purpose": "decision:project",
+    "expect": "path.dotdot"
+  },
+  {
+    "path": "spec/.claude/agents/market-analyst.md",
+    "purpose": "council:0",
+    "expect": "ok"
+  },
+  {
+    "path": "spec/.claude/agents/evil.md",
+    "purpose": "council:0",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "spec/.claude/agents/../../x",
+    "purpose": "council:0",
+    "expect": "path.dotdot"
+  },
+  {
+    "path": "docs/a\u0000b.md",
+    "purpose": "repo",
+    "expect": "path.nul"
+  },
+  {
+    "path": "docs/a\nb.md",
+    "purpose": "repo",
+    "expect": "path.control"
+  },
+  {
+    "path": "docs/ab.md",
+    "purpose": "repo",
+    "expect": "path.control"
+  },
+  {
+    "path": "docs/ab.md",
+    "purpose": "repo",
+    "expect": "path.control"
+  },
+  {
+    "path": "docs/exe‮dm.md",
+    "purpose": "repo",
+    "expect": "path.bidi"
+  },
+  {
+    "path": "docs/a​b.md",
+    "purpose": "repo",
+    "expect": "path.zero-width"
+  },
+  {
+    "path": "docs/a\\b.md",
+    "purpose": "repo",
+    "expect": "path.backslash"
+  },
+  {
+    "path": "docs//x.md",
+    "purpose": "repo",
+    "expect": "path.empty-component"
+  },
+  {
+    "path": "docs/./x.md",
+    "purpose": "repo",
+    "expect": "path.empty-component"
+  },
+  {
+    "path": "",
+    "purpose": "repo",
+    "expect": "path.empty"
+  },
+  {
+    "path": ".giт/hooks/x",
+    "purpose": "repo",
+    "expect": "path.not-allowlisted"
+  },
+  {
+    "path": "docs/.Git/x",
+    "purpose": "repo",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "docs/.git́/x",
+    "purpose": "repo",
+    "expect": "ok"
+  },
+  {
+    "path": "docs/CLAUDE․md",
+    "purpose": "repo",
+    "expect": "ok"
+  },
+  {
+    "path": "docs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "purpose": "repo",
+    "expect": "path.component-too-long"
+  },
+  {
+    "path": "docs/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/x",
+    "purpose": "repo",
+    "expect": "path.too-long"
+  },
+  {
+    "path": "docs/Ω.md",
+    "purpose": "repo",
+    "expect": "ok"
+  },
+  {
+    "path": "spec/02-teardown.md",
+    "purpose": "template-out",
+    "expect": "ok"
+  },
+  {
+    "path": ".github/workflows/x.yml",
+    "purpose": "template-out",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": ".git/hooks/x",
+    "purpose": "template-out",
+    "expect": "path.denied-component"
+  },
+  {
+    "path": "spec/.claude/agents/red-team.md",
+    "purpose": "template-out",
+    "expect": "path.denied-component"
+  }
+]

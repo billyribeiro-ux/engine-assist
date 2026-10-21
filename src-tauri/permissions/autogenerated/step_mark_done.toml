@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-step-mark-done"
+description = "Enables the step_mark_done command without any pre-configured scope."
+commands.allow = ["step_mark_done"]
+
+[[permission]]
+identifier = "deny-step-mark-done"
+description = "Denies the step_mark_done command without any pre-configured scope."
+commands.deny = ["step_mark_done"]

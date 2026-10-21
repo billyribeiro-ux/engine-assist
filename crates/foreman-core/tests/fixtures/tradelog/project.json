@@ -1,0 +1,39 @@
+{
+  "chatProjectUrl": "https://claude.ai/project/tradelog",
+  "chatUrls": {
+    "1.1": "https://claude.ai/chat/tradelog-1-1"
+  },
+  "conditionAudit": [],
+  "conditions": {
+    "commercial": "yes",
+    "has_database": "yes",
+    "has_email": "yes",
+    "has_integrations": "yes",
+    "has_ui": "yes",
+    "has_uploads": "yes",
+    "idea_known": "yes",
+    "multi_user": "yes",
+    "others_data": "yes",
+    "payments": "yes",
+    "public": "yes",
+    "server": "yes"
+  },
+  "modelPolicy": {
+    "plan": "max",
+    "substitutions": []
+  },
+  "name": "TradeLog",
+  "projectId": "5d1e2c3b-4a59-4687-9a0b-1c2d3e4f5a6b",
+  "schemaVersion": 1,
+  "slug": "tradelog",
+  "specFolder": "spec",
+  "variables": {
+    "APP_NAME": "TradeLog",
+    "BUDGET_TIME": "$0 cash; 10 hours a week for 12 weeks",
+    "MY_ADVANTAGES": "18,000-trader community; institutional trading background; Pine Script and ThinkScript expertise",
+    "PREFERRED_STACK": "Svelte 5 + SvelteKit 3, TypeScript strict, pnpm · Rust + Axum · Postgres",
+    "QUALITY_BAR": "Zero TS errors/warnings; clippy `-D warnings` clean; a test for every domain rule; WCAG 2.2 AA; p95 API < 200 ms; 99.9% uptime SLO",
+    "ROUGH_IDEA": "A journal where traders log trades and finally see if they actually have an edge",
+    "TARGET_USERS": "Active retail and prop traders"
+  }
+}

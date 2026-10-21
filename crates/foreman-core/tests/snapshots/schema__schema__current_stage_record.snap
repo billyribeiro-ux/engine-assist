@@ -1,0 +1,74 @@
+---
+source: crates/foreman-core/tests/schema.rs
+expression: written
+---
+{
+  "branch": {
+    "mode": "current",
+    "ref": "refs/heads/main"
+  },
+  "gate": [
+    {
+      "item": "feature-matrix",
+      "kind": "attest",
+      "outcome": "done",
+      "text": "matrix in spec/council/r1-engineering.md"
+    }
+  ],
+  "git": {
+    "env": [
+      "HOME",
+      "PATH"
+    ],
+    "overrides": [
+      "core.hooksPath=/dev/null"
+    ],
+    "signMode": "noGpgSign"
+  },
+  "packet": {
+    "attachments": null,
+    "path": "docs/handoff/stage-02.md",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "schemaVersion": 1,
+  "signedBy": "Billy Ribeiro",
+  "signedOn": "2026-10-20",
+  "skipped": [
+    "2.1 Competitor teardown: not applicable (commercial = no)"
+  ],
+  "stage": 2,
+  "steps": [
+    {
+      "activeMs": 120000,
+      "chainId": "6f1c2a3b-1d2e-4f50-8a9b-0c1d2e3f4a5b",
+      "intended": {
+        "effort": "xhigh",
+        "mode": "plan",
+        "model": "opus"
+      },
+      "observed": null,
+      "promptSha256s": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "runIds": [
+        "9b2c4d6e-1f3a-4b5c-8d7e-0a1b2c3d4e5f"
+      ],
+      "state": "done",
+      "step": "2.2"
+    },
+    {
+      "activeMs": 0,
+      "chainId": null,
+      "intended": null,
+      "observed": null,
+      "promptSha256s": [],
+      "reason": "commercial = no",
+      "runIds": [],
+      "state": "notApplicable",
+      "step": "2.1"
+    }
+  ],
+  "substitutions": [
+    "2.2: fable@high/plan → opus@xhigh/plan (substitution fable → opus@xhigh)"
+  ]
+}

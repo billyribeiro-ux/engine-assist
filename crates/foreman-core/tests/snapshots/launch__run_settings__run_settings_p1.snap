@@ -1,0 +1,16 @@
+---
+source: crates/foreman-core/tests/launch.rs
+expression: text
+---
+{
+  "disableAllHooks": false,
+  "permissions": {
+    "deny": [
+      "Read(//Users/billy/dev/tradelog/.foreman/**)",
+      "Edit(//Users/billy/dev/tradelog/.foreman/**)",
+      "Read(//Users/billy/Library/Application Support/Foreman/**)",
+      "Edit(//Users/billy/Library/Application Support/Foreman/**)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  }
+}

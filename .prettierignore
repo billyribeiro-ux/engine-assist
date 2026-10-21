@@ -1,0 +1,23 @@
+build/
+.svelte-kit/
+node_modules/
+target/
+src-tauri/target/
+src-tauri/gen/
+coverage/
+pnpm-lock.yaml
+Cargo.lock
+src/lib/ipc/bindings/
+docs/
+spec/
+.claude/
+scripts/lint-plants/fixtures/
+test-results/
+playwright-report/
+*.md
+# Rust test fixtures and goldens are byte-exact (canonical JSON, blueprint text, insta snapshots).
+crates/*/tests/fixtures/
+crates/*/tests/schema/
+crates/*/tests/snapshots/
+# tokens.css is a byte copy of docs/design/tokens.css (checked by the token lint).
+src/lib/styles/tokens.css

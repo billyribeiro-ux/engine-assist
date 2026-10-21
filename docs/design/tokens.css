@@ -261,10 +261,40 @@
   }
 }
 
-/* Increase Contrast: hairlines and control edges step up. */
+/* Increase Contrast (AC-XC-23): hairlines and control edges step up, secondary text becomes
+ * primary text, and every text pair in contrast-check.py reaches 7:1 (AAA). Night values apply
+ * to :root; the two Vellum blocks below must stay identical (contrast-check.py fails on drift). */
 @media (prefers-contrast: more) {
-  :root {
+  :root:root {
     --rule: var(--control-edge);
     --ink-muted: var(--ink);
+    --accent-ink: #A7C5ED;
+    --pass: #7FCC9E;
+    --fail: #ECA7A2;
+    --attention: #F5A96F;
+    --primary-bg-hover: #1E4B88;
+    --primary-disabled-ink: #B9C0C8;
+    --strip-muted: #E6EDF6;
+    --strip-attention: #FFE9D5;
+    --strip-fail: #FFE7E4;
+    --term-muted: #9AA4B0;
+  }
+  :root:root[data-theme="vellum"] {
+    --accent-ink: #1C4984;
+    --pass: #215738;
+    --fail: #8E2923;
+    --attention: #7C3C0B;
+    --primary-disabled-ink: #434B55;
+    --term-muted: #4D5763;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: light) {
+  :root:root:not([data-theme="night"]) {
+    --accent-ink: #1C4984;
+    --pass: #215738;
+    --fail: #8E2923;
+    --attention: #7C3C0B;
+    --primary-disabled-ink: #434B55;
+    --term-muted: #4D5763;
   }
 }

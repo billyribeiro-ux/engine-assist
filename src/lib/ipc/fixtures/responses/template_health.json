@@ -1,0 +1,232 @@
+{
+	"version": "2.2",
+	"grammarVersion": 1,
+	"commit": "a3f9c1",
+	"file": "~/claude-blueprint/claude-build-blueprint.md",
+	"counts": {
+		"stages": 19,
+		"runnableSteps": 31,
+		"items": 27,
+		"errors": 1,
+		"warnings": 2
+	},
+	"stages": [
+		{
+			"stages": "0",
+			"title": "Land Survey",
+			"status": "runnable",
+			"text": "Runnable",
+			"steps": "2"
+		},
+		{
+			"stages": "1",
+			"title": "Meet the Architect",
+			"status": "runnable",
+			"text": "Runnable",
+			"steps": "5 + F.2"
+		},
+		{
+			"stages": "2",
+			"title": "Architect's Design Studio",
+			"status": "runnable",
+			"text": "Runnable",
+			"steps": "8 + F.2"
+		},
+		{
+			"stages": "3",
+			"title": "Permits & Zoning",
+			"status": "runnable",
+			"text": "Runnable",
+			"steps": "2 + F.2"
+		},
+		{
+			"stages": "4",
+			"title": "Construction Drawings",
+			"status": "warning",
+			"text": "Runnable, 1 warning",
+			"steps": "9 + F.2"
+		},
+		{
+			"stages": "5",
+			"title": "Site Prep & Excavation",
+			"status": "partial",
+			"text": "Partly: 5.4 has an error",
+			"steps": "5 + gate"
+		},
+		{
+			"stages": "6–18",
+			"title": "Foundation to Homeowner Maintenance",
+			"status": "needsAnnotation",
+			"text": "Needs annotation",
+			"steps": "—"
+		}
+	],
+	"diagnostics": [
+		{
+			"severity": "error",
+			"rule": "unknown-key",
+			"file": "claude-build-blueprint.md",
+			"line": 1121,
+			"column": 6,
+			"message": [
+				{
+					"kind": "plain",
+					"text": "5.4: unknown key "
+				},
+				{
+					"kind": "code",
+					"text": "agent="
+				},
+				{
+					"kind": "plain",
+					"text": " in "
+				},
+				{
+					"kind": "code",
+					"text": "fm:step"
+				},
+				{
+					"kind": "plain",
+					"text": ". Did you mean "
+				},
+				{
+					"kind": "code",
+					"text": "agents="
+				},
+				{
+					"kind": "plain",
+					"text": "? 5.4 can't run until the blueprint is fixed."
+				}
+			],
+			"stage": 5
+		},
+		{
+			"severity": "warning",
+			"rule": "prose-mismatch",
+			"file": "claude-build-blueprint.md",
+			"line": 1105,
+			"column": 1,
+			"message": [
+				{
+					"kind": "plain",
+					"text": "5.3: RUN WITH says \"same session\"; the annotation says "
+				},
+				{
+					"kind": "code",
+					"text": "session=new"
+				},
+				{
+					"kind": "plain",
+					"text": ". The annotation wins; check which one you meant."
+				}
+			],
+			"stage": 5
+		},
+		{
+			"severity": "warning",
+			"rule": "prose-mismatch",
+			"file": "claude-build-blueprint.md",
+			"line": 946,
+			"column": 1,
+			"message": [
+				{
+					"kind": "plain",
+					"text": "4.5: RUN WITH says effort \"high\"; the annotation says "
+				},
+				{
+					"kind": "code",
+					"text": "opus@xhigh"
+				},
+				{
+					"kind": "plain",
+					"text": ". The annotation wins."
+				}
+			],
+			"stage": 4
+		}
+	],
+	"steps": [
+		{
+			"key": "1.1",
+			"stage": 1,
+			"number": "1.1",
+			"title": "Describe the idea",
+			"annotation": "fm:step id=1.1 surface=chat start=opus@adaptive",
+			"warnings": [],
+			"outs": []
+		},
+		{
+			"key": "2.2",
+			"stage": 2,
+			"number": "2.2",
+			"title": "Convene the council",
+			"annotation": "fm:step id=2.2 surface=cli cwd=spec start=opus@xhigh/plan switch=plan-approved:acceptEdits",
+			"warnings": [],
+			"outs": ["spec/council/r1-research.md", "spec/council/r2-options.md"]
+		},
+		{
+			"key": "4.5",
+			"stage": 4,
+			"number": "4.5",
+			"title": "Threat model",
+			"annotation": "fm:step id=4.5 surface=cli cwd=app start=opus@xhigh/plan",
+			"warnings": [
+				{
+					"severity": "warning",
+					"rule": "prose-mismatch",
+					"file": "claude-build-blueprint.md",
+					"line": 946,
+					"column": 1,
+					"message": [
+						{
+							"kind": "plain",
+							"text": "4.5: RUN WITH says effort \"high\"; the annotation says "
+						},
+						{
+							"kind": "code",
+							"text": "opus@xhigh"
+						},
+						{
+							"kind": "plain",
+							"text": ". The annotation wins."
+						}
+					],
+					"stage": 4
+				}
+			],
+			"outs": ["docs/threat-model.md"]
+		},
+		{
+			"key": "5.3",
+			"stage": 5,
+			"number": "5.3",
+			"title": "Scaffold the workspace",
+			"annotation": "fm:step id=5.3 surface=cli cwd=app start=sonnet@high/acceptEdits",
+			"warnings": [
+				{
+					"severity": "warning",
+					"rule": "prose-mismatch",
+					"file": "claude-build-blueprint.md",
+					"line": 1105,
+					"column": 1,
+					"message": [
+						{
+							"kind": "plain",
+							"text": "5.3: RUN WITH says \"same session\"; the annotation says "
+						},
+						{
+							"kind": "code",
+							"text": "session=new"
+						},
+						{
+							"kind": "plain",
+							"text": ". The annotation wins; check which one you meant."
+						}
+					],
+					"stage": 5
+				}
+			],
+			"outs": []
+		}
+	]
+}

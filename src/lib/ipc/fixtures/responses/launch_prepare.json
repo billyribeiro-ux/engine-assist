@@ -1,0 +1,35 @@
+{
+	"kind": "blocked",
+	"blockers": [
+		{
+			"kind": "notRunnable",
+			"reason": "running",
+			"text": "Waits for 2.3: Claude is still working in this session. Run re-arms it with Accept edits when it's idle."
+		},
+		{
+			"kind": "configChanged",
+			"cwd": "spec",
+			"fingerprint": "abababababababababababababababababababababababababababababababab",
+			"diffs": [
+				{
+					"source": "spec/.claude/agents/principal-engineer.md",
+					"entries": [
+						{
+							"keyPath": "tools",
+							"change": "valueChanged",
+							"before": "\"Read, Grep, Glob\"",
+							"after": "\"Read, Grep, Glob, Bash\""
+						},
+						{
+							"keyPath": "model",
+							"change": "valueChanged",
+							"before": "\"fable\"",
+							"after": "\"opus\""
+						}
+					]
+				}
+			]
+		}
+	],
+	"warnings": []
+}

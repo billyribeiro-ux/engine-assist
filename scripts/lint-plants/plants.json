@@ -1,0 +1,45 @@
+{
+	"eslint": [
+		{
+			"fixture": "at-html.svelte",
+			"target": "src/lib/components/__plant_at_html.svelte",
+			"rules": ["svelte/no-at-html-tags"]
+		},
+		{
+			"fixture": "inner-html.svelte.ts",
+			"target": "src/lib/stores/__plant_inner_html.svelte.ts",
+			"rules": ["no-restricted-properties", "no-restricted-properties", "no-restricted-properties"]
+		},
+		{
+			"fixture": "tauri-import.ts",
+			"target": "src/lib/stores/__plant_tauri_import.ts",
+			"rules": ["no-restricted-imports"]
+		},
+		{
+			"fixture": "page-server.ts",
+			"target": "src/routes/__plant/+page.server.ts",
+			"rules": ["no-restricted-syntax"]
+		},
+		{
+			"fixture": "network.ts",
+			"target": "src/lib/stores/__plant_network.ts",
+			"rules": ["no-restricted-globals"]
+		}
+	],
+	"clippy": [
+		{
+			"fixture": "spawn_plant.rs",
+			"crate": "foreman-app",
+			"target": "src-tauri/src/spawn_plant.rs",
+			"modFile": "src-tauri/src/lib.rs",
+			"mod": "spawn_plant"
+		},
+		{
+			"fixture": "fs_plant.rs",
+			"crate": "foreman-core",
+			"target": "crates/foreman-core/src/rules.rs",
+			"modFile": "crates/foreman-core/src/lib.rs",
+			"mod": "rules"
+		}
+	]
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-blueprint-pick-repo"
+description = "Enables the blueprint_pick_repo command without any pre-configured scope."
+commands.allow = ["blueprint_pick_repo"]
+
+[[permission]]
+identifier = "deny-blueprint-pick-repo"
+description = "Denies the blueprint_pick_repo command without any pre-configured scope."
+commands.deny = ["blueprint_pick_repo"]

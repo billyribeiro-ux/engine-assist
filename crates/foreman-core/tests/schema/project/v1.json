@@ -1,0 +1,48 @@
+{
+  "chatProjectUrl": "https://claude.ai/project/0199eeb7",
+  "chatUrls": {
+    "1.1": "https://claude.ai/chat/abc"
+  },
+  "conditionAudit": [
+    {
+      "at": "2026-10-20T09:00:00Z",
+      "condition": "has_ui",
+      "from": "undecided",
+      "note": "desktop app",
+      "to": "yes"
+    }
+  ],
+  "conditions": {
+    "commercial": "no",
+    "has_database": "undecided",
+    "has_email": "undecided",
+    "has_integrations": "undecided",
+    "has_ui": "yes",
+    "has_uploads": "undecided",
+    "idea_known": "yes",
+    "multi_user": "no",
+    "others_data": "no",
+    "payments": "no",
+    "public": "no",
+    "server": "no"
+  },
+  "modelPolicy": {
+    "plan": "max",
+    "substitutions": [
+      {
+        "effort": "xhigh",
+        "from": "fable",
+        "to": "opus"
+      }
+    ]
+  },
+  "name": "Foreman",
+  "projectId": "3f6a1c2e-8b4d-4e7f-9a1b-2c3d4e5f6a7b",
+  "schemaVersion": 1,
+  "slug": "foreman",
+  "specFolder": "spec",
+  "variables": {
+    "APP_NAME": "Foreman",
+    "BUDGET_TIME": "$0 cash; 10 hours a week"
+  }
+}

@@ -104,3 +104,7 @@ Source checks, 2026-10-19:
 ## Exit path
 
 The allowlist and builders are data plus pure functions; adding a program or variable is a one-line change with a test. Replacing tokio's `Command` touches only `spawn.rs`.
+
+## Amended 2026-10-20 (M1-07)
+
+`foreman-sys::spawn` runs non-PTY children with `std::process::Command` (`env_clear`, `process_group(0)`, null or piped stdin, a polling wait that kills the process group on timeout, reader threads that cap each stream), synchronously; tokio isn't needed until the PTY and launch tickets. The world-writable check treats a sticky world-writable folder (`/tmp`, mode 1777) as acceptable, as the OS prevents other users from replacing files there; any non-sticky world-writable ancestor is refused. `spawn::no_inherited_fds` proves Foreman's own (CLOEXEC) descriptors don't reach the child; a descriptor opened without CLOEXEC by a system framework would still be inherited (the documented residual, fallback unchanged).

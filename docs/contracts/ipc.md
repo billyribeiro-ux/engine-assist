@@ -1,6 +1,6 @@
 # Foreman · IPC contract
 
-**Status:** DRAFT for the Stage 4.7 review · 2026-10-19 · Blueprint stage 4.4
+**Status:** DRAFT for the Stage 4.7 review · 2026-10-19 · Blueprint stage 4.4 · amended 2026-10-20 (M2-01: §2.4 settles the Stage 4 gaps, IPC-R12, §7.1 drift checks)
 **Inputs:** `docs/design-doc.md` §3.5 (the design doc points here for the command list), ADR-004 (typed IPC), ADR-006 (PTY), ADR-008 (chains), ADR-014 (capabilities), ADR-021 (launch), ADR-022 (decisions), `docs/requirements.md`, `docs/scope.md`, `spec/council/r6-feature-specs.md`.
 
 This file is the single list of everything that crosses the webview ↔ Rust boundary: **91 commands**, **3 Channel types** and **9 events**. A command, field, Channel or event that isn't in this file doesn't exist. Adding one is a change to this file, to `ipc::COMMANDS`, to `src/lib/ipc/contract.ts` and to `MockIpcClient`, in one commit (§7).
@@ -20,13 +20,14 @@ Library facts this contract relies on were checked on 2026-10-19 in the publishe
 | IPC-R2 | Rust validates every field before use: string lengths (the max is in the type table, §2), enum membership (serde), ID existence (`NotFound`), repo-relative paths through `pathpolicy::check_read`/`check_write`, URLs through `app::os` parsing. The webview never supplies a program, argv, env value or absolute path (SR-24). Paths Billy picks come from Rust-side dialogs (`blueprint_pick_repo`, `setup_pick_folder`, `settings_pick_tool`, save dialogs). | `ipc::fuzz_<command>` (one proptest per command: arbitrary JSON → typed error, never a panic), `ipc::no_absolute_paths_accepted` |
 | IPC-R3 | Every command returns `Result<T, IpcError>` (§3). A handler panic is caught (`catch_unwind`) and becomes `Internal`, logged with the location only (SR-57). | `ipc::panic_returns_typed_error` |
 | IPC-R4 | **No 64-bit integers in DTOs.** Counts, revisions and durations are `u32` (`number`); times are RFC 3339 strings (`jiff::Timestamp` serialized as a string, `#[ts(type = "string")]`). The default `TS_RS_LARGE_INT = bigint` is kept on purpose, so a stray `u64` shows up as `bigint` in the bindings and fails the test. | `ipc::no_bigint_in_bindings` (greps `src/lib/ipc/bindings/` for `bigint`) |
-| IPC-R5 | Response `Option` fields serialize as `null` (no `skip_serializing_if`), so the generated `T \| null` is exact. Maps are `BTreeMap<String, _>` (sorted, string keys). | `ipc::response_snapshot_<command>` (insta JSON snapshot per command) |
-| IPC-R6 | Commands that mutate state are user invokes only. No event, watcher hint, sensor event or terminal output calls a command handler or its internals (SR-18). | `rearm::only_from_user_action`, `watcher::events_never_act`, `sensor::events_only_update_state` (module-dependency tests) |
-| IPC-R7 | Two-phase actions (`*_preview` → `*_apply`) store the preview under a one-time `PreviewId` (UUID v4) bound to the project revision and the `ReadStamp`s it read, valid 10 minutes. `launch_prepare` stores a one-time `PlanId` valid **60 s** and bound to the project revision and the config fingerprint (ADR-021). A consumed or expired ID returns `Expired`; a changed revision, stamp or fingerprint returns `Stale` with the fresh preview in `detail`. | `ipc::preview_single_use`, `ipc::plan_expires_60s`, `ipc::stale_plan_rejected` |
+| IPC-R5 | Response `Option` fields serialize as `null` (no `skip_serializing_if`), so the generated `T \| null` is exact. Maps are `BTreeMap<String, _>` (sorted, string keys). | `ipc::fixture_responses_roundtrip` (§7.1: every command's response fixture deserializes and re-serializes byte for byte, so an `Option` dropped by `skip_serializing_if` fails it; code review W7: there is no separate `response_snapshot_<command>`) |
+| IPC-R6 | Commands that mutate state are user invokes only. No event, watcher hint, sensor event or terminal output calls a command handler or its internals (SR-18). | `rearm::only_from_user_action`, `watcher::events_never_act` and `watcher::app_events_never_act` (runtime proofs since code review W8: while the watchers handle every kind of change, the repo and app data are unchanged beyond the pending-review state, no run starts and `claude` never runs), `sensor::events_only_update_state` |
+| IPC-R7 | Two-phase actions (`*_preview` → `*_apply`) store the preview under a one-time `PreviewId` (UUID v4) bound to the project revision and the `ReadStamp`s it read, valid 10 minutes. `launch_prepare` stores a one-time `PlanId` valid **60 s** and bound to the project revision and the config fingerprint (ADR-021). A consumed or expired ID returns `Expired`; a changed revision, stamp or fingerprint returns `Stale` with the fresh preview in `detail`. | `ipc::preview_single_use`, `ipc::plan_expires_60s`, `ipc::stale_plan_rejected`, `ipc::stale_fingerprint_rejected` (`src-tauri/tests/launch_plan.rs`) |
 | IPC-R8 | Every command is listed in `ipc::COMMANDS`, passed to `AppManifest::commands` in `build.rs`, registered in `generate_handler!`, and granted to the `main-window` capability only (SR-23). | `capabilities::every_command_declared_and_granted` |
 | IPC-R9 | Mutating commands on a project opened read-only (lock mismatch, invalid or newer-schema decision file, missing blueprint) return `ReadOnly` with the reason, except `pending_change_*`, `blueprint_repin`, `project_remove`, `progress_rebuild_*` and `file_open`/`file_reveal`. | `ipc::read_only_refuses_mutation` |
-| IPC-R10 | A command that writes a file goes through `store::Root::write` (ADR-010). A compare-and-swap failure returns `Conflict` naming the file and, for multi-file applies, the list of files already written (§3.5.3 of the design doc). | `pasteback::conflict_reports_written_targets` |
-| IPC-R11 | **Approvals are native, never IPC fields** (SR-24a). No request struct has a field that means approved, confirmed, consented, acknowledged or "idle confirmed". A command that needs Billy's confirmation raises a native macOS dialog from Rust (`tauri-plugin-dialog`, called only in `app::os`) and acts on its answer; declining returns `Cancelled`. The webview may show context (diffs, reasons, the preview) but its own buttons only *request* the action. Native dialogs: config acknowledgement (SR-06), launch and re-arm confirmations (SR-19, SR-13 idle assertion), Terminate, accepting an outside change (SR-40), writing root `CLAUDE.md` (SR-30), confirming a signature written outside Foreman (SR-47), signing (SR-42), terminal links (SR-29), security-relevant settings (pass-through list, tool paths, allowlisted key hashes, project `env` approval, login PATH), item-kind re-confirmation, project removal, Clear run history and the quit guard. | `ipc::security_confirmations_are_native` (a static check over `src/lib/ipc/bindings/*Req.ts`: no field named `confirm*`, `ack*`, `consent*`, `approved*`, `*Confirmed`; plus one integration test per dialog that a scripted "Cancel" leaves state unchanged), `settings::security_fields_require_native_confirm` |
+| IPC-R10 | A command that writes a file goes through `store::Root::write` (ADR-010). A compare-and-swap failure returns `Conflict` naming the file and, for multi-file applies, the list of files already written (§3.5.3 of the design doc). | `atomic::refuses_newer_file` (paste-back checks every target before writing, so its `written` is empty) and `sign::conflict_reports_written_targets` (signing's phase 1 writes in order: a conflict lists what it already wrote) |
+| IPC-R11 | **Approvals are native, never IPC fields** (SR-24a). No request struct has a field that means approved, confirmed, consented, acknowledged or "idle confirmed". A command that needs Billy's confirmation raises a native macOS dialog from Rust (`tauri-plugin-dialog`, called only in `app::os`) and acts on its answer; declining returns `Cancelled`. The webview may show context (diffs, reasons, the preview) but its own buttons only *request* the action. Native dialogs: config acknowledgement (SR-06), launch and re-arm confirmations (SR-19, SR-13 idle assertion), Terminate, accepting an outside change (SR-40), writing root `CLAUDE.md` (SR-30), confirming a signature written outside Foreman (SR-47), signing (SR-42), terminal links (SR-29), security-relevant settings (pass-through list, tool paths, allowlisted key hashes, project `env` approval, login PATH, the editor), item-kind re-confirmation, project removal, Clear run history, re-pinning the blueprint and the quit guard. A dialog that approves content Foreman writes (root `CLAUDE.md`, an outside change) shows that content: SHA-256 prefix, size and the first lines with escapes visible (security review 2026-10-20, W-2). | `ipc::security_confirmations_are_native` (a static check over `src/lib/ipc/bindings/*Req.ts`: no field named `confirm*`, `ack*`, `consent*`, `approved*`, `*Confirmed`; plus one integration test per dialog that a scripted "Cancel" leaves state unchanged), `settings::security_fields_require_native_confirm` |
+| IPC-R12 | **Commands not built yet** (Stage 5 build-out). Every command in §4 is registered, granted and validated from M2-01 on. A command whose backend ticket hasn't landed returns `Unsupported { feature: "<command>", why: "notYetAvailable:<ticket>" }` after its request passes validation, and nothing changes. The ticket is named in `docs/progress.md`. A command reaches the UI's "not built yet" state only this way, never as `Internal` or an untyped error. | `ipc::rejects_unknown_fields` (a valid fixture never answers `Invalid` or `Internal`) |
 
 Mutation column legend used below: **no** = reads only; **mem** = in-memory state only (plan or preview IDs); **app** = app-data files; **repo** = project repo files; **clip** = writes the clipboard; **spawn** = starts a process; **git** = makes a git commit.
 
@@ -38,7 +39,8 @@ Every type below derives `Serialize`/`Deserialize` as needed, `ts_rs::TS` with `
 
 | Rust | Wire / TS | Validation (Rust) |
 |---|---|---|
-| `ProjectId(Uuid)`, `RunId(Uuid)`, `ChainId(Uuid)`, `PlanId(Uuid)`, `PreviewId(Uuid)`, `ChangeId(Uuid)`, `PickId(Uuid)`, `HitId(Uuid)` | `string` (`#[ts(type = "string")]`) | Lowercase hyphenated UUID; `NotFound` if unknown |
+| `ProjectId(Uuid)`, `RunId(Uuid)`, `ChainId(Uuid)`, `PlanId(Uuid)`, `PreviewId(Uuid)`, `ChangeId(Uuid)`, `PickId(Uuid)` | `string` (`#[ts(type = "string")]`) | Lowercase hyphenated UUID; `NotFound` if unknown |
+| `HitId` (§2.4) | `string` | 64 lowercase hex: the SHA-256 hit ID `fingerprint::auth_key_hits` gives an auth-key hit (stable across scans, never the value); `NotFound` if unknown |
 | `StepKey(String)` | `string` | `^(?:[0-9]{1,2}\.[0-9]{1,2}[a-z]?\|council-setup\|[0-9]{1,2}:(?:gate\.[ABC]\|F\.2)\|x-[0-9]{1,2}-[0-9]{1,3})$` (domain-rules DR-005) |
 | `ItemId(String)` | `string` | `^(?:[a-z][a-z0-9-]{0,47}\|xi-[0-9]{1,2}-[0-9]{1,3})$` |
 | `Stage(u8)` | `number` | `0..=18` |
@@ -123,7 +125,7 @@ struct RedactedDiff { source: String, entries: Vec<RedactedEntry> }      // SR-5
 struct RedactedEntry { key_path: String, change: ChangeKind /* "added"|"removed"|"valueChanged" */, before: Option<String>, after: Option<String> }
 
 struct ReadOnly { reason: ReadOnlyReason, detail: String }
-struct Problem { rule: String, line: Option<u32>, message: String, fix: Option<FixAction> }
+struct Problem { rule: String, line: Option<u32>, message: String, fix: Option<Vec<FixAction>> }   // every fix offered (§2.4)
 enum FixAction { Repair, OpenInEditor, CopyFixRequest }     // Repair: P2
 ```
 
@@ -131,7 +133,7 @@ enum FixAction { Repair, OpenInEditor, CopyFixRequest }     // Repair: P2
 
 ```rust
 enum Blocker {
-  NotRunnable { reason: NotRunnableReason },                    // n/a, undecided, needs-annotation, done (non-repeatable)
+  NotRunnable { reason: NotRunnableReason, text: String },      // §2.4: notApplicable, undecided, needsAnnotation, done, needsNewerForeman, waiting, running, notCli, chainNotStarted
   ReadOnly(ReadOnly),
   ClaudeMissing { path: Option<String>, why: ToolPathProblem }, // relative, missing, not executable, in project, symlink
   VersionBelowFloor { found: String, required: String, requirements: Vec<Requirement> },
@@ -157,6 +159,175 @@ enum ConfirmReason { OverlayStep, ModeOrModelChanged { from: Start, to: Start },
 
 `Blocker` and `ConfirmReason` use `#[serde(tag = "kind", rename_all = "camelCase")]`, so TS gets discriminated unions (`{ kind: "versionBelowFloor"; found: string; … }`).
 
+### 2.4 Types settled in Stage 5 (the UI's 67 `GAP:` notes)
+
+Stage 4 left types that §2–§4 name but never define, and fields the screens need that no response had. They are settled here, for ticket M2-01, consistent with the domain rules. The Rust definitions are in `src-tauri/src/ipc/` (`types.rs`, `dto/*.rs`); the TypeScript below is what ts-rs generates from them into `src/lib/ipc/bindings/` (ADR-004), copied here for review. `src/lib/ipc/types.ts` only re-exports the bindings, so the webview can't use a shape Rust doesn't produce.
+
+**Rules for these fields.**
+- Every text field below is Foreman-written (SR-56) or repo/terminal text already passed through visible escapes (SR-26): plain strings get `‹U+XXXX›` for bidi, zero-width, tag and control characters; `TextSpan[]` gets `escape` spans.
+- `StepSummary.stateText`, `whyNotRunnable` and `conditionNote` come from the derived state (DR-050, DR-065): `Not applicable` with the reason, `Undecided` with `<condition> = undecided`, `Waiting until <date>`, `Skipped: <reason>`.
+- `StepSummary.next` is true when another step of the same chain is running (Run re-arms it, DR-068).
+- `StageView.status` (the sheet strip, `docs/design/components.md`): `signed` (Foreman's signing or a confirmed outside signature, DR-135); `notApplicable`, `needsAnnotation` and `undecided` from the applicable path (DR-054; `undecided` when no step of the stage is on the path and one waits on a condition); `locked` "until Stage N is signed" while the previous applicable stage isn't signed; `waiting` when a wait step is waiting; `inspecting` when every non-gate step on the path is done; `inProgress` when any is copied, running or done; else `ready`.
+- `ProjectSummary.currentStage` is the lowest applicable stage that isn't signed. Before a project is opened in this run, `app_bootstrap` (which reads only `settings.json`, `projects.json` and each `progress.json`, NFR-01) estimates it from `progress.json` as the stage after the highest signed one.
+- `SpecLine`: `model`/`effort`/`mode` are display names with `origin` and `from` set only when the effective value differs from the template's (DR-104); `note` is the `SUBSTITUTIONS:` line; `where` is `project root`, `spec/` or `claude.ai chat, in Project`.
+- `PendingChange.file` uses the `progress.json` wire form (`project`, `overlay`, `blueprintLock`; files.md §4.3).
+- `Problem.fix` lists every fix offered, in order (a packet problem offers `openInEditor` and `copyFixRequest`).
+- `Blocker::NotRunnable` carries `text`, Foreman's sentence for the row. `NotRunnableReason` gains `waiting`, `running`, `notCli` (a `launch_prepare` on a step that isn't CLI) and `chainNotStarted` (a continuing step whose chain hasn't started).
+- `SettingsView.screenReaderMode` is the Settings toggle `settings_update` patches. `settings.json` v1 has no field for it, so it is kept in memory until `settings.json` v2 adds `screenReaderMode` (files.md §4.1, proposal); `runHistory` counts `runs/` once run records exist (M2-10).
+- `HitId` is the hit's SHA-256 ID from `fingerprint::AuthKeyHit` (not a UUID), so the same hit keeps its ID across scans; Rust maps it back to file, key and value hash.
+- `Requirement { feature, min, source }`: the feature that needs the newer Claude Code, its minimum version and where the requirement comes from (`step 2.3`, `Foreman`), as `foreman-core::launch` reports it.
+- `ToolPathProblem` gains `worldWritable` (the configured `claude` or a directory above it is writable by others, SR-03); `AuthProblem.exit.code` is `number | null` (killed by a signal).
+- `LaunchProgress`: `Version.found` and `Exited.code` are `string | null` and `number | null`; `Contract.outcome` is `ContractOutcome` (`pass`, `flagFailure`, `inconclusive`, `skipped`), the probe result without its output.
+- (CR-003) A pin refused for annotation errors is `code: notAllowed` with `detail: { kind: "annotationErrors", errors }` instead of the `notAllowed` detail, so the rule name `p1-annotation-errors` isn't on the wire; the UI branches on `detail.kind` and lists each error (stage, step ID, line, rule, message). `setup_preview` runs the same check before anything is written (`foreman_core::lock::p1_annotation_errors`, the check `lock::pin` runs), and `setup_apply` pins the same blob (its oid is compared).
+- A decision-file write that meets an outside change still pending review returns `Conflict` with the file's path (the pending change is reviewed first; DR-148).
+- (M3-25) `StageView.closeoutChecklist` is the P1 close-out checklist step (AC-F015-01): the stage type's close-out sequence (MASTER-SPEC §8, `foreman_core::steps::closeout`) while the stage's packet exists with no problems and the stage isn't signed; empty otherwise. P2 replaces it with `GateView.closeout`.
+- `AppBootstrap.interrupted` lists runs whose `run.json` says `running` at startup (SR-57: listed, never relaunched); `capabilities` gates Desktop (`--desktop` ≥ 2.1.285), the P2 sensor and the verified probes.
+
+**Nested request objects.** A tagged object inside a request (`EditorSetting`, `LinkSource`, `AttestOutcome`, `SignBranch`) is an enum whose variants hold a struct with `deny_unknown_fields`, so an extra field inside it is `Invalid` too (IPC-R1). The wire form is unchanged (`{ kind: "set", bundleId }`); ts-rs writes it as `{ "kind": "set" } & EditorSet`.
+
+New types:
+
+```ts
+export type HitId = string;
+export type ContractOutcome = "pass" | "flagFailure" | "inconclusive" | "skipped";
+export type RunSummary = { runId: RunId, chain: ChainId, project: ProjectId, projectName: string, step: StepKey | null, stepTitle: string, tabName: string, ranWith: string, substituted: string | null, status: RunStatus, exitCode: number | null, error: string | null, startedAt: Timestamp, timeToStartMs: number | null, argv: Array<string>, resumable: boolean, whyNotResumable: string | null, };
+export type Capabilities = { claudeVersion: string | null, desktop: boolean, sensor: boolean, probesVerified: boolean, };
+export type ToolPathView = { path: string | null, version: string | null, autoDetected: boolean, problem: string | null, };
+export type ToolPaths = { claude: ToolPathView, git: ToolPathView, };
+export type TemplateHealthSummary = { runnable: string, needsAnnotation: string, errors: number, warnings: number, };
+export type VariableSpec = { name: string, label: string, placeholder: string, multiline: boolean, fromSettings: boolean, };
+export type ConditionSpec = { id: ConditionId, label: string, effect: string, late: boolean, };
+export type LoginPathView = { capturedAt: Timestamp, entries: Array<string>, };
+export type AllowlistEntry = { sha256: Sha256, file: string, key: string, addedAt: Timestamp, };
+export type RunHistorySize = { runs: number, megabytes: number, };
+export type InboxKind = "sessionBlocked" | "sessionYourTurn" | "packetLanded" | "packetInvalid" | "gateFailed" | "gateSignable" | "outsideChange" | "tamper" | "chatAwaitingPaste" | "waitElapsed" | "interruptedSession" | "stepReady";
+export type SpecSurface = "chat" | "cli" | "desktop" | "action";
+export type SpecLine = { surface: SpecSurface, where: string, model: Explained<string> | null, effort: Explained<string> | null, mode: Explained<string> | null, agents: Array<string>, droppedAgents: Array<string>, note: string | null, };
+export type SheetStatus = "locked" | "ready" | "inProgress" | "inspecting" | "waiting" | "signed" | "notApplicable" | "needsAnnotation" | "undecided";
+export type SignedInfo = { date: string, commit: string, branch: string, merged: boolean, };
+export type PacketSummary = { path: RepoPath, exists: boolean, problems: number, signed: boolean, };
+export type Applicability = { "kind": "applies" } | { "kind": "notApplicable", reason: string, } | { "kind": "undecided", condition: ConditionId, } | { "kind": "needsAnnotation" };
+export type ConditionView = { value: TriState, locked: boolean, lockRule: string | null, label: string, effect: string, late: boolean, };
+export type BlueprintPin = { version: string, commit: string, };
+export type ConfigChangedNotice = { cwd: CwdKind, fingerprint: Sha256, blocking: boolean, title: string, detail: string, diffs: Array<RedactedDiff>, };
+export type SchemaState = "current" | "older" | "newer";
+export type PlannedAction = "create" | "leaveAlone" | "refuse";
+export type PinPreview = { version: string, commit: string, clean: boolean, };
+export type PathRowStatus = "applies" | "notApplicable" | "undecided" | "needsAnnotation";
+export type ApplicablePathRow = { stages: string, title: string, status: PathRowStatus, why: string, };
+export type StripCell = { stage: Stage, status: SheetStatus, why: string | null, };
+export type ApplicablePathSummary = { applies: number, total: number, summary: string, rows: Array<ApplicablePathRow>, strip: Array<StripCell>, };
+export type CheckGroup = "claude" | "toolchain";
+export type CheckAction = "captureLoginPath" | "openProbeFolder";
+export type DoctorCheck = { id: string, group: CheckGroup, name: string, level: DoctorLevel, summary: string | null, detail: Array<TextSpan>, found: string | null, foundMono: boolean, action: CheckAction | null, };
+export type CapabilityRow = { feature: string, code: boolean, minimum: string, found: boolean, blocks: string | null, };
+export type ProbeResult = "pass" | "fail" | "inconclusive";
+export type ProbeOutcome = { probe: Array<TextSpan>, result: ProbeResult, text: string, detail: string | null, };
+export type PathEntryCheck = { entry: string, ok: boolean, why: string | null, };
+export type Counts = { stages: number, runnableSteps: number, items: number, errors: number, warnings: number, };
+export type StageHealthStatus = "runnable" | "warning" | "partial" | "needsAnnotation";
+export type StageHealth = { stages: string, title: string, status: StageHealthStatus, text: string, steps: string, };
+export type Severity = "error" | "warning";
+export type RunInputView = { name: string, label: string, token: string, multiline: boolean, remember: boolean, required: boolean, value: string, warning: string | null, };
+export type SwitchCue = { text: string, };
+export type ChatChip = { id: string, label: string, strong: boolean, };
+export type ChatChips = { chips: Array<ChatChip>, link: string | null, linkLabel: string | null, };
+export type OutView = { path: RepoPath, exists: boolean, };
+export type StepPart = { partId: string, label: string, included: boolean, locked: boolean, };
+export type MissingLink = "project" | "conversation";
+export type PacketFields = { fromStage: Stage, toStage: Stage | null, };
+export type ChangeEffect = "changesPath" | "noEffect" | "reloaded";
+export type ConsequenceGlyph = "lock" | "info" | "check";
+export type Consequence = { glyph: ConsequenceGlyph, text: string, };
+export type ChangeContext = { changed: string, git: string, approved: string, };
+export type PacketHeader = { line: string, fromStage: Stage, toStage: Stage | null, };
+export type PacketFieldView = { key: string, label: string, value: Array<DocNode>, missing: boolean, problems: Array<Problem>, note: Array<TextSpan> | null, };
+export type NormalizationNote = { field: string, message: string, };
+export type Signature = { name: string, date: IsoDate, byForeman: boolean, confirmed: boolean, };
+export type RawLine = { line: number, spans: Array<TextSpan>, bad: boolean, };
+export type BaselineComparison = { baselineMedianMs: number, foremanMedianMs: number, };
+export type GateState = "notStarted" | "inProgress" | "failed" | "passed" | "signed";
+export type ArtifactKind = "path" | "command";
+export type GateArtifact = { kind: ArtifactKind, text: string, };
+export type ItemKind = "attest" | "time";
+export type ItemStatus = "pass" | "fail" | "waiting" | "notApplicable";
+export type Proposed = "pass" | "fail";
+export type GateItemView = { id: ItemId, text: string, kind: ItemKind, how: string | null, status: ItemStatus, evidence: Array<TextSpan> | null, proposed: Proposed | null, note: string | null, waitsFor: string | null, artifacts: Array<GateArtifact>, failures: number, needsReconfirm: boolean, session: string | null, textSha256: Sha256, previousText: string | null, };
+export type CloseoutKey = "gateA" | "results" | "gateB" | "gateC" | "sign";
+export type CloseoutState = "done" | "now" | "failed" | "pending" | "locked";
+export type CloseoutStep = { key: CloseoutKey, label: string, state: CloseoutState, note: string | null, };
+export type LessonRef = { id: string, title: string, };
+export type ManifestRow = { path: RepoPath, exists: boolean, inProject: boolean, producer: StepKey | null, };
+export type AssemblerState = "exists" | "missing" | "empty" | "refused";
+export type LateConditionView = { condition: ConditionId, value: TriState, proposed: TriState | null, evidence: string | null, decided: string | null, };
+export type ImportResult = "pass" | "fail" | "unmatched";
+export type Tag = "core" | "conditional" | "optional" | "added";
+export type StepKind = "prompt" | "followup" | "action" | "manual" | "wait" | "repeatable" | "gate" | "lessons";
+export type NotRunnableReason = "notApplicable" | "undecided" | "needsAnnotation" | "done" | "needsNewerForeman" | "waiting" | "running" | "notCli" | "chainNotStarted";
+export type ToolPathProblem = "relative" | "missing" | "notExecutable" | "inProject" | "symlinkIntoProject" | "worldWritable";
+export type AuthProblem = { "kind": "wrongMethod", method: string, } | { "kind": "unknownMethod" } | { "kind": "unparsable" } | { "kind": "exit", code: number | null, } | { "kind": "timeout" };
+export type Requirement = { feature: string, min: string, source: string, };
+export type DecisionFileKind = "project" | "overlay" | "blueprintLock";
+export type FixAction = "repair" | "openInEditor" | "copyFixRequest";
+export type Problem = { rule: string, line: number | null, message: string, fix: Array<FixAction> | null, };
+export type Blocker = { "kind": "notRunnable", reason: NotRunnableReason, text: string, } | { "kind": "readOnly" } & ReadOnly | { "kind": "claudeMissing", path: string | null, why: ToolPathProblem, } | { "kind": "versionBelowFloor", found: string, required: string, requirements: Array<Requirement>, } | { "kind": "contractFailed", feature: string, version: string, } | { "kind": "configChanged", cwd: CwdKind, fingerprint: Sha256, diffs: Array<RedactedDiff>, } | { "kind": "authKeyBlocked", file: string, key: string, hit: HitId, allowlistable: boolean, } | { "kind": "configTooLarge", file: string, bytes: number, } | { "kind": "projectEnvUnapproved", file: string, sha256: Sha256, } | { "kind": "authFailed", why: AuthProblem, } | { "kind": "transcriptMissing", chain: ChainId, } | { "kind": "signedPacketMissing", stage: Stage, } | { "kind": "packetUnsigned", stage: Stage, } | { "kind": "runInputMissing", name: string, } | { "kind": "unresolvedToken", token: string, } | { "kind": "promptOptionLike", first: string, } | { "kind": "promptControlChar", offset: number, codepoint: number, } | { "kind": "runSettingsPathUnsafe", path: string, } | { "kind": "cwdNotDirectory", cwd: CwdKind, };
+```
+
+Types from §2–§4 with the fields this section adds:
+
+```ts
+export type AppBootstrap = { firstRun: boolean, settingsRev: Rev, projects: Array<ProjectSummary>, interrupted: Array<RunSummary>, doctor: DoctorLevel, capabilities: Capabilities, };
+export type BlueprintRepoInfo = { displayPath: string, commit: string, version: string, grammarVersion: number, dirty: boolean, health: TemplateHealthSummary, variables: Array<VariableSpec>, conditions: Array<ConditionSpec>, };
+export type SettingsView = { rev: Rev, driName: string | null, tools: ToolPaths, editorBundleId: BundleId | null, blueprintRepo: BlueprintRepoInfo | null, theme: Theme, terminal: TerminalPrefs, envPassthrough: Array<EnvName>, loginPath: LoginPathView | null, globalVariables: Record<string, string>, authKeyAllowlist: Array<AllowlistEntry>, screenReaderMode: boolean, runHistory: RunHistorySize, };
+export type InboxItem = { kind: InboxKind, project: ProjectId, step: StepKey | null, stage: Stage | null, at: Timestamp, projectName: string, title: string, detail: string, chain: ChainId | null, run: RunId | null, };
+export type StepSummary = { key: StepKey, number: string, title: string, state: StepState, tag: Tag, surface: Surface | null, specLine: SpecLine | null, whyNotRunnable: string | null, stateText: string, conditionNote: string | null, kind: StepKind, run: RunId | null, next: boolean, };
+export type StageView = { stage: Stage, title: string, applicable: Applicability, signed: SignedInfo | null, steps: Array<StepSummary>, packet: PacketSummary | null, subtitle: string, status: SheetStatus, statusWhy: string | null, closeoutChecklist: Array<string>, };
+export type ProjectView = { summary: ProjectSummary, conditions: { [key in ConditionId]?: ConditionView }, stages: Array<StageView>, pendingChanges: number, readOnly: ReadOnly | null, branch: string, blueprint: BlueprintPin, dri: string | null, chatProjectUrl: string | null, configChanged: ConfigChangedNotice | null, };
+export type NextStepRow = { project: ProjectSummary, next: StepSummary | null, whyNone: string | null, strip: Array<SheetStatus>, stageTitle: string | null, };
+export type DoctorReport = { level: DoctorLevel, checks: Array<DoctorCheck>, capabilities: Array<CapabilityRow>, probes: Array<ProbeOutcome>, probeNote: string | null, ranAt: Timestamp, };
+export type Diagnostic = { severity: Severity, rule: string, file: string, line: number, column: number, message: Array<TextSpan>, stage: Stage, };
+export type TemplateHealth = { version: string, grammarVersion: number, counts: Counts, stages: Array<StageHealth>, diagnostics: Array<Diagnostic>, commit: string, file: string, steps: Array<StepHealth>, };
+export type StepHealth = { key: StepKey, stage: Stage, number: string, title: string, annotation: string, warnings: Array<Diagnostic>, outs: Array<string>, };
+export type StepView = { summary: StepSummary, prompt: Array<PromptSegment>, inputs: Array<RunInputView>, start: Explained<Start> | null, switches: Array<SwitchCue>, chips: ChatChips | null, argvPreview: Array<string> | null, envNames: Array<EnvName>, blockers: Array<Blocker>, warnings: Array<string>, remaps: Array<string>, outs: Array<OutView>, override: RunOverride | null, parts: Array<StepPart>, copiedAt: Timestamp | null, live: LiveMode | null, };
+export type LiveMode = { mode: string, expected: string | null, };
+export type PendingChange = { id: ChangeId, file: DecisionFileKind, detectedAt: Timestamp, seenSha256: Sha256, diff: RedactedDiff, effect: ChangeEffect, consequences: Array<Consequence>, context: ChangeContext, };
+export type PacketView = { path: RepoPath, exists: boolean, sha256: Sha256 | null, header: PacketHeader | null, fields: Array<PacketFieldView>, problems: Array<Problem>, normalization: Array<NormalizationNote>, signed: Signature | null, tamper: Diff | null, raw: Array<RawLine>, writtenBy: string | null, summary: string, };
+export type MetricsView = { perSurface: Array<SurfaceMetrics>, manualEditsByStage: Array<StageEdits>, stagesThroughForeman: number, baseline: BaselineComparison | null, runsCounted: number, p95AllMs: number, };
+export type RunsPage = { runs: Array<RunSummary>, next: string | null, total: number, };
+export type GateView = { stage: Stage, state: GateState, items: Array<GateItemView>, closeout: Array<CloseoutStep>, signable: boolean, whyNot: Array<string>, importedFrom: string | null, };
+export type SignPreview = { previewId: PreviewId, packetSha256: Sha256, short: string, addedFields: Diff, paths: Array<RepoPath>, confirmConditions: Array<ConditionId> | null, chainBusy: boolean, blockers: Array<string>, branch: string, commitMessage: string, pathNotes: Record<string, string>, };
+export type AssemblerRow = { path: string, state: AssemblerState, rule: string | null, note: string | null, };
+```
+
+Nested request payloads:
+
+```ts
+export type EditorSetting = { "kind": "set" } & EditorSet | { "kind": "clear" } & Empty;
+export type EditorSet = { bundleId: BundleId, };
+export type LinkSource = { "kind": "clipboard" } & Empty | { "kind": "text" } & LinkText;
+export type LinkText = { url: ClaudeUrl, };
+export type AttestOutcome = { "kind": "done" } & AttestDone | { "kind": "notApplicable" } & AttestNotApplicable | { "kind": "clear" } & Empty;
+export type AttestDone = { note: Note, link: string | null, };
+export type AttestNotApplicable = { reason: Note, };
+export type SignBranch = { "kind": "current" } & Empty | { "kind": "other" } & SignOther;
+export type SignOther = { branch: ShortText, };
+export type Empty = Record<symbol, never>;
+```
+
+Event payloads (§6), generated from Rust so the webview and the emitter agree:
+
+```ts
+export type ProjectChanged = { projectId: ProjectId, rev: Rev, };
+export type ProjectsChanged = { rev: Rev, };
+export type PacketChanged = { projectId: ProjectId, stage: Stage, rev: Rev, };
+export type DecisionPending = { projectId: ProjectId, count: number, };
+export type TamperDetected = { projectId: ProjectId, stage: Stage, rev: Rev, };
+export type RunStatusChanged = { runId: RunId, status: RunStatus, rev: Rev, };
+export type ConfigChanged = { projectId: ProjectId, cwd: CwdKind, };
+export type DoctorStatus = { level: DoctorLevel, };
+export type SettingsChanged = { rev: Rev, };
+```
+
 ## 3. Errors
 
 ```rust
@@ -172,6 +343,7 @@ enum IpcErrorDetail {
   Stale { what: StaleWhat /* "projectRev"|"readStamp"|"fingerprint"|"plan" */, fresh: Option<serde_json::Value> },
   ReadOnly(ReadOnly),
   NotAllowed { rule: String },                    // e.g. "core-step-skip", "condition-locked-after-stage-2", "pty-not-live"
+  AnnotationErrors { errors: Vec<AnnotationProblem> },   // (CR-003) code NotAllowed, rule "p1-annotation-errors": a pin refused for errors in Stages 1–2 or F.2
   Conflict { path: RepoPath, written: Vec<RepoPath> },
   PolicyViolation { path: String, rule: String },  // the path is shown with visible escapes
   ToolMissing { tool: ToolKind, path: Option<String> },
@@ -180,6 +352,8 @@ enum IpcErrorDetail {
   Unsupported { feature: String, why: String },
 }
 ```
+
+(CR-003) `AnnotationProblem { stage: Option<Stage>, step: Option<String>, diagnostic: Diagnostic }` (`Diagnostic` as in `template_health`); `step` is the annotation ID (`2.3`, `F.2`). The list is in line order and holds every error that stops the pin; `message` already reads "Stage 2 step 2.3 has an annotation error on line 214: … Fix the blueprint, then pin again." for one error and lists each for several.
 
 `message` is Foreman-written text for display; the UI branches only on `code` and `detail.kind` (ADR-004 §5). `ToolFailed.stderr_tail` passes through the SR-54 redaction layer. In TS, `fresh` is `unknown` and is narrowed by the calling method's own type.
 
@@ -194,7 +368,7 @@ Each entry: request struct (Rust) and its generated TS shape, response, error co
 Rust  AppBootstrapReq {}
 TS    Record<symbol, never>
 Res   AppBootstrap { first_run: bool, settings_rev: Rev, projects: Vec<ProjectSummary>, interrupted: Vec<RunSummary>,
-                     doctor: DoctorLevel, capabilities: Capabilities }
+                     doctor: DoctorLevel, capabilities: Capabilities }       // RunSummary, Capabilities: §2.4
 Err   Io
 ```
 F-017, F-019, F-020 · AC-F019-01, AC-F020-10, AC-F017-03 · SR-57 (interrupted runs never relaunched). Reads only `settings.json`, `projects.json` and each `progress.json` (NFR-01).
@@ -230,9 +404,9 @@ TS    { expectRev: number; patch: { driName: string | null;
         resetTool: "claude" | "git" | null; clearLoginPath: boolean | null; removeAllowlistEntry: string | null;
         screenReaderMode: boolean | null; osDisplay: { reduceTransparency: boolean; increaseContrast: boolean } | null } }
 Res   SettingsView
-Err   Stale · Cancelled · Conflict · Io
+Err   Stale · Cancelled · NotAllowed ("editor-refused") · Conflict · Io
 ```
-F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". A patch that sets `env_passthrough`, `reset_tool` or `remove_allowlist_entry` is applied only after a native confirmation listing the change (SR-24a); declining returns `Cancelled` and nothing in the patch is saved. `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32. `screen_reader_mode` is the Settings "Screen reader mode" toggle (stored, default off): when on, CLI launches add `--ax-screen-reader` and xterm gets `screenReaderMode: true` (AC-XC-22). `os_display` is what the webview's `prefers-reduced-transparency: reduce` and `prefers-contrast: more` media queries currently report; it isn't stored, and Rust turns the window's vibrancy off when either is true (ADR-014, AC-XC-23).
+F-029 · AC-F029-02, -03, -04, -05, -07 · SR-05 (`env_passthrough` can't re-add an always-removed name: it is stored, and `build_env` still removes it, AC-F029-05). In every patch, `null` means "unchanged". A patch that sets `env_passthrough`, `reset_tool` or `remove_allowlist_entry`, **sets a different `editor`, or sets `clear_login_path` while a login PATH is captured** is applied only after a native confirmation listing the change (SR-24a, T-004; the editor and login PATH since the security review of 2026-10-20, W-1 and N-8); declining returns `Cancelled` and nothing in the patch is saved. A patch whose only security change is the editor asks "Use <app> to open files?" (OK label "Use <app>") with "Open files from Open in editor with <app> (<bundle id>)."; the app name comes from a fixed table of common editors (`foreman-app::editor::KNOWN`), and an ID outside it is shown as the ID with "Foreman doesn't know this app ID. Make sure it is a text editor: Open in editor hands it project files." Clearing the editor asks nothing. Clearing the login PATH lists "Forget the login PATH captured <time> (<n> folders). Launches then use Foreman's fixed PATH only." An `editor` naming an app that runs what it opens (Terminal, iTerm2, Script Editor and AppleScript applets, Automator, Shortcuts, Python Launcher, kitty, Alacritty, WezTerm, Warp, Ghostty, Hyper; compared without case; `foreman-app::editor::REFUSED`) is `NotAllowed("editor-refused")` before any dialog, and nothing in the patch is saved. `global_variables` changes need no dialog (no spec lists them as security-relevant). `scrollback` is 1,000–100,000 (default 10,000, or the S-0 branch value); `font_size` 9–32. `screen_reader_mode` is the Settings "Screen reader mode" toggle (stored, default off): when on, CLI launches add `--ax-screen-reader` and xterm gets `screenReaderMode: true` (AC-XC-22). `os_display` is what the webview's `prefers-reduced-transparency: reduce` and `prefers-contrast: more` media queries currently report; it isn't stored, and Rust turns the window's vibrancy off when either is true (ADR-014, AC-XC-23). As built (M5-04): `osDisplay` is sent by the webview at start and on every change of `prefers-reduced-transparency` or `prefers-contrast: more` (`src/lib/os-display.ts`); it is not stored. Rust passes `reduceTransparency || increaseContrast` to `Os::set_window_reduced_effects`, which records it (`window::reduced_effects`) and clears the main window's effects. As built (M4-34): the confirmation lists the pass-through names that will be passed and, separately, the always-removed names in the list ("Foreman always removes ANTHROPIC_API_KEY; listing it changes nothing."); the stored list keeps them (sorted, deduplicated) and `build_env` still removes them.
 
 **`settings_pick_tool`** · P1 · M2 · **app**
 ```text
@@ -253,6 +427,7 @@ Res   TodayView { rows: Vec<NextStepRow>, inbox: Vec<InboxItem> }        // inbo
 Err   Io
 ```
 F-017 · AC-F017-01, -03, -04, -05, -07, -08 · SR-56 (inbox notifications are Rust-side templates).
+As built (M4-25): `inbox` is sorted by AC-F017-07's rank (`foreman_app::inbox::rank`; items of one rank keep the project order) and each item also carries `projectName`, `title`, `detail`, `chain` and `run` (Foreman-written text only, SR-56). Sources: live runs announced `blocked`/`idle` through `runs::emit_status` (session-blocked, session-your-turn), `closeout::gather` + `gates::view` (packet landed/invalid, gate failed/signable), pending outside changes, the tamper check, a chat step `copied` more than 10 minutes ago (`chat-awaiting-paste`), wait steps whose day has come (`wait-elapsed`) and interrupted runs. `step-ready` is never emitted: the Next step rows already show every project's next step. Time-derived items are not events, so the webview refetches once a minute (`bus.TODAY_TICK_MS`). When Foreman isn't focused, a new `session-blocked`/`packet-landed` item shows a macOS notification from a template in `src-tauri/src/notify.rs` (once per item per app run); the Dock badge counts the first four kinds. A notification click only activates Foreman (no action handler is registered). The webview and `tauri-plugin-notification` get no permission: both calls are made from Rust.
 
 **`do_next`** · P1 · M2 · **mem** (one-time plan)
 ```text
@@ -287,7 +462,7 @@ Res   TemplateHealth { version: String, grammar_version: u32, counts: Counts, st
       Diagnostic { severity: "error" | "warning", rule: String, file: String, line: u32, column: u32, message: String }
 Err   NotFound · ReadOnly · Io
 ```
-F-001, F-003 · AC-F001-06, -15, AC-F003-05, -06, AC-F019-02 · SR-27.
+F-001, F-003 · AC-F001-06, -15, AC-F003-05, -06, AC-F019-02 · SR-27. As built (M4-06): `steps` lists every runnable template step in order with its `fm:step` annotation rendered on one line (`fm:step id=2.2 surface=cli …`, canonical key order), its lint warnings (the stage's warnings at the annotation's line or naming the step's ID first) and its declared `out=` paths (AC-F003-05).
 
 **`doctor_run`** · P1 (version, auth, git) + P2 (full) · M2/M4 · **spawn** (`claude -v`, `claude auth status` in `<app-data>/probe/` after its fingerprint passes, `git --version`, P2 toolchain `--version`)
 ```text
@@ -296,7 +471,7 @@ TS    { scope: "p1" | "full" }
 Res   DoctorReport { level: DoctorLevel, checks: Vec<DoctorCheck>, capabilities: Vec<CapabilityRow> }
 Err   (none; failures are rows)
 ```
-F-019 · AC-F019-04…07, -09…-11, -14 · SR-01, SR-08, SR-17. Emits `doctor:status`.
+F-019 · AC-F019-04…07, -09…-11, -14 · SR-01, SR-08, SR-17. Emits `doctor:status`. As built (M4-13): row IDs `path`, `version`, `auth` (P1 and full), `sensor`, `probeFolder` (action `openProbeFolder`), `cleanup` (effective `cleanupPeriodDays`, managed over user, default 30, recommendation 90, never written), `hooks` (`disableAllHooks` in user or managed settings), `allow` (`Bash`, `Bash(*)`, `Bash(pnpm exec *)`, `Bash(npx *)`, `Bash(pnpm dlx *)`, `Bash(bunx *)` and interpreter rules), `appendixA` (blueprint v2.2 Appendix A: `~/.claude/settings.json`, `CLAUDE.md`, the 8 global agents) in group `claude`; `git` (P1 and full), `node`, `pnpm`, `cargo` (fixed candidates, `--version`, cwd app data), `launchPath` (the PATH a launch gets), `loginPath` (action `captureLoginPath`) in group `toolchain`. `capabilities[].blocks` names the registered projects' steps that need the missing feature. `probes` and `probeNote` come from `settings.json` `contract` (full scope only).
 
 **`doctor_capture_login_path`** · P2 (M2 if S-12 fails) · M4 · **spawn** (the single consented shell), **mem**
 ```text
@@ -305,7 +480,7 @@ TS    Record<symbol, never>
 Res   LoginPathPreview { preview_id: PreviewId, shell: String, entries: Vec<PathEntryCheck> }
 Err   NotAllowed ($SHELL not in /etc/shells) · Cancelled · ToolFailed
 ```
-F-019 · AC-F019-12, -13 · SR-02.
+F-019 · AC-F019-12, -13 · SR-02. As built (M4-14): `$SHELL` from Foreman's own environment must be an absolute path listed in `/etc/shells` (`NotAllowed("shell-not-listed")`, before any dialog); the native consent dialog names the exact command; `foreman_sys::spawn` runs `SpawnRequest::LoginShellPath` with the fixed argv `-l -c 'printf %s "$PATH"'`, cwd app data, a 10 s timeout, 64 KB output cap and an environment of `HOME`, `USER`, `LOGNAME`, `TMPDIR`, `LANG`, `LC_*`, `SHELL` and `PATH=/usr/bin:/bin:/usr/sbin:/sbin`. The output is split on `:` (≤ 200 entries) and checked as SR-05 PATH entries; each entry comes back with `ok` and `why`. Timeout or a non-zero exit is `ToolFailed`.
 
 **`doctor_login_path_apply`** · P2 · M4 · **app**
 ```text
@@ -314,7 +489,7 @@ TS    { previewId: string }
 Res   SettingsView
 Err   Expired · Cancelled (native dialog listing the entries) · Conflict
 ```
-F-019 · AC-F019-12 · SR-02, SR-05, SR-24a (entries sanitized again when PATH is built).
+F-019 · AC-F019-12 · SR-02, SR-05, SR-24a (entries sanitized again when PATH is built). As built: the dialog lists the kept entries and the number dropped; OK stores `loginPath { entries, shell, capturedAt }` by CAS.
 
 **`probe_folder_open`** · P2 · M4 · **spawn** (interactive `claude` in a PTY tab, cwd `<app-data>/probe/`, no prompt)
 ```text
@@ -323,7 +498,7 @@ TS    Record<symbol, never>
 Res   RunStarted
 Err   ToolMissing · Io
 ```
-`output: Channel<tauri::ipc::Response>` · F-019 · AC-F019-08 · SR-17. P2, M4 (moved from M3 in the Stage 4.7 fix pass, with AC-F019-08 and ticket M3-18).
+`output: Channel<tauri::ipc::Response>` · F-019 · AC-F019-08 · SR-17. P2, M4 (moved from M3 in the Stage 4.7 fix pass, with AC-F019-08 and ticket M3-18). As built (M3-18): the probe folder is reset first (`0700`, Foreman's settings file only), then `claude --name fm-probe` runs in it as an ordinary terminal tab (`pty_*` work on its `runId`; no `run.json`, no index line). Opening it records `settings.json` `probeFolderTrusted: true` (the trust step was done; Foreman can't see Billy's answer without acting on a session event, SR-18). A probe that then meets the trust prompt is inconclusive and Doctor says so.
 
 **`probe_run`** · P2 · M4 · **spawn** (`claude --init-only` probes A and B), **app** (`settings.json` `contract`)
 ```text
@@ -332,7 +507,7 @@ TS    Record<symbol, never>
 Res   ContractResult { version: String, verified_at: Timestamp, outcomes: Vec<ProbeOutcome> }
 Err   ToolMissing
 ```
-`progress: Channel<LaunchProgress>` · F-019 · AC-F019-15…17 · SR-17, NFR-44. `launch_prepare` runs the same probes automatically before the first launch on a new version (AC-F008-21).
+`progress: Channel<LaunchProgress>` · F-019 · AC-F019-15…17 · SR-17, NFR-44. `launch_prepare` runs the same probes automatically before the first launch on a new version (AC-F008-21). As built (M4-12): `contract.version` is the semver of `claude -v`. `outcomes` are probe A then probe B of this run (§2.4 rows; `fail` = flag failure). Probe A's marker needs the hash-checked sensor; without it A is inconclusive. Before a launch the probes run only when `probeFolderTrusted` is set and this build has the sensor (otherwise `Contract { outcome: skipped }` and Doctor's `probeNote` says why). The stored contract turns into launch blockers only for the features a launch needs: `launch` and `chains` (`--session-id`; every launch passes it) always, `re-arm` (`--resume`) for a continuing step; an `--effort` failure is a warning (Claude Code ignores an unknown effort and runs), `desktop-handoff` is Desktop's.
 
 ### 4.3 Projects
 
@@ -366,7 +541,7 @@ TS    { pickId: string; name: string; slug: string; variables: Record<string, st
 Res   SetupPreview { preview_id: PreviewId, writes: Vec<PlannedWrite>, git_init: bool, pin: PinPreview,
                      path: ApplicablePathSummary }
       PlannedWrite { path: RepoPath, action: "create" | "leaveAlone" | "refuse", reason: Option<String> }
-Err   Expired (pick) · NotAllowed (pin refused: blueprint file differs from HEAD, AC-F002-02, shown as both hashes instead of `git status` output) · ToolMissing (git) · PolicyViolation
+Err   Expired (pick) · NotAllowed (pin refused: blueprint file differs from HEAD, AC-F002-02, shown as both hashes instead of `git status` output; or, (CR-003) a step in Stages 1–2 or F.2 has an annotation error, `detail: AnnotationErrors` listing each, AC-F002-02) · ToolMissing (git) · PolicyViolation
 ```
 F-018, F-002, F-004 · AC-F018-01, -02, -04, -08, AC-F002-01, -02 · SR-30, SR-34, SR-44. A folder inside an enclosing repo but without its own (`rev-parse --show-toplevel` ≠ the folder) gets `gitInit: true`; Foreman never acts on the enclosing repo. Variable keys must be blueprint variable names (`^[A-Z][A-Z0-9_]*$`); `slug` must match `^[a-z0-9-]{1,40}$` (it becomes part of `--name`, DR-121).
 
@@ -425,9 +600,9 @@ F-018, F-006 · AC-F006-03 · SR-40.
 Rust  BlueprintRepinReq { project_id: ProjectId }
 TS    { projectId: string }
 Res   ProjectView
-Err   NotAllowed ("repin-after-stage-1-signed", "blueprint-dirty") · ToolMissing · Conflict
+Err   Cancelled · NotAllowed ("repin-after-stage-1-signed", "blueprint-dirty", "p1-annotation-errors" with `detail: AnnotationErrors`, CR-003) · ToolMissing · Conflict
 ```
-F-002 · AC-F002-02, -03 · SR-41, SR-44.
+F-002 · AC-F002-02, -03 · SR-24a, SR-41, SR-44. (CR-003) A re-pin runs the same checks as the first pin; on refusal the existing lock and stored text are untouched. Security review 2026-10-20 (N-8): a re-pin changes the text every later step resolves from and commits the lock, so it first asks in a native dialog, "Re-pin the blueprint for <project>?", naming `<repo>/claude-build-blueprint.md`, the commit (12 hex), the file's SHA-256 prefix and size, the pin it replaces ("in place of commit <12 hex>, pinned <time>") and that `.foreman/blueprint.lock.json` is written and committed. Cancel → `Cancelled`, nothing written.
 
 **`project_remove`** · P1 (registry) + P2 (full deletion UI) · M4 · **app** (deletes `projects/<id>/`, `approvals/<id>*`, its fingerprint snapshots)
 ```text
@@ -459,7 +634,7 @@ Res   StepView { summary: StepSummary, prompt: Vec<PromptSegment>, inputs: Vec<R
                  warnings: Vec<String>, remaps: Vec<String>, outs: Vec<OutView>, override_: Option<RunOverride> }
 Err   NotFound · Io
 ```
-F-005, F-006, F-030 · AC-F005-03, -04, AC-F006-12, -13, AC-F008-17, AC-F030-01, -04, AC-XC-32 · SR-19, SR-26. `argv_preview` is the argv the next launch would use (prompt shown in full here; the run log stores only its hash, SR-52).
+F-005, F-006, F-030 · AC-F005-03, -04, AC-F006-12, -13, AC-F008-17, AC-F030-01, -04, AC-XC-32 · SR-19, SR-26. `argv_preview` is the argv the next launch would use (prompt shown in full here; the run log stores only its hash, SR-52). As built (M4-11): `live` is the P2 sensor's live mode while the step's last run is live (`sensor_ingest::live_mode`): `mode` is its display name, and `expected` (the step's start mode) is set only when the live mode is neither the start mode nor a switch target; `null` without the sensor or a live run. The Now/Next strip shows it (AC-F009-11). The watcher's `out` paths (the round tracker, AC-F009-12) bump the project's revision, so `project:changed` refreshes `outs`.
 
 **`run_input_set`** · P1 · M2 · **app** (`progress.json`; `remember` inputs per project)
 ```text
@@ -495,7 +670,7 @@ TS    { projectId: string; step: string }
 Res   StepView
 Err   NotAllowed (CLI prompt steps finish by exit, not by mark; `wait` before its date) · ReadOnly
 ```
-F-007 · AC-F007-04, -08 · DR-066.
+F-007 · AC-F007-04, -08 · DR-066. As built (integration, M3-26): a chat step marked done ends its run's clock (`runs::note_step_done`: a second index line for the Copy and open run, with its duration).
 
 **`step_skip`** · P1 · M2 · **repo** (`overlay.json`, a decision file: commit by plumbing before Stage 5, pending after), **git**
 ```text
@@ -542,7 +717,7 @@ TS    { projectId: string; target: "prompt" | "command" | "sessionId" | "fileCon
 Res   CopyResult { removed_controls: u32, focus_run: Option<RunId> }   // focus_run: followup → focus its chain's tab
 Err   NotFound · Invalid (the target needs a field that is null) · NotAllowed ("unresolved-tokens", "prompt-control-char")
 ```
-F-005, F-007, F-009, F-023, F-026 · AC-F007-07, AC-F009-05, -16, AC-F026-01, AC-F023-01, AC-F013-12 · SR-22, SR-28 (text sanitized before it reaches the clipboard), SR-56. Covers Copy prompt (⌘⇧C), Copy command (⌘⌥C), Copy session ID, `followup` Copy-and-focus, manifest Copy contents and the fix request. One typed command covers them all; the fix request is `clipboard_copy { target: "fixRequest" }`.
+F-005, F-007, F-009, F-023, F-026 · AC-F007-07, AC-F009-05, -16, AC-F026-01, AC-F023-01, AC-F013-12 · SR-22, SR-28 (text sanitized before it reaches the clipboard), SR-56. Covers Copy prompt (⌘⇧C), Copy command (⌘⌥C), Copy session ID, `followup` Copy-and-focus, manifest Copy contents and the fix request. One typed command covers them all; the fix request is `clipboard_copy { target: "fixRequest" }`. As built (M2-06, M3-17): `command` runs the same preparation as `launch_prepare` (the UI never builds argv) and copies the program and argv, POSIX shell-quoted; a blocked step answers `NotAllowed("not-runnable")`. A `followup`'s `prompt` copy returns `focusRun`, the live run of its chain, or `null` when the chain's process has exited (the UI then relaunches it, DR-068).
 
 ### 4.5 Chat
 
@@ -554,7 +729,7 @@ Res   ChatCopyResult { run_id: RunId, opened: bool, missing_link: Option<"projec
                        removed_controls: u32 }
 Err   NotFound · ReadOnly · NotAllowed ("unresolved-tokens", "prompt-control-char") · Io
 ```
-F-012, F-026 · AC-F012-03, -04, AC-F026-02, AC-F017-06 · SR-25, SR-28, SR-52.
+F-012, F-026 · AC-F012-03, -04, AC-F026-02, AC-F017-06 · SR-25, SR-28, SR-52. As built (M3-23): `NotAllowed` also carries `not-a-chat-step` and `not-runnable` (the step refuses a copy: not applicable, undecided, waiting, with the reason). The URL opens through `foreman-sys` (`/usr/bin/open -u <url>`, CR-006) only after the stored link passes the SR-25 allowlist again; a stored link that fails it counts as missing (`missingLink`). If `open` itself fails, the prompt stays copied and the result is `opened: false, missingLink: null`. The run record is `kind: chatCopy`, `status: copied`, prompt hash only; a per-run override is consumed by the copy (DR-103). As built (integration, M3-26): the record and its one index line are written by `runs::record_chat_copy` (the run log's single path): the hash is of the sanitized prompt that went onto the clipboard, the step's run-input interventions are carried, and `override` is set when one was used.
 
 **`chat_link_set`** · P1 · M3 · **repo** (`project.json` `chatUrls`, variable field), reads the clipboard when asked
 ```text
@@ -564,7 +739,7 @@ TS    { projectId: string; chainStart: string; source: { kind: "clipboard" } | {
 Res   Rev
 Err   Clipboard · Invalid (not https://claude.ai/…) · Conflict
 ```
-F-012 · AC-F012-02 · SR-25, SR-56, PR-02 (g).
+F-012 · AC-F012-02 · SR-25, SR-56, PR-02 (g). As built (M3-23): `chainStart` may name any chat step of the chain; the link is stored under the chain's start step. `Invalid { field: "chainStart", rule: "chatChainStart" }` when it isn't a chat chain; the clipboard text is trimmed before the check.
 
 **`paste_back_preview`** · P1 (packet, output) + P2 (ADR set, lessons) · M3/M4 · reads the clipboard, **mem**
 ```text
@@ -575,7 +750,7 @@ Res   PastePreview { preview_id: PreviewId, kind: PasteKind, targets: Vec<Diff>,
                      notes: Vec<String>, packet_fields: Option<PacketFields> }
 Err   Clipboard · Unsupported (`sensor` with no sensor, or no `last_assistant_message` for the step's run) · NotAllowed ("wrong-stage-packet", "two-packets", "appends-in-p1") · PolicyViolation · ReadOnly
 ```
-F-012, F-013, F-016 · AC-F012-05…-11, -13, -14, -15, AC-F013-14, AC-F016-02 · SR-18, SR-26, SR-35, SR-56. Diffs show bidi, zero-width and control characters as visible escapes. `source: "sensor"` (P2, M4) reads the text the sensor recorded for the step's last run; it goes through the same normalize, split, `check_write` and preview as a clipboard paste, and only Billy's Apply writes it (SR-18). Mock fixtures: one request per source (`requests/paste_back_preview.json`, `requests/paste_back_preview.sensor.json`).
+F-012, F-013, F-016 · AC-F012-05…-11, -13, -14, -15, AC-F013-14, AC-F016-02 · SR-18, SR-26, SR-35, SR-56. Diffs show bidi, zero-width and control characters as visible escapes. `source: "sensor"` (P2, M4) reads the text the sensor recorded for the step's last run; it goes through the same normalize, split, `check_write` and preview as a clipboard paste, and only Billy's Apply writes it (SR-18). Mock fixtures: one request per source (`requests/paste_back_preview.json`, `requests/paste_back_preview.sensor.json`). As built (M3-24): `NotAllowed` also carries `no-packet` (a packet step's paste has no header), `not-a-packet-step` (`kind: packet` on a step without a packet `out`) and `no-output` (the step declares nowhere to write); Each other declared `out` of a packet step receives the whole paste (packet, then attachments). Problems carry `fix: ["openInEditor", "copyFixRequest"]`. As built (Stage 5 integration, M4-18, M4-23, M4-24): `kind: "lessons"` works only on a step whose `appends` is `docs/lessons.md` (else `NotAllowed("not-a-lessons-step")`); the file is read through `foreman_core::lessons::read` and the one target is `docs/lessons.md` with the append as its diff (each entry renumbered to the next free `L-NNN`, with a note; an entry for another stage is noted); a missing file is `NotAllowed("lessons-missing")` and nothing is written (AC-F016-04); a paste without an entry heading is `NotAllowed("no-lessons-entries")`. `kind: "auto"` on an appending step still answers `appends-in-p1` (AC-F012-14); the UI sends `lessons` for F.2 steps. `kind: "adrSet"` splits through `foreman_core::packet::adr_split` (`split_adrs`, `plan`): every `docs/adr/ADR-NNN.md` is listed with its diff against the current file before any write; `NotAllowed("no-adrs" | "duplicate-adr")`; a target the policy refuses is `PolicyViolation` for the whole paste. An ADR set makes the step done only when the step declares no `out` and no `appends`. `source: "sensor"` reads the step's last run's `last_assistant_message` through `foreman_sys::sensor::ingest` (the run's own `sensorToken`) and then takes the clipboard path; without a run, a sensor token or a `Stop` reply it answers `Unsupported { feature: "sensor", why: "noSensor" }` (every run until the P2 sensor hooks give runs a token, M4-08/M4-09).
 
 **`paste_back_apply`** · P1 · M3 · **repo**
 ```text
@@ -584,7 +759,7 @@ TS    { previewId: string }
 Res   PasteApplyResult { written: Vec<RepoPath>, step_done: bool }
 Err   Expired · Conflict (lists `written`) · PolicyViolation
 ```
-F-012, F-016 · AC-F012-06…-08, -12, AC-F016-02, -03, -04 · SR-33, SR-35.
+F-012, F-016 · AC-F012-06…-08, -12, AC-F016-02, -03, -04 · SR-33, SR-35. As built (M3-24): every target's stamp is re-checked before the first write, so a file changed since the preview writes nothing (`Conflict` with `written: []`); a change racing the writes reports what was written. A valid packet or output makes the step `done` (a step never copied counts the paste-back as its copy) and emits `packet:changed` for a packet. As built (integration): a lessons append is written by `foreman_core::lessons::append` against the stamp read at preview (a changed file is `Conflict` on `docs/lessons.md`, nothing written; the next preview diffs the new text, AC-F016-03); ADR files are written by compare-and-swap like every other target. A step made `done` here ends its chat run's clock (`runs::note_step_done`: a second index line with the run's duration).
 
 ### 4.6 Launch
 
@@ -619,7 +794,7 @@ TS    { planId: string }
 Res   RunStarted { run_id: RunId, chain: ChainId, tab_name: String }
 Err   Expired · Stale (revision or fingerprint changed: fresh preview in detail) · Cancelled · NotAllowed ("needs-rearm") · ToolFailed · Io
 ```
-`output: Channel<tauri::ipc::Response>` · F-008, F-009, F-026 · AC-F008-14…-16, -19, -20, -25, AC-F009-01, AC-F026-01, -03 · SR-01…SR-05, SR-09, SR-19, SR-52, SR-57. Emits `run:status`.
+`output: Channel<tauri::ipc::Response>` · F-008, F-009, F-026 · AC-F008-14…-16, -19, -20, -25, AC-F009-01, AC-F026-01, -03 · SR-01…SR-05, SR-09, SR-19, SR-52, SR-57. Emits `run:status`. As built (code review C2): the revision is checked before the native dialog and again after it under the write lock, together with the configuration fingerprint of the plan's cwd (stat-cached); either change is `Stale` (`projectRev` or `fingerprint`) with a fresh preview, and nothing spawns. The sensor binary's hash is checked again right before the run settings are written; a mismatch drops the hooks and the token (SR-15). Every error comes before the spawn: once the session runs, the call returns `RunStarted`, and the step and chain updates go to the project as it is then (a failure there is logged).
 
 **`config_ack`** · P1 · M3 · **app** (`cache/fingerprints/<cwdHash>.json`, redacted, `0600`)
 ```text
@@ -720,7 +895,7 @@ TS    { planId: string }
 Res   RearmOutcome = Relaunched(RunStarted) | EndYourself { chain: ChainId }    // "Claude didn't exit…"
 Err   Expired · Stale · Cancelled · NotAllowed ("no-rearm-needed", P2: "background-tasks-running" until Billy picks End anyway in the native dialog)
 ```
-`output: Channel<tauri::ipc::Response>`, `progress: Channel<LaunchProgress>` — the one command with two Channels; IPC-R1 allows one Channel **per role**. F-010 · AC-F010-03…-06, -10, -11, -13, -14, AC-F013-11 · SR-13, SR-14, SR-18. After the old process exits, Rust prepares again; if the new argv or prompt hash differs from the confirmed plan, it stops with `Stale` and the new preview (DR-116). (ADR-008 names the argument `stepId`; this contract takes the prepared `planId` so a re-arm always goes through the same preview and confirmation.)
+`output: Channel<tauri::ipc::Response>`, `progress: Channel<LaunchProgress>` — the one command with two Channels; IPC-R1 allows one Channel **per role**. F-010 · AC-F010-03…-06, -10, -11, -13, -14, AC-F013-11 · SR-13, SR-14, SR-18. After the old process exits, Rust prepares again; if the new argv or prompt hash differs from the confirmed plan, it stops with `Stale` and the new preview (DR-116). (ADR-008 names the argument `stepId`; this contract takes the prepared `planId` so a re-arm always goes through the same preview and confirmation.) As built (M4-10): when Billy presses Run, Rust reads the old session's sensor state: idle with nothing outstanding → no dialog (AC-F010-13); outstanding subagents, tasks or background shells → the native "N background tasks still running" dialog, where Wait answers `NotAllowed("background-tasks-running")` and End anyway re-arms (AC-F010-14); no sensor, no events, or a session working or blocked with nothing outstanding → the P1 idle dialog (AC-F011-09). The preview's `rearm` stays `idleConfirmation` (the answer that counts is read at Run); `sensorBusy` isn't sent.
 
 **`rearm_continue`** · P1 · M3 · **spawn**
 ```text
@@ -738,7 +913,7 @@ TS    { runId: string; url: string }
 Res   LinkOutcome     // "opened" | "refused" | "cancelled"
 Err   NotFound
 ```
-F-009 · AC-F009-17 · SR-29, SR-26 (the dialog shows the URL with visible escapes).
+F-009 · AC-F009-17 · SR-29, SR-26 (the dialog shows the URL with visible escapes). As built (M3-12): a refused URL answers `refused` without a dialog; `Invalid { field: "url", rule: "tooLong" }` over 8 KB; `ToolFailed` when `open` fails. The URL opens through `foreman-sys` (`/usr/bin/open -u`, CR-006), never in the webview.
 
 ### 4.8 Files
 
@@ -747,9 +922,9 @@ F-009 · AC-F009-17 · SR-29, SR-26 (the dialog shows the URL with visible escap
 Rust  FileOpenReq { project_id: ProjectId, path: RepoPath }
 TS    { projectId: string; path: string }
 Res   ()
-Err   PolicyViolation (read policy, extension not .md/.json/.txt, symlink) · NotAllowed ("no-editor-set") · NotFound
+Err   PolicyViolation (read policy, extension not .md/.json/.txt, symlink) · NotAllowed ("no-editor-set", "editor-refused") · NotFound
 ```
-F-013, F-020, F-029 · AC-F029-07, AC-XC-28, AC-F020-05 · SR-25a, SR-31, SR-50.
+F-013, F-020, F-029 · AC-F029-07, AC-XC-28, AC-F020-05 · SR-25a, SR-31, SR-50. Security review 2026-10-20 (W-1): a stored editor that is an app which runs what it opens (`foreman-app::editor::REFUSED`, for example a settings file edited outside Foreman to name Terminal) is `NotAllowed("editor-refused")` and nothing opens.
 
 **`file_reveal`** · P1 · M3 · **spawn** (`open -R`)
 ```text
@@ -768,6 +943,7 @@ Res   ()
 Err   NotFound · ToolFailed
 ```
 F-014 · AC-F014-11, AC-XC-28 · SR-25a.
+As built (M4-25): `/usr/bin/open -b com.apple.Terminal <project root>` through `foreman-sys::spawn` (`SpawnRequest::OpenWithBundle`) behind the `Os::open_terminal` seam; no shell and no command is typed into Terminal. A project whose folder is missing answers `ReadOnly`/`NotFound`; a non-zero `open` is `ToolFailed`.
 
 ### 4.9 Decisions and recovery
 
@@ -780,7 +956,7 @@ Res   Vec<PendingChange>
                       diff: RedactedDiff }
 Err   NotFound
 ```
-F-022 · AC-F022-01, -02 · SR-40, SR-55.
+F-022 · AC-F022-01, -02 · SR-40, SR-55. As built (code review W1): a change's `id` is derived from the file and its current bytes (UUID v4 form), so every read names the same change the same way until the file changes again (AC-F022-05) ([CR-017](../change-requests/CR-017-code-review-fixes.md), part C).
 
 **`pending_change_accept`** · P1 · M2 · **app** (approved copy + hash), **git** (before Stage 5)
 ```text
@@ -789,7 +965,7 @@ TS    { projectId: string; change: string; seenSha256: string }
 Res   ProjectView
 Err   Cancelled · Stale (file changed again: new diff in detail) · NotFound
 ```
-F-022 · AC-F022-02, -05 · SR-24a, SR-40, SR-42. Native dialog: "Accept this change to <file>? It changes: <decision keys>".
+F-022 · AC-F022-02, -05 · SR-24a, SR-40, SR-42. Native dialog: "Accept this change to <file>? It changes: <decision keys>", followed by the content that becomes the approved copy (security review 2026-10-20, W-2): `SHA-256 <12 hex> · <n> bytes · <n> lines`, then the first 15 lines, each cut at 100 characters, with every control, bidi, zero-width or invisible character (TAB and CR included) shown as `‹U+XXXX›`, and "… and <n> more lines." when there are more (`render::content_summary`). The dialog is shown without the write lock; the change is checked again under it afterwards (code review W3).
 
 **`pending_change_reject`** · P1 · M2 · **repo** (approved content written back by CAS)
 ```text
@@ -807,7 +983,7 @@ TS    { projectId: string; item: string; textSha256: string }
 Res   GateView
 Err   Cancelled · Stale (bullet changed again) · NotFound
 ```
-F-001, F-015 · AC-F001-16, -17 · SR-24a, SR-40.
+F-001, F-015 · AC-F001-16, -17 · SR-24a, SR-40. `textSha256` is the item's `GateItemView.textSha256`; the gate view also gives `previousText` (the pinned bullet's text when another item now has it, e.g. swapped bullets) so the webview can show both texts as context. The approval itself is the native dialog only.
 
 **`progress_rebuild_preview`** · P1 · M3 · **mem**
 ```text
@@ -816,7 +992,7 @@ TS    { projectId: string }
 Res   RebuildPreview { preview_id: PreviewId, stages: Vec<StageView>, lost: Vec<String> }
 Err   NotFound · Io
 ```
-F-020 · AC-F020-11, -12 · NFR-17.
+F-020 · AC-F020-11, -12 · NFR-17. Opens the project even when `progress.json` is unreadable (the file is left as it is) and writes nothing. The rebuilt state: every step on the path of a signed stage is `done`, the step whose `out` is a stage's packet is `done` when the packet exists, Foreman's own pending decision changes are recomputed from the approvals, and pending outside changes are kept; chains, run inputs, overrides, optional parts, waits and gate runs are lost (`lost` says so). From M4, stage records add the signing entries. A missing `progress.json` (app data deleted) is rebuilt the same way on `project_open` without a preview, since nothing can be lost (M3-16).
 
 **`progress_rebuild_apply`** · P1 · M3 · **app** (the corrupt file is kept as `progress.json.corrupt-<timestamp>`)
 ```text
@@ -825,7 +1001,7 @@ TS    { previewId: string }
 Res   ProjectView
 Err   Expired · Conflict
 ```
-F-020 · AC-F020-12.
+F-020 · AC-F020-12. `Conflict` when `progress.json` changed after the preview (compare-and-swap against the stamp the preview read). No native dialog (not in IPC-R11's list): Billy's press after reviewing the preview is the confirmation. An unreadable `project_open` is `Io` naming the file; the UI offers Rebuild from repo on that error (M3-16).
 
 ### 4.10 Packets and run log
 
@@ -838,7 +1014,7 @@ Res   PacketView { path: RepoPath, exists: bool, sha256: Option<Sha256>, header:
                    signed: Option<Signature>, tamper: Option<Diff> }
 Err   NotFound
 ```
-F-013, F-014 · AC-F013-01…-09, -12, -13, AC-F014-15 · SR-26, SR-27.
+F-013, F-014 · AC-F013-01…-09, -12, -13, AC-F014-15 · SR-26, SR-27. `normalization` lists the DR-131 notes for the file as it is on disk (one per change kind and field; `field` is a format key, `header`, or `""` for the whole file, e.g. a removed fence); empty means normalizing would change nothing that §5.2 notes. `problems` are DR-133's, plus (AC-F004-12) `packet.undecided-early-condition` "Decide <condition> before signing Stage 2" on a hand-signed, unconfirmed Stage 2 packet while an early condition is `undecided` (M3-21). `tamper` (M4-22) is the diff from the committed text to the working copy of a signed packet whose working hash differs from `signing.packetSha256`; the other fields show the committed text (`crate::signing::tamper_diff`).
 
 **`packet_normalize_apply`** · P1 · M3 · **repo**
 ```text
@@ -847,7 +1023,7 @@ TS    { projectId: string; stage: number; seenSha256: string }
 Res   PacketView
 Err   Stale · Conflict
 ```
-F-013 · AC-F013-08 · SR-33.
+F-013 · AC-F013-08 · SR-33. Writes `packet::normalize_packet`'s output by compare-and-swap against the stamp read with `seenSha256` (no native dialog: Billy's press after reviewing the notes is the confirmation, and normalization isn't security-relevant under IPC-R11); a file that needs nothing returns the view unchanged; emits `packet:changed` (M3-21).
 
 **`packet_signature_confirm`** · P1 · M3 · **app** (`approvals/<id>.json` `outsideSignatures`)
 ```text
@@ -978,7 +1154,7 @@ Res   SignResult = Signed { commit: String, stage: Stage } | CommitPending { std
                  | ReadBackMismatch { diffs: Vec<Diff> }
 Err   Expired · Cancelled · Stale ("packet changed since you reviewed it") · Conflict · ToolFailed
 ```
-`progress: Channel<SignProgress>` · F-014, F-016 · AC-F014-04…-14, AC-F013-15 · SR-42…SR-47, SR-53 (sensor events of the stage deleted).
+`progress: Channel<SignProgress>` · F-014, F-016 · AC-F014-04…-14, AC-F013-15 · SR-42…SR-47, SR-53 (sensor events of the stage deleted). Built (M4-20, M4-21): the native dialog names the DRI, the date, "Signing stage-NN.md @ <6 hex>", the branch, Stage 2's conditions and a running session. Read-back runs before the real-index refresh, so `ReadBack` messages come before `RefreshIndex` (a mismatch leaves Billy's index alone). On another branch nothing is written to the working tree, so a failed commit there answers `ToolFailed` and records nothing (sign again); `CommitPending` is the current branch's state after phase 1.
 
 **`sign_retry_commit`** · M4 · **git**
 ```text
@@ -1025,7 +1201,7 @@ TS    { projectId: string; path: string; inProject: boolean }
 Res   Manifest
 Err   NotFound
 ```
-F-023 · AC-F023-01.
+F-023 · AC-F023-01. As built (M4-27): the rows are every **signed** packet (`docs/handoff/stage-NN.md`, and its `-attachments.md` when declared) and every declared `out=` of a **chat** step on the applicable path, in template order, each with the first step that declares it (`producer`); `exists` is a regular file at the path; `ready` counts files that exist and are marked. With no rows, `firstProducer` names the first step on the path that will produce one (AC-F023-02). The "in the claude.ai Project" marks are kept in memory for the app session: `progress.json` v1 has no field for them ([CR-014](../change-requests/CR-014-knowledge-marks-and-desktop-closed.md), part A). `manifest_mark` refuses a path the manifest doesn't list (`NotFound`).
 
 **`assembler_view`** · M4 · **no**
 ```text
@@ -1035,7 +1211,7 @@ Res   Assembler { rows: Vec<AssemblerRow>, complete: bool, late_conditions: Vec<
       AssemblerRow { path: String, state: "exists" | "missing" | "empty" | "refused", rule: Option<String> }
 Err   NotFound · NotAllowed ("no-stage-4-packet")
 ```
-F-023 · AC-F023-03…-06 · SR-30.
+F-023 · AC-F023-03…-06 · SR-30. As built (M4-28): REPO FILES is read from the Stage 4 packet's `REPO FILES (create exactly these):` field (`foreman_core::assembler::repo_files`: one entry per line, the first word, remarks such as `(SR/PR/LC lists)` and `…` dropped, duplicates removed, at most 200); `NotAllowed("no-repo-files")` when the packet has none. Each entry is checked by the write policy first: root `CLAUDE.md` with `WritePurpose::AssemblerClaudeMd`, every other path as an ordinary repo write (`docs/`, `spec/`), and a secret-file name (SR-50) is refused too; a refused row carries the policy `rule` and a sentence in `note` and is never written. A folder entry (`docs/migrations/`) exists when it has an entry and is empty when it has none. `complete` is true when every row that isn't refused exists (a refused row never blocks it; an empty list is never complete). `lateConditions` lists the four late conditions while any is undecided and Stage 4 isn't signed: an undecided one gets `proposed: "yes"` and `evidence` from DR-063 over the REPO FILES paths first, then the paths in the project (names only: depth ≤ 6, ≤ 5,000 entries, hidden entries, `node_modules`, `target`, `dist`, `build` and symlinks skipped); a decided one has `decided` ("Decided by you on <date> ("<note>")."). Confirming is `condition_set` with the note `from evidence: <path>`.
 
 **`assembler_paste_preview`** · M4 · reads the clipboard, **mem**
 ```text
@@ -1044,16 +1220,16 @@ TS    { projectId: string; path: string }
 Res   PastePreview
 Err   Clipboard · PolicyViolation · NotFound (not a REPO FILES row)
 ```
-F-023 · AC-F023-03, -04, AC-F021-06 · SR-30, SR-35, SR-56.
+F-023 · AC-F023-03, -04, AC-F021-06 · SR-30, SR-35, SR-56. As built (M4-28): the policy check runs before the clipboard is read; a folder row is `NotAllowed("folder-row")`; the text is normalized like a paste-back (BOM, line ends, a wrapping code fence) and ends with one newline; `kind` is `output`, `targets` the one diff, and `notes` say "Overwrites the current file" and, for `CLAUDE.md`, "Claude Code loads this file in every session…".
 
 **`assembler_paste_apply`** · M4 · **repo**
 ```text
-Rust  AssemblerPasteApplyReq { preview_id: PreviewId }   // root CLAUDE.md: native "Claude Code loads this file in every session"
+Rust  AssemblerPasteApplyReq { preview_id: PreviewId }   // root CLAUDE.md: native "Claude Code loads this file in every session" + the text
 TS    { previewId: string }
 Res   Assembler
 Err   Expired · Cancelled · Conflict
 ```
-F-023, F-021 · AC-F021-06 · SR-30 (`WritePurpose::AssemblerClaudeMd`).
+F-023, F-021 · AC-F021-06 · SR-30 (`WritePurpose::AssemblerClaudeMd`). As built (M4-28): apply re-checks that the path is still a REPO FILES row and passes the policy, compares the file's stamp with the preview's (`Conflict`, nothing written), then, for root `CLAUDE.md` only, raises the native dialog "Write CLAUDE.md?" whose text says Claude Code loads the file in every session (Cancel → `Cancelled`, nothing written), and writes by compare-and-swap. The preview ID is single use. Security review 2026-10-20 (W-2): the text comes from the clipboard, which the webview can set, so the dialog also shows what will be written, in the same form as `pending_change_accept` (SHA-256 prefix, bytes, lines, the first 15 lines with escapes visible).
 
 ### 4.14 Desktop, overlay additions, run sheet (P2)
 
@@ -1064,7 +1240,7 @@ TS    { projectId: string; step: string }
 Res   DesktopOpened { chips: ChatChips }
 Err   ToolMissing · NotAllowed ("not-desktop-step") · ToolFailed
 ```
-`progress: Channel<LaunchProgress>` · F-024 · AC-F024-01, -04 · SR-01, SR-05, SR-08.
+`progress: Channel<LaunchProgress>` · F-024 · AC-F024-01, -04 · SR-01, SR-05, SR-08. As built (M4-29): the order is `claude -v` (the `--desktop` floor, 2.1.285 from ADR-017's table: below it `NotAllowed("version-below-floor")`), the launch environment (`foreman_sys::launch::child_env`: the same allowlist, pass-through and PATH as a CLI launch), `claude auth status` in the step's cwd with that environment (a failure is `NotAllowed("auth-failed")`, fail closed), then the resolved prompt is sanitized (SR-28) and copied, and `claude --desktop` runs in the step's cwd (`foreman_sys::spawn::SpawnRequest::ClaudeDesktop`, argv `["--desktop"]` only, 30 s timeout; a non-zero exit is `ToolFailed`). A prompt that doesn't resolve is `NotAllowed("prompt-unresolved")`. The step becomes `copied` like Copy and open: `desktop_open` writes app state (`progress.json`), and a step that can't take Copy is `NotAllowed("not-runnable")` before anything opens. A Desktop step finishes by Mark done ([CR-017](../change-requests/CR-017-code-review-fixes.md), part A). `chips`: the session chip, then model, effort and mode to pick in Desktop. Progress: `version`, `auth`, `spawning`, `done`.
 
 **`desktop_handoff`** · M4 · **spawn** (`claude --desktop --resume <uuid>`), **app** (chain `handed-off`)
 ```text
@@ -1073,7 +1249,7 @@ TS    { chain: string }
 Res   ()
 Err   NotFound · ToolMissing · NotAllowed ("chain-live": end it first)
 ```
-F-024, F-010 · AC-F024-02, -03 · SR-14.
+F-024, F-010 · AC-F024-02, -03 · SR-14. As built (M4-29): the chain must be a CLI chain (`NotAllowed("not-cli-chain")`) that isn't live; the floor, environment and auth checks are `desktop_open`'s, in the chain's cwd; argv `--desktop --resume <uuid>` (`foreman_core::launch::argv::desktop`). After a successful handoff the chain follows S-23's branch as an explicit input (`foreman_core::chain::DesktopShare`; the app passes `Shared`, the specified branch, until S-23 is recorded): shared → `handedOff`, so the next continuing step forks (`--resume <old> --fork-session --session-id <new>` on S-8's pass branch, a new chain with `forkedFrom`, AC-F010-15); copied → the chain is left as it was. Called for a chain that is already `handedOff`, it spawns nothing and raises the native dialog "Is Claude Desktop closed?"; OK opens the chain again so the next continuing step resumes it without a fork (DR-110's "unless Billy confirms Desktop is closed"), Cancel → `Cancelled` ([CR-014](../change-requests/CR-014-knowledge-marks-and-desktop-closed.md), part B).
 
 **`add_step`** · M4 · **repo** (`overlay.json`)
 ```text
@@ -1084,7 +1260,7 @@ TS    { projectId: string; stage: number; after: string; copyConfigFrom: string;
 Res   ProjectView
 Err   NotAllowed ("bypass-permissions", "invalid-start") · PolicyViolation (an `out` path) · Conflict
 ```
-F-025 · AC-F025-01, -03, -04, -05 · SR-03, SR-19, SR-30.
+F-025 · AC-F025-01, -03, -04, -05 · SR-03, SR-19, SR-30. As built (M4-30, M4-31): `NotAllowed` also carries `stage-not-applicable`, `wrong-stage` (`after` is not in `stage`), `bad-title` (empty, over 200 characters or a line break), `bad-text` (empty or over 4000), `bad-out` (more than 8 outputs) and `too-many` (999 added steps in a stage); `invalid-start` means the start config is not the one the surface needs (a chat step has no mode or folder and adaptive effort; a CLI step needs a folder, a mode and a non-adaptive effort). Nothing is written when a check fails. Foreman numbers the step `x-<stage>-<n>` (highest `n` in the overlay plus one) and writes it to `.foreman/overlay.json` through `Opened::own_change`. The project's effective template is the project-local template with each added step spliced in after `after`, so the path, stage view, resolver and launch treat an added step like any other; stage state counts template steps only (DR-054), and a launch of an added step always asks first (`ConfirmReason::OverlayStep`, SR-19).
 
 **`add_item`** · M4 · **repo** (`overlay.json`)
 ```text
@@ -1093,7 +1269,7 @@ TS    { projectId: string; stage: number; text: string }
 Res   GateView
 Err   Conflict
 ```
-F-025 · AC-F025-02.
+F-025 · AC-F025-02. As built (M4-30, M4-31): the item is an `attest` item `xi-<stage>-<n>`; it shows in the gate and in the close-out checklist after the template's items. `NotAllowed` carries `bad-text` and `wrong-stage` like `add_step`.
 
 **`run_sheet_export`** · M4 · writes to the Rust save dialog's path
 ```text
@@ -1102,7 +1278,7 @@ TS    { projectId: string; stage: number }
 Res   ExportResult
 Err   NotFound · Io
 ```
-F-027 · AC-F027-01…-03 · NFR-14, SR-30 (`WritePurpose::UserExport`).
+F-027 · AC-F027-01…-03 · NFR-14, SR-30 (`WritePurpose::UserExport`). As built (M4-32): the Markdown is `foreman_core::runsheet::run_sheet` (golden `runsheet::stage_2_golden`): a header, then per applicable step its surface, chat chips or the exact argv one argument per line (the session IDs and the run-settings path shown as placeholders, the prompt as "<the prompt above>"), switch cues, `out=` paths, the run inputs as filled, and the resolved prompt in a fence; then the stage's inspection items with their kinds. Unresolved tokens are marked in place (`⟦UNRESOLVED [APP_NAME]⟧`) and listed under the step; the export is never refused for them. The file is written only to the path from the Rust save dialog (`<slug>-stage-NN-run-sheet.md` suggested) through `store::export::write_user_export`, the policy `metrics_export` uses; Cancel → `{ kind: "cancelled" }`.
 
 ### 4.15 Command count by group
 
@@ -1130,9 +1306,9 @@ This file is the only command list; the design doc points here (Stage 4.7 fix pa
 
 | Channel type | Wire | Created by | Payload | Rules |
 |---|---|---|---|---|
-| **PTY output** `Channel<tauri::ipc::Response>` | `InvokeResponseBody::Raw` → `ArrayBuffer` | `launch_start`, `rearm_start`, `rearm_continue`, `pty_attach`, `probe_folder_open` | Raw PTY bytes, chunks ≤ 64 KB (`Response::new(Vec<u8>)`) | Never JSON (a `Channel<Vec<u8>>` would send a number array). The webview writes with `term.write(new Uint8Array(buf), cb)` and calls `pty_flow(paused=true)` above 1 MB pending (NFR-08). Ordered per channel. One channel per run; a re-arm's relaunch gets a new run and a new channel; the old buffer is archived client-side. Tests: `pty::channel_sends_raw_bytes`, `pty::burst_1mb_backpressure`. |
-| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `chain_resume_prepare`, `packet_repair_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found }` · `Contract { outcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code }` · `Spawning` · `Done` | Phases arrive in DR-120's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
-| **Sign progress** `Channel<SignProgress>` (P2) | JSON | `sign_apply`, `sign_retry_commit` | `ReRead` · `Write { path }` · `HashObject { path }` · `WriteTree` · `CommitTree { signed: bool }` · `UpdateRef` · `RefreshIndex` · `ReadBack { path, ok }` · `Done { commit }` | One message per plumbing step (ADR-012). Test: `sign::progress_matches_plumbing_order`. |
+| **PTY output** `Channel<tauri::ipc::Response>` | `InvokeResponseBody::Raw` → `ArrayBuffer` | `launch_start`, `rearm_start`, `rearm_continue`, `pty_attach`, `probe_folder_open` | Raw PTY bytes, chunks ≤ 64 KB (`Response::new(Vec<u8>)`) | Never JSON (a `Channel<Vec<u8>>` would send a number array). The webview writes with `term.write(new Uint8Array(buf), cb)` and calls `pty_flow(paused=true)` above 1 MB pending (NFR-08); a view that unmounts with bytes still pending resumes a PTY it paused (code review W5). Ordered per channel. One channel per run; a re-arm's relaunch gets a new run and a new channel; the old buffer is archived client-side. Tests: `pty::channel_sends_raw_bytes`, `pty::burst_1mb_backpressure`. |
+| **Launch progress** `Channel<LaunchProgress>` | JSON | `launch_prepare`, `chain_resume_prepare`, `packet_repair_prepare`, `rearm_start`, `rearm_continue`, `gate_fix_start`, `desktop_open`, `probe_run` | `#[serde(tag = "phase")]` `Version { found: Option<String> }` · `Contract { outcome: ContractOutcome }` · `Fingerprint { firstScan: bool }` · `Auth { cached: bool }` · `Transcript` · `Inputs` · `Ending { step: "ctrlC" \| "exit" \| "waiting" }` · `Exited { code: Option<i32> }` · `Spawning` · `Done` | Phases arrive in DR-120's order; a phase that is skipped (cache hit) is still sent with `cached: true`. Contains no prompt text, env values or config values. Test: `launch::progress_phase_order`. |
+| **Sign progress** `Channel<SignProgress>` (P2) | JSON | `sign_apply`, `sign_retry_commit` | `ReRead` · `Write { path }` · `HashObject { path }` · `WriteTree` · `CommitTree { signed: bool }` · `UpdateRef` · `RefreshIndex` · `ReadBack { path, ok }` · `Done { commit }` | One message per plumbing step (ADR-012). Test: `sign::pathspec_only` (asserts the progress messages in plumbing order; code review W7: there is no separate `sign::progress_matches_plumbing_order`). |
 
 Channels need no capability permission (SR-22). The TS client wraps each in `#lib/ipc/tauri.ts`; components receive callbacks, never `Channel` objects.
 
@@ -1146,19 +1322,21 @@ Events carry identifiers and a revision, never content (design doc §3.3). A new
 | `projects:changed` | `{ rev: number }` | Registry change (setup, remove) | commands | F-018 | — |
 | `packet:changed` | `{ projectId: string; stage: number; rev: number }` | A packet file (exactly `docs/handoff/stage-\d{2}\.md` or `stage-\d{2}-attachments\.md`; lookalike names are ignored, SR-31) changed on disk and was re-read and re-validated | `app::watch`, re-stat on focus/open/launch | F-013 · AC-F013-06, -07, -10 | SR-31, SR-18 |
 | `decision:pending` | `{ projectId: string; count: number }` | An outside change to a decision file was classified as pending | `app::watch`, open, launch, sign | F-022 · AC-F022-04 | SR-40 |
-| `tamper:detected` (P2) | `{ projectId: string; stage: number; rev: number }` | A signed packet differs from its committed blob | `app::watch` | F-014 · AC-F014-15 | SR-46 |
+| `tamper:detected` (P2) | `{ projectId: string; stage: number; rev: number }` | A signed packet differs from its committed blob: once per tampered version of the file (a new edit, or tampering again after a restore, is announced again) | `project_open` (which the watcher's `packet:changed` makes the UI call) ([CR-017](../change-requests/CR-017-code-review-fixes.md), part B) | F-014 · AC-F014-15 | SR-46 |
 | `run:status` | `{ runId: string; status: RunStatus; rev: number }` | Run state transitions (spawned, exited, errored, interrupted; P2 sensor idle/blocked) | `sys::pty` exit, `app::sensor_ingest` (P2), exit handler | F-009, F-011 · AC-F009-02, -03, AC-F011-05 | SR-18 |
 | `config:changed` | `{ projectId: string; cwd: CwdKind }` | A fingerprinted file changed while a run in that cwd is live (warning only) | `app::watch` | F-008 · ADR-021 §7 | SR-06, SR-18 |
 | `doctor:status` | `{ level: DoctorLevel }` | Doctor finished | `doctor_run`, startup | F-019 · AC-F019-07 | — |
 | `settings:changed` | `{ rev: number }` | `settings.json` changed on disk (reloaded) or through a command | `app::watch` (app data), commands | F-029 · AC-F029-03 | SR-33 |
 
-Rules: `events::payload_snapshot` (insta, every event), `events::no_content_fields` (every payload type has only IDs, numbers, enums and booleans), `watcher::events_never_act`.
+Rules: `events::payload_snapshot` (every event's payload, `src-tauri/tests/ipc.rs`), `events::no_content_fields` (every payload type has only IDs, numbers, enums and booleans), `watcher::events_never_act`.
+
+Mapping in `app::watch` (M3-21, M3-22): the project watcher starts at `project_open`; a packet or attachments change → `packet:changed` (its `rev` is an app-wide packet counter, not the project revision); a decision-file change → re-classified by the same classifier as open (`project::classify_decisions`, code review W2) → `decision:pending` (new pending only) and `project:changed` (when the pending list or a variables-only reload changed state); `docs/lessons.md` emits nothing; an `out` path (P2 round tracker, AC-F009-12) → `project:changed` with the project's view revision moved in memory (`progress.json` isn't written, so a held launch plan isn't staled; code review N1). The `rev` of `project:changed` is the view revision: `progress.json`'s revision plus the in-memory `out` counter, both only growing; a refused watch root stops the watcher and emits `doctor:status` (`warning`). `config:changed` comes from a per-run hint watcher over the run's fingerprint sources, with a 60 s re-check for what hints can't see (5 s for a run whose hint watcher couldn't start). Window focus re-stats every watched project and re-checks live runs.
 
 ### 6.2 Client-side rules
 
 - `TauriIpcClient` is the only importer of `@tauri-apps/api` (ESLint `no-restricted-imports`, ADR-004).
 - `pty_write` data over 64 KB (for example from `term.paste` of a 1 MB clipboard) is split by the client into ≤ 64 KB writes at UTF-8 code-point boundaries, in order, awaiting each. Test: `terminal::large_paste_chunked` (Vitest).
-- Stores keep `{ value, rev }`; an event with `rev ≤ stored rev` is ignored.
+- Stores keep `{ value, rev }`; an event with `rev ≤ stored rev` is ignored. This holds for every event that carries a `rev` (code review C1): `project:changed` per project, `packet:changed` per project (its `rev` is the app-wide packet counter), `tamper:detected` per project and stage. Test: `bus::rev_rule_on_packet_and_tamper_events` (Vitest) and the flow `tamper::no_refetch_loop`.
 
 ## 7. Contract tests and the mock
 
@@ -1168,7 +1346,7 @@ Rules: `events::payload_snapshot` (insta, every event), `events::no_content_fiel
 |---|---|---|
 | `bindings-drift` | `cargo test -p foreman-app --features ts export_bindings` (ts-rs runs one `export_bindings_<type>` test per exported type, writing to `TS_RS_EXPORT_DIR=src/lib/ipc/bindings`), then `git diff --exit-code src/lib/ipc/bindings`. Any Rust DTO change without regenerated bindings fails. | CI |
 | `ipc::commands_json` | Rust writes `ipc::COMMANDS` to `src/lib/ipc/bindings/commands.json` (sorted). | cargo test |
-| `ipc/contract.test.ts` | `Object.keys(COMMAND_MAP)` of `TauriIpcClient` equals `commands.json`; `MockIpcClient` is declared `implements IpcClient` (tsc enforces every method and signature); `commands.json` equals the command list in this document (the test parses §4.15's table from `docs/contracts/ipc.md`). | Vitest |
+| `ipc/contract.test.ts` | `Object.keys(COMMAND_MAP)` of `TauriIpcClient` equals `commands.json` exactly (all 91; drift either way fails); every `Requests[cmd]` is the generated `<Name>Req` binding; `MockIpcClient` is declared `implements IpcClient` (tsc enforces every method and signature); `commands.json` equals the command list in this document (the test parses §4.15's table from `docs/contracts/ipc.md`). | Vitest |
 | `capabilities::every_command_declared_and_granted` | `COMMANDS` = `generate_handler!` set = `allow-*` grants in `capabilities/main-window.json`. | cargo test |
 | `ipc::fixture_requests_deserialize` | For every command, `src/lib/ipc/fixtures/requests/<command>.json` (type-checked in TS with `satisfies <Req>`) deserializes in Rust into the request struct. Catches serde/ts-rs divergences (renames, tags, `Option` handling). | cargo test + tsc |
 | `ipc::fixture_responses_roundtrip` | The mock's fixture responses (`src/lib/ipc/fixtures/responses/<command>.json`) deserialize in Rust into the response type and re-serialize byte-identically. | cargo test |

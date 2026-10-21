@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-rearm-start"
+description = "Enables the rearm_start command without any pre-configured scope."
+commands.allow = ["rearm_start"]
+
+[[permission]]
+identifier = "deny-rearm-start"
+description = "Denies the rearm_start command without any pre-configured scope."
+commands.deny = ["rearm_start"]

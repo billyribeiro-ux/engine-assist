@@ -1,0 +1,40 @@
+{
+	"version": "2.1.288",
+	"verifiedAt": "2026-10-19T09:00:00Z",
+	"outcomes": [
+		{
+			"probe": [
+				{
+					"kind": "plain",
+					"text": "Flags parse and per-launch hooks fire ("
+				},
+				{
+					"kind": "code",
+					"text": "--init-only"
+				},
+				{
+					"kind": "plain",
+					"text": ")"
+				}
+			],
+			"result": "pass",
+			"text": "Pass on 2.1.288",
+			"detail": null
+		},
+		{
+			"probe": [
+				{
+					"kind": "code",
+					"text": "--resume"
+				},
+				{
+					"kind": "plain",
+					"text": " parses"
+				}
+			],
+			"result": "inconclusive",
+			"text": "Inconclusive",
+			"detail": "Timed out after 20 s. Keeping the last verified state, 2.1.284."
+		}
+	]
+}

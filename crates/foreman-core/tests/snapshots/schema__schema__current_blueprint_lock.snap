@@ -1,0 +1,19 @@
+---
+source: crates/foreman-core/tests/schema.rs
+expression: written
+---
+{
+  "blueprintPath": "claude-build-blueprint.md",
+  "blueprintRepoCommit": "1111111111111111111111111111111111111111",
+  "blueprintVersion": "2.2",
+  "grammarVersion": 1,
+  "items": {
+    "fresh-clone": {
+      "kind": "attest",
+      "textSha256": "6cfd6dda92a916f9c1c1b4f128dcd1839aacca3ed19508ec22e7d1cfb6b57640"
+    }
+  },
+  "pinnedAt": "2026-10-20T09:00:00Z",
+  "schemaVersion": 1,
+  "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

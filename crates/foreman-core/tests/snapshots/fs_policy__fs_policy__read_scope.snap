@@ -1,0 +1,14 @@
+---
+source: crates/foreman-core/tests/fs_policy.rs
+expression: "locations.join(\"\\n\")"
+---
+/Users/billy/.claude/settings.json
+/Library/Application Support/ClaudeCode/managed-settings.json
+/Library/Application Support/ClaudeCode/managed-settings.d/a.json
+/Users/billy/.claude.json
+/Users/billy/.claude/CLAUDE.md
+/Users/billy/dev/CLAUDE.local.md
+/etc/paths
+/etc/paths.d/homebrew
+/etc/shells
+/Users/billy/dev/claude-blueprint/claude-build-blueprint.md

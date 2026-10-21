@@ -1,0 +1,26 @@
+---
+source: crates/foreman-core/tests/resolver_tokens.rs
+expression: "lines.join(\"\\n\")"
+---
+[APP_NAME] · ProjectVariable · 10
+[BUDGET_TIME] · ProjectVariable · 2
+[M#-NN] · Literal · 1
+[MY_ADVANTAGES] · ProjectVariable · 2
+[N+1] · PathAlias · 2
+[N-1] · PathAlias · 1
+[N] · RunInput · 4
+[PREFERRED_STACK] · ProjectVariable · 3
+[QUALITY_BAR] · ProjectVariable · 2
+[ROUGH_IDEA] · ProjectVariable · 1
+[TARGET_USERS] · ProjectVariable · 2
+[X] · RunInput · 1
+[changes] · RunInput · 1
+[jurisdictions] · RunInput · 1
+[list screens] · RunInput · 1
+[optional: …] · OptionalPart · 1
+[paste numbers] · RunInput · 1
+[paste the Stage 1 Handoff Packet] · PacketMarker · 1
+[paste the Stage 2 Handoff Packet] · PacketMarker · 1
+[paste the Stage 2 and 3 packets] · PacketMarker · 1
+[paste the Stage 2 and Stage 3 Handoff Packets] · PacketMarker · 1
+[paste the stage's inspection list] · PacketMarker · 1

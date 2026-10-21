@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-item-kind-confirm"
+description = "Enables the item_kind_confirm command without any pre-configured scope."
+commands.allow = ["item_kind_confirm"]
+
+[[permission]]
+identifier = "deny-item-kind-confirm"
+description = "Denies the item_kind_confirm command without any pre-configured scope."
+commands.deny = ["item_kind_confirm"]

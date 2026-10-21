@@ -1,0 +1,94 @@
+# cargo-deny policy (ADR-016, SR-60, SR-61, AC-M0-06). Run: `cargo deny --workspace check`.
+# The graph is evaluated for the only shipped target; tauri's mobile-only reqwest path is outside it.
+
+[graph]
+targets = ["aarch64-apple-darwin"]
+all-features = false
+no-default-features = false # default features; `e2e` and `ts` are off (deny-e2e job covers e2e)
+
+[advisories]
+yanked = "deny"
+ignore = []
+
+[licenses]
+# Final list fixed at M0 from the real aarch64-apple-darwin graph (ADR-016 decision 1); ADR-016's
+# draft also listed Apache-2.0 WITH LLVM-exception, BSD-2-Clause and ISC, which no crate uses, so they
+# were dropped (cargo-deny warns on unused allowances). A new license needs review.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "Unicode-3.0",
+  "Zlib",
+  "MPL-2.0",
+  "CC0-1.0",
+  # M1 (ADR-016 log, 2026-10-20): comrak =0.56.0 is BSD-2-Clause; its finl_unicode dependency adds
+  # Unicode-DFS-2016 (its Unicode data tables). Both are OSI-approved permissive licenses.
+  "BSD-2-Clause",
+  "Unicode-DFS-2016",
+]
+confidence-threshold = 0.93
+
+[licenses.private]
+# Foreman's own crates are `publish = false` and unlicensed (personal app).
+ignore = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+# Known duplicate versions inside Tauri's own macOS graph (2026-10-20). `multiple-versions` stays
+# "warn" (ADR-016), so any NEW duplicate still shows; re-check this list at each Stage Gate.
+skip = [
+  { crate = "base64@0.21.7", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "bitflags@1.3.2", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "getrandom@0.3.4", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "hashbrown@0.12.3", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "indexmap@1.9.3", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "miniz_oxide@0.8.9", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "png@0.17.16", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "syn@2.0.119", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  # M1: foreman-core pins sha2 0.11.1 (design doc §3.2); tauri-codegen 2.7.3 still uses sha2 0.10 and
+  # its RustCrypto 0.10 siblings, and its html5ever path uses phf 0.13 while comrak 0.56.0 uses phf 0.14.
+  { crate = "sha2@0.10.9", reason = "older duplicate pulled by tauri-codegen 2.7.3 (core pins 0.11.1)" },
+  { crate = "digest@0.10.7", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "block-buffer@0.10.4", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "crypto-common@0.1.7", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "cpufeatures@0.2.17", reason = "older duplicate pulled by tauri-codegen 2.7.3 (via sha2 0.10)" },
+  { crate = "phf@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack (comrak 0.56.0 uses 0.14)" },
+  { crate = "phf_codegen@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "phf_generator@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  { crate = "phf_shared@0.13.1", reason = "older duplicate pulled by the tauri 2.12.4 stack" },
+  # Stage 5 integration (2026-10-20): portable-pty 0.9.0 (newest) needs filedescriptor 0.8.3
+  # (newest, crates.io 2025-02-11), which requires thiserror ^1.0; the workspace uses thiserror 2.
+  # No release aligns them without downgrading, so the 1.x pair is skipped until filedescriptor
+  # moves to thiserror 2.
+  { crate = "thiserror@1.0.69", reason = "older duplicate pulled by filedescriptor 0.8.3 (portable-pty 0.9.0)" },
+  { crate = "thiserror-impl@1.0.69", reason = "older duplicate pulled by thiserror 1.0.69 (filedescriptor 0.8.3)" },
+]
+deny = [
+  { crate = "reqwest", reason = "SR-60: no HTTP client" },
+  { crate = "hyper", reason = "SR-60" },
+  { crate = "hyper-util", reason = "SR-60" },
+  { crate = "ureq", reason = "SR-60" },
+  { crate = "isahc", reason = "SR-60" },
+  { crate = "curl", reason = "SR-60" },
+  { crate = "surf", reason = "SR-60" },
+  { crate = "attohttpc", reason = "SR-60" },
+  { crate = "h2", reason = "SR-60" },
+  { crate = "quinn", reason = "SR-60" },
+  { crate = "tungstenite", reason = "SR-60" },
+  { crate = "axum", reason = "SR-60: only under the e2e feature" },
+  { crate = "openssl", reason = "SR-60: no TLS stack needed" },
+  { crate = "rustls", reason = "SR-60" },
+  { crate = "native-tls", reason = "SR-60" },
+  { crate = "git2", reason = "ADR-012" },
+  { crate = "keyring", reason = "SR-51" },
+  { crate = "security-framework", reason = "SR-51: no keychain access" },
+]

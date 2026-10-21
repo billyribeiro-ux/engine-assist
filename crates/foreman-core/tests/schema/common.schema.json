@@ -1,0 +1,114 @@
+{
+	"$defs": {
+		"claudeUrl": {
+			"maxLength": 2048,
+			"pattern": "^https://claude\\.ai/[^\\s@]*$",
+			"type": "string"
+		},
+		"conditionId": {
+			"enum": [
+				"idea_known",
+				"commercial",
+				"payments",
+				"multi_user",
+				"public",
+				"has_ui",
+				"others_data",
+				"server",
+				"has_database",
+				"has_uploads",
+				"has_email",
+				"has_integrations"
+			]
+		},
+		"effort": {
+			"enum": ["low", "medium", "high", "xhigh", "max", "ultracode", "adaptive"]
+		},
+		"gitOid": {
+			"pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+			"type": "string"
+		},
+		"isoDate": {
+			"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+			"type": "string"
+		},
+		"itemId": {
+			"pattern": "^(?:[a-z][a-z0-9-]{0,47}|xi-[0-9]{1,2}-[0-9]{1,3})$",
+			"type": "string"
+		},
+		"itemKind": {
+			"pattern": "^(?:attest|time:[1-9][0-9]{0,2}d(?:>attest)?|auto:cmd=[a-z][a-z0-9-]{0,47})$",
+			"type": "string"
+		},
+		"mode": {
+			"enum": ["plan", "default", "acceptEdits", "auto", "dontAsk"]
+		},
+		"model": {
+			"enum": ["fable", "opus", "sonnet", "haiku", "opusplan"]
+		},
+		"note": {
+			"maxLength": 4000,
+			"type": "string"
+		},
+		"repoPath": {
+			"maxLength": 1024,
+			"minLength": 1,
+			"pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\u0000-\\u001f\\u007f\\\\]+$",
+			"type": "string"
+		},
+		"sha256": {
+			"pattern": "^[0-9a-f]{64}$",
+			"type": "string"
+		},
+		"shortText": {
+			"maxLength": 200,
+			"type": "string"
+		},
+		"stage": {
+			"maximum": 18,
+			"minimum": 0,
+			"type": "integer"
+		},
+		"start": {
+			"additionalProperties": false,
+			"properties": {
+				"effort": {
+					"$ref": "#/$defs/effort"
+				},
+				"mode": {
+					"oneOf": [
+						{
+							"$ref": "#/$defs/mode"
+						},
+						{
+							"type": "null"
+						}
+					]
+				},
+				"model": {
+					"$ref": "#/$defs/model"
+				}
+			},
+			"required": ["model", "effort", "mode"],
+			"type": "object"
+		},
+		"stepKey": {
+			"pattern": "^(?:[0-9]{1,2}\\.[0-9]{1,2}[a-z]?|council-setup|[0-9]{1,2}:(?:gate\\.[ABC]|F\\.2)|x-[0-9]{1,2}-[0-9]{1,3})$",
+			"type": "string"
+		},
+		"timestamp": {
+			"format": "date-time",
+			"pattern": "Z$",
+			"type": "string"
+		},
+		"triState": {
+			"enum": ["yes", "no", "undecided"]
+		},
+		"uuid": {
+			"pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+			"type": "string"
+		}
+	},
+	"$id": "urn:foreman:common",
+	"$schema": "https://json-schema.org/draft/2020-12/schema"
+}

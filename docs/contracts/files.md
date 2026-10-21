@@ -408,6 +408,7 @@ App data is `~/Library/Application Support/<bundle id>/` (`app_data_dir()`).
 
 - `authKeyAllowlist[].sha256` is `sha256("<key>=<canonical JSON value>")` for a key in **user** settings only (SR-07); the value itself is never stored.
 - `lastSeenClaudeVersion` drives the "Claude Code updated X → Y" confirmation (SR-19); `contract.version` drives the probes (SR-17).
+- **Proposal (v2, Stage 5):** add `"screenReaderMode": { "type": "boolean" }` (default `false`), the Settings toggle `settings_update` patches (ipc.md §2.4, AC-XC-22). Until the core's `SettingsFile` gains it with a v1→v2 migration (ADR-023), foreman-app keeps the toggle in memory only. Tracked in `docs/progress.md`.
 - Missing file → defaults and auto-detection (AC-F029-03). Migration: ADR-023 chain; app data only, no approval path.
 
 ### 4.2 `projects.json` · v1 · class (f)
@@ -534,7 +535,7 @@ App data is `~/Library/Application Support/<bundle id>/` (`app_data_dir()`).
 - Derived states (`skipped`, `notApplicable`, `undecided`, `needsAnnotation`, `needsNewerForeman`, `waitingUntil`) are **not stored**: they're computed from the template, conditions, overlay and `waits` on every read (DR-050), so they can't go stale. Stored `state` is only what Billy's actions produced.
 - `readStamps` holds the stamp of every repo file Foreman may write next (ADR-010). `dev`, `ino`, `mtimeNs` are 64-bit; this file is never sent to the webview whole (IPC-R4 doesn't apply).
 - `signing[NN].commit` is where the signing commit's OID lives (the stage record can't hold it, because it is inside that commit; ADR-012 decision 7, DR-143).
-- `indexRefreshPending` is set when a commit moved the ref but the real-index refresh failed after 5 retries on `index.lock` (ADR-012). Foreman retries on project open and window focus and shows "Index not refreshed; don't commit until this clears" until it succeeds; then it goes back to `null`.
+- `indexRefreshPending` is set when a commit moved the ref but the real-index refresh failed after 5 retries on `index.lock` (ADR-012), or was skipped because `$GIT_DIR/info/attributes` is non-empty (CR-002). Foreman retries on project open and window focus and shows "Index not refreshed; don't commit until this clears" until it succeeds; then it goes back to `null`.
 - `handSigned` marks a P1 packet whose `APPROVED BY` was filled in outside Foreman **and** confirmed by Billy in the native dialog (AC-F013-09, SR-47); it's derived from `approvals/<id>.json` `outsideSignatures` and `commit` is `null` for it. A packet with a name in it but no confirmation is "signature not confirmed", not signed.
 - Rebuild (NFR-17, AC-F020-11): from `docs/handoff/` packets and `.foreman/stages/` records; chains, run inputs and overrides are lost.
 
@@ -773,7 +774,7 @@ Written by `foreman-sensor` with `O_CREAT|O_EXCL|O_NOFOLLOW`, `0600` (SR-15). AD
 
 - `redacted` is the canonical parsed JSON of a settings-like source after `fingerprint::redact` (values under `env`/`headers`, `apiKey*` keys, keys containing `token`/`secret`/`password`, and secret-pattern strings become `‹redacted sha256:<8 hex>›`), or `null` for non-JSON sources (Markdown, programs), which are diffed by hash only (SR-55).
 - From `~/.claude.json`, only `mcpServers` (user scope and `projects[<repo path>]`) is ever stored (SR-31a).
-- `envKey` = SHA-256 over the sorted env **names** and the SHA-256 of their values (never the values themselves).
+- `envKey` = SHA-256 over the sorted env **names** and the SHA-256 of their values (never the values themselves), leaving out `FOREMAN_RUN_ID`, which is new every run (amended 2026-10-20, ADR-021).
 - Retention: until the project is removed (PR-04).
 
 ### 4.10 `templates/<sourceSha256>.p<parserVersion>.json` · v1 · class (b)
@@ -782,7 +783,7 @@ The parsed `Template` (design doc §3.2.1) serialized with serde, keyed by sourc
 
 ### 4.11 `probe/settings.json` · Claude Code settings format · P2
 
-Same schema as §4.4 with exactly one hook (`SessionStart`, the sensor writing a marker into `probe/marker-<uuid>`), no `effortLevel`. Recreated with the folder before each probe run (SR-17).
+Same schema as §4.4 with exactly one hook (`SessionStart`, the hash-checked sensor run with a fresh probe run ID and token), no `effortLevel`; its deny rules name the probe folder and app data. The marker is the `SessionStart` event file the sensor writes to `events/<probeRunId>/` with that token (amended 2026-10-20, ADR-017: it reuses the sensor's checked writer instead of a separate marker file). Recreated with the folder before each probe run (SR-17).
 
 ## 5. Handoff packet text format
 

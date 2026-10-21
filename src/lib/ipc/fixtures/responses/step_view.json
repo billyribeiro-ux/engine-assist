@@ -1,0 +1,152 @@
+{
+	"summary": {
+		"key": "2.4",
+		"number": "2.4",
+		"title": "Stack decision, evidence first",
+		"state": "notStarted",
+		"tag": "core",
+		"surface": "cli",
+		"specLine": {
+			"surface": "cli",
+			"where": "CLI, continues 2.2",
+			"model": {
+				"value": "Fable 5.1",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"effort": {
+				"value": "high",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"mode": {
+				"value": "Accept edits",
+				"origin": {
+					"kind": "template"
+				},
+				"from": null
+			},
+			"agents": ["principal-engineer"],
+			"droppedAgents": ["market-analyst"],
+			"note": null
+		},
+		"whyNotRunnable": "Waits for 2.3: Claude is still working in this session. Run re-arms it with Accept edits when it's idle.",
+		"stateText": "Next, waits for 2.3",
+		"conditionNote": null,
+		"kind": "followup",
+		"run": null,
+		"next": true
+	},
+	"prompt": [
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "Recommend the best stack for "
+				}
+			]
+		},
+		{
+			"kind": "resolved",
+			"token": "[APP_NAME]",
+			"class": "projectVariable",
+			"text": "TradeLog",
+			"note": "APP_NAME from project.json"
+		},
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": ", layer by layer: frontend,\nbackend, data, cache/queue, search, file storage, auth, payments,\nemail, hosting, observability, CI/CD.\n\nPART 1, evidence-first (ignore my preferences): for each layer, list the\nrequirements it must meet (from the feature specs and non-functional\nneeds), the 2-3 strongest candidates, and the winner. …\n\nPART 2, compare with my preference: "
+				}
+			]
+		},
+		{
+			"kind": "resolved",
+			"token": "[PREFERRED_STACK]",
+			"class": "projectVariable",
+			"text": "SvelteKit + Rust/Axum + Postgres",
+			"note": "PREFERRED_STACK from project.json"
+		},
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": ".\nFor each layer where you differ, say what I'd gain, what I'd lose, and\nyour confidence (high / medium / low). …\n\nPART 3, cite the evidence: official docs, release notes and what top\nengineering teams ship in production. Mark anything you couldn't verify.\n\nPART 4, the final table: layer, choice, runner-up, why, risk.\nAsk me to confirm each layer, then record my final choice per layer.\nDon't change any other council file.\n-> council/r7-stack.md"
+				}
+			]
+		}
+	],
+	"inputs": [],
+	"start": {
+		"value": {
+			"model": "fable",
+			"effort": "high",
+			"mode": "acceptEdits"
+		},
+		"origin": {
+			"kind": "template"
+		},
+		"from": null
+	},
+	"switches": [
+		{
+			"text": "Re-arms the council session with Accept edits when Claude is idle."
+		}
+	],
+	"chips": null,
+	"argvPreview": [
+		"/opt/homebrew/bin/claude",
+		"--resume",
+		"7f3a9c2e-51d4-4b8e-9e0a-2c61f0b4d871",
+		"--model",
+		"fable",
+		"--effort",
+		"high",
+		"--permission-mode",
+		"acceptEdits",
+		"--agents",
+		".foreman/agents/2.4.json",
+		"--name",
+		"fm-tradelog-s02-2-4",
+		"--settings",
+		"~/Library/Application Support/dev.foreman/runs/r_0193/settings.json",
+		"Recommend the best stack for TradeLog, layer by layer: frontend,\nbackend, data, cache/queue, search, file storage, auth, payments,\nemail, hosting, observability, CI/CD.\n\nPART 1, evidence-first (ignore my preferences): for each layer, list the\nrequirements it must meet (from the feature specs and non-functional\nneeds), the 2-3 strongest candidates, and the winner. …\n\nPART 2, compare with my preference: SvelteKit + Rust/Axum + Postgres.\nFor each layer where you differ, say what I'd gain, what I'd lose, and\nyour confidence (high / medium / low). …\n\nPART 3, cite the evidence: official docs, release notes and what top\nengineering teams ship in production. Mark anything you couldn't verify.\n\nPART 4, the final table: layer, choice, runner-up, why, risk.\nAsk me to confirm each layer, then record my final choice per layer.\nDon't change any other council file.\n-> council/r7-stack.md"
+	],
+	"envNames": [
+		"HOME",
+		"LANG",
+		"PATH",
+		"SHELL",
+		"TERM",
+		"USER",
+		"HTTPS_PROXY",
+		"NODE_EXTRA_CA_CERTS"
+	],
+	"blockers": [
+		{
+			"kind": "notRunnable",
+			"reason": "running",
+			"text": "Waits for 2.3: Claude is still working in this session. Run re-arms it with Accept edits when it's idle."
+		}
+	],
+	"warnings": [],
+	"remaps": [],
+	"outs": [
+		{
+			"path": "spec/council/r7-stack.md",
+			"exists": false
+		}
+	],
+	"override": null,
+	"parts": [],
+	"copiedAt": null,
+	"live": null
+}

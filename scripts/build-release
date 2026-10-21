@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# `pnpm release` (SR-64, AC-M0-11, M0-10): verify, then build an ad-hoc signed Apple Silicon
+# Foreman.app reproducibly from the lockfiles and rust-toolchain.toml; copy it to /Applications only
+# after Billy confirms, keeping the previous build as /Applications/Foreman-previous.app.
+# Runbook: docs/runbooks/release.md.
+#
+#   scripts/build-release              # verify + build + (confirm) install
+#   scripts/build-release --no-install # verify + build only
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+INSTALL=1
+[ "${1:-}" = "--no-install" ] && INSTALL=0
+
+if [ "$(uname -s)" != "Darwin" ] || [ "$(uname -m)" != "arm64" ]; then
+  echo "build-release: Foreman ships only as an Apple Silicon macOS app; run this on the Mac." >&2
+  exit 2
+fi
+
+# Reproducibility inputs (see the runbook's "Reproducible build" section).
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}"
+export CARGO_INCREMENTAL=0
+export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$PWD=/foreman --remap-path-prefix=$HOME/.cargo=/cargo"
+
+echo "▶ toolchain: $(rustup show active-toolchain)"
+pnpm install --frozen-lockfile
+pnpm verify
+
+echo "▶ foreman-sensor (embedded in the app binary by src-tauri/build.rs, ADR-009)"
+cargo build --release --locked -p foreman-sensor --target aarch64-apple-darwin
+export FOREMAN_SENSOR_BIN="$PWD/target/aarch64-apple-darwin/release/foreman-sensor"
+echo "  sha256(sensor) $(shasum -a 256 "$FOREMAN_SENSOR_BIN" | cut -d' ' -f1)"
+
+echo "▶ tauri build (aarch64-apple-darwin, ad-hoc signed via bundle.macOS.signingIdentity \"-\")"
+pnpm tauri build --target aarch64-apple-darwin --bundles app -- --locked
+
+APP="target/aarch64-apple-darwin/release/bundle/macos/Foreman.app"
+[ -d "$APP" ] || { echo "build-release: $APP not found" >&2; exit 1; }
+
+codesign --verify --deep --strict --verbose=2 "$APP"
+codesign -dv "$APP" 2>&1 | grep -q 'Signature=adhoc' || { echo "build-release: not ad-hoc signed" >&2; exit 1; }
+
+# release::no_webdriver (re-run against the release graph): the e2e plugin must not be linked.
+if cargo tree -p foreman-app -e normal --target aarch64-apple-darwin | grep -Eq 'tauri-plugin-wdio-webdriver|axum'; then
+  echo "build-release: webdriver/axum in the release graph" >&2; exit 1
+fi
+
+BIN="$APP/Contents/MacOS/foreman-app"
+echo "▶ built $APP"
+echo "  sha256(binary) $(shasum -a 256 "$BIN" | cut -d' ' -f1)"
+echo "  commit         $(git rev-parse HEAD)"
+
+[ "$INSTALL" -eq 1 ] || exit 0
+
+read -r -p "Install to /Applications/Foreman.app (the current one becomes Foreman-previous.app)? [y/N] " answer
+case "$answer" in
+  y|Y|yes|YES) ;;
+  *) echo "Not installed. The build is at $APP."; exit 0 ;;
+esac
+
+if [ -d /Applications/Foreman.app ]; then
+  rm -rf /Applications/Foreman-previous.app
+  mv /Applications/Foreman.app /Applications/Foreman-previous.app
+fi
+ditto "$APP" /Applications/Foreman.app
+echo "Installed /Applications/Foreman.app (rollback: docs/runbooks/release.md)."

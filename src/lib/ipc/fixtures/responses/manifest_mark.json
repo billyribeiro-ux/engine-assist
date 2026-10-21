@@ -1,0 +1,13 @@
+{
+	"files": [
+		{
+			"path": "docs/handoff/stage-01.md",
+			"exists": true,
+			"inProject": true,
+			"producer": "1.4"
+		}
+	],
+	"ready": 1,
+	"total": 1,
+	"firstProducer": null
+}

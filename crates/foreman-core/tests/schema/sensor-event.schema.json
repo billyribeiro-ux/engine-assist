@@ -1,0 +1,40 @@
+{
+	"$id": "urn:foreman:sensor-event.v1",
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"additionalProperties": false,
+	"properties": {
+		"event": {
+			"enum": [
+				"SessionStart",
+				"Stop",
+				"StopFailure",
+				"Notification",
+				"PermissionRequest",
+				"SessionEnd",
+				"SubagentStart",
+				"SubagentStop",
+				"TaskCreated",
+				"TaskCompleted",
+				"PostToolUse"
+			]
+		},
+		"payload": {
+			"type": ["object", "null"]
+		},
+		"receivedAt": {
+			"$ref": "urn:foreman:common#/$defs/timestamp"
+		},
+		"schemaVersion": {
+			"const": 1
+		},
+		"token": {
+			"pattern": "^[0-9a-f]{64}$",
+			"type": "string"
+		},
+		"truncated": {
+			"type": "boolean"
+		}
+	},
+	"required": ["schemaVersion", "token", "event", "receivedAt", "truncated", "payload"],
+	"type": "object"
+}

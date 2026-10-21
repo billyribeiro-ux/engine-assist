@@ -1,0 +1,29 @@
+[package]
+name = "foreman-sensor"
+description = "Foreman per-launch hook helper (P2, ADR-009): one token-tagged event file per hook event"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "foreman-sensor"
+path = "src/main.rs"
+
+# Exact pins (SR-61, design doc §3.2): std + serde_json + rustix only (ADR-003, ADR-009).
+[dependencies]
+serde_json = "=1.0.154"
+rustix = { version = "=1.1.5", features = ["fs", "event", "process"] }
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+criterion = { version = "=0.8.2", default-features = false, features = ["cargo_bench_support"] }
+
+# SR-15 / AC-F011-04: the 10 ms exit budget, measured on the installed binary (ADR-009).
+[[bench]]
+name = "sensor"
+harness = false
+
+[lints]
+workspace = true

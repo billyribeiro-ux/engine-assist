@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-packet-normalize-apply"
+description = "Enables the packet_normalize_apply command without any pre-configured scope."
+commands.allow = ["packet_normalize_apply"]
+
+[[permission]]
+identifier = "deny-packet-normalize-apply"
+description = "Denies the packet_normalize_apply command without any pre-configured scope."
+commands.deny = ["packet_normalize_apply"]

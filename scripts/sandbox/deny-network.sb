@@ -1,0 +1,9 @@
+;; Deny-network sandbox profile (ADR-016 decision 6, SR-60, AC-M0-10, M0-11).
+;; Everything is allowed except IP networking; local Unix sockets stay open because WebKit's helper
+;; processes and launchd services use them. UNVERIFIED on macOS 27 until M0-11 runs on Billy's Mac;
+;; if sandbox-exec is missing or ineffective, use the pf anchor in docs/runbooks/release.md.
+(version 1)
+(allow default)
+(deny network*)
+(allow network* (local unix-socket))
+(allow network* (remote unix-socket))

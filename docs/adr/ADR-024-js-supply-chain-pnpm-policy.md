@@ -72,3 +72,38 @@ pnpm 13 changes these settings, or a dedicated exotic-source block setting is co
 ## Exit path
 
 All policy is configuration plus one CI script. Moving to another package manager means re-expressing the same four controls (pins, frozen lockfile, build allowlist, release age) in its terms.
+
+## Log
+
+**2026-10-20 · M0 scaffold (Stage 5).** `minimumReleaseAge: 10080` is strict, so every pin was checked against its npm publish time (cutoff 2026-10-13 12:15 UTC). Pins newer than 7 days were stepped back to the newest version that is old enough:
+
+| Package | Planned (r7 / ADR-002) | Pinned at M0 | Planned version published | Notes |
+|---|---|---|---|---|
+| `@sveltejs/kit` | 3.1.0 | **3.0.1** | 2026-10-14 | Same peers (`vite ^8.0.12`, `svelte ^5.57.1`, `typescript ^6.0.0`); the ADR-002 config works unchanged |
+| `@tauri-apps/api` | 2.12.4 | **2.12.3** | 2026-10-14 | Same 2.12 minor as the `tauri` crate (2.12.4) |
+| `@tauri-apps/cli` | 2.12.3 | **2.12.2** | 2026-10-14 | |
+| `vitest` · `@vitest/browser-playwright` | 5.0.5 | **5.0.4** | 2026-10-15 | |
+| `playwright` · `@playwright/test` | 1.64.1 | **1.64.0** | 2026-10-14 | |
+| `@axe-core/playwright` | 4.14.0 | **4.13.0** | 2026-10-15 | |
+| `eslint` | 10.13.0 | **10.12.0** | 2026-10-16 | |
+| `typescript-eslint` | 8.72.0 | **8.71.2** | 2026-10-19 | Peer `typescript >=4.8.4 <6.1.0`, so TS 6.0.3 still fits |
+| `svelte-check` | 4.7.7 | **4.7.6** | 2026-10-16 | Peer `typescript ^5 \|\| ^6` |
+
+Every other planned pin was already old enough and is used as planned. Re-pin to the planned versions once they are 7 days old (a one-line change each plus `pnpm install`).
+
+- **`allowBuilds: {}`**: no package in the M0 tree has a build script (Vite 8 bundles with rolldown, so `esbuild` isn't in the tree). The example `esbuild: true` entry was not needed.
+- **`trustPolicyExclude: [undici-types@6.21.0]`**: `trustPolicy: no-downgrade` rejected `undici-types@6.21.0` (published 2024-11-13, before that line had provenance). It is type declarations only, has no scripts, and is required by `@types/node` 22.x. Exact-version exclusion; re-check when `@types/node` moves to a newer `undici-types`.
+- **Policy keys** live in `pnpm-workspace.yaml` (`saveExact`, `engineStrict` too); `.npmrc` keeps only the registry.
+- **Proofs run on 2026-10-20** (`scripts/plants/run.sh`): a dependency with a `postinstall` script (`esbuild@0.25.0`) fails `pnpm add` with `ERR_PNPM_IGNORED_BUILDS`; a git-sourced package in the lockfile fails `scripts/check-lockfile-sources.mjs`; a known-vulnerable package (`minimist@1.2.5`) fails `pnpm audit`.
+
+**2026-10-20 · Release-age exceptions (`minimumReleaseAgeExclude`).** Billy requires the latest SvelteKit and Tauri releases, and they are younger than the 7-day gate. `pnpm-workspace.yaml` therefore exempts these exact versions:
+
+- `@sveltejs/kit@3.1.0` (published 2026-10-14 22:35 UTC; removable from 2026-10-21);
+- `@tauri-apps/api@2.12.4` (published 2026-10-14 18:47 UTC; removable from 2026-10-21);
+- `@tauri-apps/cli@2.12.3` (published 2026-10-14 19:50 UTC; removable from 2026-10-21), plus its 11 platform binaries `@tauri-apps/cli-<platform>@2.12.3`, published in the same release.
+
+Scope: these four packages only, each a first-party release from the framework's own npm scope (`@sveltejs`, `@tauri-apps`), reviewed 2026-10-20. Every other package keeps the 7-day gate. The exemption relaxes SR-61's 7-day minimum for these entries only, and only until the expiry date.
+
+Rule: pnpm 12.14.0 does not allow name patterns with versions in `minimumReleaseAgeExclude`, so the platform binaries are listed one by one. Verified 2026-10-20: `'@tauri-apps/cli-*@2.12.3'` fails with "Name patterns are not allowed with version unions".
+
+Expiry: on or after 2026-10-21, confirm each version's age with `npm view <pkg> time --json`, delete the 14 entries, run `pnpm verify`, and add a log line here. The pinned versions stay; only the exemptions go.

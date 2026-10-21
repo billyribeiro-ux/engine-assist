@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tamper-restore"
+description = "Enables the tamper_restore command without any pre-configured scope."
+commands.allow = ["tamper_restore"]
+
+[[permission]]
+identifier = "deny-tamper-restore"
+description = "Denies the tamper_restore command without any pre-configured scope."
+commands.deny = ["tamper_restore"]

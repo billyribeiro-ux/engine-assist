@@ -1,0 +1,31 @@
+[
+	{
+		"id": "c0000000-0000-4000-8000-000000000001",
+		"file": "overlay",
+		"detectedAt": "2026-10-19T14:02:00Z",
+		"seenSha256": "d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3",
+		"diff": {
+			"source": ".foreman/overlay.json",
+			"entries": [
+				{
+					"keyPath": "skips",
+					"change": "added",
+					"before": null,
+					"after": "{ \"step\": \"2.5\", \"reason\": \"NFRs are covered in r6-feature-specs.md\" }"
+				}
+			]
+		},
+		"effect": "noEffect",
+		"consequences": [
+			{
+				"glyph": "lock",
+				"text": "2.5 Non-functional requirements is core. Accepting records the skip, but Foreman ignores it and flags it: core steps can't be skipped."
+			}
+		],
+		"context": {
+			"changed": "Today at 14:02, while fm-tradelog-s02-2-3 was running in spec/",
+			"git": "Uncommitted; no commit touches these files since your last approval",
+			"approved": "sha256 9c41…e07a, approved 12 Oct"
+		}
+	}
+]

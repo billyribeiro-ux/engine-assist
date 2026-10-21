@@ -1,0 +1,143 @@
+{
+	"stage": 2,
+	"state": "inProgress",
+	"items": [
+		{
+			"id": "feature-matrix",
+			"text": "The feature matrix covers every serious competitor, with sources",
+			"kind": "attest",
+			"how": null,
+			"status": "notApplicable",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Not applicable: 2.1 didn't run (commercial = no)",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null,
+			"textSha256": "96378d0c96378d0c96378d0c96378d0c96378d0c96378d0c96378d0c96378d0c",
+			"previousText": null
+		},
+		{
+			"id": "beats-competitor",
+			"text": "Every v1 feature beats a named competitor's version or is table stakes",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.6",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null,
+			"textSha256": "9c6a15869c6a15869c6a15869c6a15869c6a15869c6a15869c6a15869c6a1586",
+			"previousText": null
+		},
+		{
+			"id": "red-team",
+			"text": "Every fatal or serious red-team objection is resolved in writing",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.6",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null,
+			"textSha256": "bb52d0eabb52d0eabb52d0eabb52d0eabb52d0eabb52d0eabb52d0eabb52d0ea",
+			"previousText": null
+		},
+		{
+			"id": "stack",
+			"text": "The stack recommendation exists for every layer, plus your recorded final choice",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.4",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null,
+			"textSha256": "a2902614a2902614a2902614a2902614a2902614a2902614a2902614a2902614",
+			"previousText": null
+		},
+		{
+			"id": "frozen",
+			"text": "Open questions: zero. Status: FROZEN v1.0",
+			"kind": "attest",
+			"how": null,
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest, waits for 2.6",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null,
+			"textSha256": "c3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2bc3d08f2b",
+			"previousText": null
+		},
+		{
+			"id": "xi-2-1",
+			"text": "The stack table names a runner-up for every layer",
+			"kind": "attest",
+			"how": "Added for this project",
+			"status": "waiting",
+			"evidence": null,
+			"proposed": null,
+			"note": null,
+			"waitsFor": "Attest",
+			"artifacts": [],
+			"failures": 0,
+			"needsReconfirm": false,
+			"session": null,
+			"textSha256": "d059c046d059c046d059c046d059c046d059c046d059c046d059c046d059c046",
+			"previousText": null
+		}
+	],
+	"closeout": [
+		{
+			"key": "gateA",
+			"label": "Gate A inspection",
+			"state": "now",
+			"note": null
+		},
+		{
+			"key": "results",
+			"label": "Results: 5 waiting",
+			"state": "now",
+			"note": null
+		},
+		{
+			"key": "gateB",
+			"label": "Gate B packet",
+			"state": "pending",
+			"note": "Runs after every item passes. Writes docs/handoff/stage-0N.md."
+		},
+		{
+			"key": "gateC",
+			"label": "Gate C lessons",
+			"state": "pending",
+			"note": "Continues the gate session. Needs an entry headed \"Stage 2\" in docs/lessons.md."
+		},
+		{
+			"key": "sign",
+			"label": "Sign",
+			"state": "locked",
+			"note": null
+		}
+	],
+	"signable": false,
+	"whyNot": ["5 wait for your note", "Then Gate B and Gate C"],
+	"importedFrom": null
+}

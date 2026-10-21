@@ -1,0 +1,35 @@
+{
+	"kind": "ready",
+	"planId": "f0000000-0000-4000-8000-000000000001",
+	"expiresInMs": 60000,
+	"prompt": [
+		{
+			"kind": "text",
+			"spans": [
+				{
+					"kind": "plain",
+					"text": "This inspection item failed: CI is green, and an intentional type error, a planted fake secret, and a known-vulnerable dependency each fail it\nEvidence follows. Plan the smallest fix, then wait for my approval."
+				}
+			]
+		}
+	],
+	"argv": [
+		"/opt/homebrew/bin/claude",
+		"--session-id",
+		"<new uuid>",
+		"--model",
+		"opus",
+		"--effort",
+		"high",
+		"--permission-mode",
+		"plan",
+		"--name",
+		"fm-tradelog-s05-fix-ci-gates"
+	],
+	"envNames": ["HOME", "LANG", "PATH", "SHELL", "TERM", "USER"],
+	"runSettingsSha256": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+	"confirm": [],
+	"rearm": null,
+	"warnings": ["Third failure: Foreman offers the F.4 prompt instead."],
+	"remaps": []
+}

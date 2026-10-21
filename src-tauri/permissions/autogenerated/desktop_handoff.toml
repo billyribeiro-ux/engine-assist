@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-handoff"
+description = "Enables the desktop_handoff command without any pre-configured scope."
+commands.allow = ["desktop_handoff"]
+
+[[permission]]
+identifier = "deny-desktop-handoff"
+description = "Denies the desktop_handoff command without any pre-configured scope."
+commands.deny = ["desktop_handoff"]

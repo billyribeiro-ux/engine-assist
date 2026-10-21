@@ -1,0 +1,28 @@
+# Project rules for Semgrep (SR-63), on top of the p/rust, p/typescript and p/javascript packs.
+rules:
+  - id: foreman-command-outside-spawn
+    languages: [rust]
+    severity: ERROR
+    message: 'SR-02: only foreman-sys::spawn constructs a Command.'
+    patterns:
+      - pattern-either:
+          - pattern: std::process::Command::new(...)
+          - pattern: Command::new(...)
+          - pattern: CommandBuilder::new(...)
+    paths:
+      exclude:
+        - crates/foreman-sys/src/spawn.rs
+        - crates/fake-claude/
+        - '**/tests/**'
+        - scripts/lint-plants/fixtures/
+  - id: foreman-html-sink
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: 'SR-26: never render content as HTML.'
+    pattern-either:
+      - pattern: $X.innerHTML = $Y
+      - pattern: $X.outerHTML = $Y
+      - pattern: $X.insertAdjacentHTML(...)
+    paths:
+      exclude:
+        - scripts/lint-plants/fixtures/

@@ -1,0 +1,75 @@
+---
+source: crates/foreman-core/tests/golden_v2_2.rs
+expression: snap
+---
+## 3.1 · Business model and pricing · Runnable
+kind=prompt tag=conditional when=commercial|payments
+surface=chat cwd=- session=New chain=3.1
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=- requires=[]
+--- prompt part ---
+Here is the frozen Master Spec Packet:
+[paste the Stage 2 Handoff Packet]
+
+Design the business model:
+1. Pricing: tiers, what each includes, monthly vs annual, free trial or
+   freemium (justified with competitor pricing, cited)
+2. Unit economics per paying user per month: hosting, storage, email,
+   payment fees, third-party APIs, any AI usage. Show the math and the
+   gross margin; mark estimates.
+3. Break-even subscriber count, plus 12-month revenue scenarios
+   (conservative / base / strong) with explicit assumptions
+4. Payment provider for the chosen stack: subscription support, a
+   merchant-of-record option for sales tax/VAT, fees, payouts, disputes.
+   Verify current terms on official sites.
+5. Entitlement matrix: tier × feature (F-IDs)
+
+## 3.2 · Security, privacy, and compliance requirements · Runnable
+kind=prompt tag=core when=-
+surface=chat cwd=- session=Continue chain=3.1
+start=opus@adaptive switches=[] alts=[]
+in=[jurisdictions:Text:remember] out=[docs/handoff/stage-03.md] appends=- requires=[]
+--- prompt part ---
+Define the requirements we must design for, before any design exists:
+1. Security requirements: authentication strength, session rules, data
+   encryption in transit and at rest, secrets handling, audit logging,
+   and the OWASP ASVS level from the NFRs
+2. Privacy requirements: data classification for every data class in
+   the packet, minimization, retention and deletion, user data export,
+   consent, and the processors we'll share data with
+--- prompt part (fm:if commercial|others_data|multi_user) ---
+3. Legal and compliance for selling to [TARGET_USERS] in [jurisdictions]:
+   privacy laws (e.g., GDPR, CCPA), terms of service, refunds and
+   cancellations, sales tax/VAT, cookie consent, accessibility
+   obligations, and anything domain-specific
+--- prompt part ---
+For each item: the requirement, which stage implements it, and whether
+a lawyer must review it. This is a planning map, not legal advice.
+
+When I say "approved", output this packet in one code block:
+
+=== HANDOFF PACKET · Stage 3 → Stage 4 ===
+PROJECT: [APP_NAME]
+APPROVED BY: <blank>
+PRICING: <tiers + prices>
+ENTITLEMENTS: <tier: F-IDs>
+UNIT ECONOMICS: <gross margin at each tier; break-even count>
+PAYMENTS: <provider + why>
+SECURITY REQUIREMENTS: <numbered, SR-01…>
+PRIVACY REQUIREMENTS: <numbered, PR-01…, with data classes>
+LEGAL/COMPLIANCE: <numbered, LC-01…, lawyer-review flagged>
+OPEN ITEMS: none
+NEXT: Stage 4 · Construction Drawings · Claude chat · Opus 5.5
+
+## 3:F.2 · Lessons in the chat stages (0–4) · Runnable
+kind=followup tag=core when=-
+surface=chat cwd=- session=Continue chain=3.1
+start=opus@adaptive switches=[] alts=[]
+in=[] out=[] appends=docs/lessons.md requires=[]
+--- prompt part ---
+Before we move on, review this conversation for lessons: questions you
+should have asked earlier, answers I had to correct, output I had to
+redo, and anything in your prompt instructions that was unclear or
+missing. Write lesson entries in the L-NNN format (I'll paste the
+format), each with the exact proposed edit to that stage's prompt in the
+blueprint. If it went cleanly, say so in one line.

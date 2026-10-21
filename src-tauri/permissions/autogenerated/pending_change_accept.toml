@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pending-change-accept"
+description = "Enables the pending_change_accept command without any pre-configured scope."
+commands.allow = ["pending_change_accept"]
+
+[[permission]]
+identifier = "deny-pending-change-accept"
+description = "Denies the pending_change_accept command without any pre-configured scope."
+commands.deny = ["pending_change_accept"]

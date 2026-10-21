@@ -1,0 +1,13 @@
+{
+  "disableAllHooks": false,
+  "effortLevel": "xhigh",
+  "permissions": {
+    "deny": [
+      "Read(//Users/billy/dev/tradelog/.foreman/**)",
+      "Edit(//Users/billy/dev/tradelog/.foreman/**)",
+      "Read(//Users/billy/Library/Application Support/dev.foreman/**)",
+      "Edit(//Users/billy/Library/Application Support/dev.foreman/**)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  }
+}
