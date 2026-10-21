@@ -15,6 +15,7 @@
 	import type { IconName } from '#lib/components/icons.ts';
 	import type { InboxItem, NextStepRow, RunSummary } from '#lib/ipc/types.ts';
 	import { registerShortcuts } from '#lib/keyboard/registry.ts';
+	import { markColdStart } from '#lib/perf.ts';
 	import { sortInbox } from '#lib/nav/inbox.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import type { Tone } from '#lib/nav/status.ts';
@@ -113,8 +114,14 @@
 		}
 	}
 
+	/** The project's current stage has its packet waiting for Billy's signature. */
+	function signable(row: NextStepRow): boolean {
+		return row.strip[row.project.currentStage ?? 0] === 'waiting';
+	}
+
 	function primary(row: NextStepRow): { label: string; icon: IconName; disabled: string | null } {
 		const s = row.next;
+		if (!s && !signable(row)) return { label: 'Open stage', icon: 'open', disabled: null };
 		if (!s) return { label: 'Review and sign', icon: 'pen', disabled: null };
 		const why = s.whyNotRunnable;
 		const disabled = why
@@ -130,7 +137,11 @@
 		const s = row.next;
 		if (!s) {
 			if (row.project.readOnly) return;
-			await goto(to.gate(row.project.id, row.project.currentStage ?? 0));
+			await goto(
+				signable(row)
+					? to.gate(row.project.id, row.project.currentStage ?? 0)
+					: to.stage(row.project.id, row.project.currentStage ?? 0)
+			);
 			return;
 		}
 		const p = primary(row);
@@ -191,11 +202,12 @@
 	$effect(() => {
 		if (focused || !today.value) return;
 		focused = true;
-		void tick().then(() =>
+		void tick().then(() => {
 			document
 				.querySelector<HTMLElement>('.next [data-today-row], .empty-start [data-today-row]')
-				?.focus()
-		);
+				?.focus();
+			markColdStart();
+		});
 	});
 </script>
 
@@ -310,12 +322,19 @@
 								{:else if row.whyNone && row.project.readOnly}
 									<div class="stepname">{row.whyNone}</div>
 									<p class="small muted">Nothing here runs until the folder is back.</p>
-								{:else}
+								{:else if signable(row)}
 									<div class="stepname">
 										Sign the Stage {row.project.currentStage} packet
 										<span class="muted">{row.stageTitle} close-out</span>
 									</div>
 									<p class="small muted">{row.whyNone}</p>
+								{:else}
+									<div class="stepname">
+										{row.whyNone ?? 'Nothing to run yet.'}
+										<span class="muted"
+											>Stage {row.project.currentStage ?? ''}, {row.stageTitle ?? ''}</span
+										>
+									</div>
 								{/if}
 							</div>
 							<div class="right">

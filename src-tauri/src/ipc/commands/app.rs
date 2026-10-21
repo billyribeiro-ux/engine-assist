@@ -1,10 +1,13 @@
 //! App (`docs/contracts/ipc.md` §4.1; F-017, F-019, F-020; tickets M2-19, M2-20).
 
+use std::path::Path;
+
 use foreman_core::ids::Surface as CoreSurface;
 use foreman_core::steps::StepState as CoreState;
 use foreman_core::template::StepKind as CoreKind;
 
 use crate::ipc::IpcError;
+use crate::ipc::commands::first_run::BLUEPRINT_FILE;
 use crate::ipc::commands::projects::summaries;
 use crate::ipc::commands::steps;
 use crate::ipc::dto::app::{AppBootstrap, Capabilities, DoNextOutcome, NextStepRow, TodayView};
@@ -60,8 +63,15 @@ pub fn app_bootstrap(app: &App, req: AppBootstrapReq) -> Result<AppBootstrap, Ip
         let i = app.inner();
         (i.settings_rev, i.doctor.unwrap_or(DoctorLevel::Unknown))
     };
+    // AC-F001-18: a configured blueprint repo that is gone or unreadable sends Billy back to first
+    // run to choose it again; existing projects keep opening from their pinned (cached) template.
+    // A stat of the blueprint file only: no git, no parse (NFR-01).
+    let repo_gone = s
+        .blueprint_repo
+        .as_ref()
+        .is_some_and(|r| !Path::new(&r.path).join(BLUEPRINT_FILE).is_file());
     Ok(AppBootstrap {
-        first_run: !exists || (s.blueprint_repo.is_none() && projects.is_empty()),
+        first_run: !exists || repo_gone || (s.blueprint_repo.is_none() && projects.is_empty()),
         settings_rev: Rev(settings_rev),
         projects,
         // Run records exist once the launch pipeline lands (M2-10, M3-10); none before.
@@ -88,10 +98,32 @@ pub fn next_step<'a>(app: &App, p: &'a Opened) -> Result<&'a foreman_core::templ
         return Err("Every applicable stage is signed.".to_owned());
     };
     let mut running = false;
+    let mut unfinished = false;
     for s in t.stage_steps(stage) {
         let state = p.display_state(app, s);
-        if matches!(state, CoreState::Running) {
-            running = true;
+        match &state {
+            CoreState::Running => running = true,
+            // AC-F017-04: the first step still to do is waiting on a decision, a date or the
+            // blueprint; the row says which instead of reaching past it.
+            CoreState::Undecided
+            | CoreState::WaitingUntil(_)
+            | CoreState::NeedsAnnotation
+            | CoreState::NeedsNewerForeman => {
+                return Err(if running {
+                    format!("A Stage {stage} session is running.")
+                } else {
+                    project::state_words(&state, s, p.path.as_ref())
+                        .2
+                        .unwrap_or_else(|| format!("Nothing in Stage {stage} can run yet."))
+                });
+            }
+            _ => {}
+        }
+        if !matches!(
+            state,
+            CoreState::Done | CoreState::Skipped(_) | CoreState::NotApplicable(_)
+        ) {
+            unfinished = true;
         }
         if runnable_now(&state) && s.runnable() && s.kind != CoreKind::Repeatable {
             return Ok(s);
@@ -99,8 +131,10 @@ pub fn next_step<'a>(app: &App, p: &'a Opened) -> Result<&'a foreman_core::templ
     }
     Err(if running {
         format!("A Stage {stage} session is running.")
+    } else if unfinished {
+        format!("Nothing in Stage {stage} can run yet.")
     } else {
-        format!("Stage {stage} is waiting for its packet to be signed.")
+        format!("Sign Stage {stage} first: its steps are done and its packet isn't signed.")
     })
 }
 

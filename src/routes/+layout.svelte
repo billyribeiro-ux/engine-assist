@@ -25,6 +25,7 @@
 	} from '#lib/keyboard/registry.ts';
 	import { to } from '#lib/nav/routes.ts';
 	import { watchOsDisplay } from '#lib/os-display.ts';
+	import { observe } from '#lib/perf.ts';
 	import { refresh } from '#lib/stores/bus.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 	import { resource } from '#lib/stores/resource.svelte.ts';
@@ -49,10 +50,14 @@
 	});
 
 	onMount(() => {
+		observe();
 		void (async () => {
 			const client = await ipc();
 			const boot = await client.appBootstrap({});
 			if (boot.firstRun && page.url.pathname === '/') await goto(to.firstRun());
+			// AC-F019-07: Doctor runs in the background at start; its `doctor:status` event moves the
+			// sidebar's status dot. Nothing waits for it and a failure is only a missing dot.
+			void client.doctorRun({ scope: 'p1' }).catch(() => undefined);
 			await client.listen('run:status', (p) => {
 				void terminal.statusChanged(client, p.runId, p.status);
 			});

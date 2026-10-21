@@ -40,7 +40,7 @@ tracing-subscriber = { version = "=0.3.23", default-features = false, features =
 # Same exact pins as foreman-core (design doc §3.2).
 jiff = "=0.2.38"
 uuid = { version = "=1.28.0", features = ["v4"] }
-rustix = { version = "=1.1.5", features = ["fs"] }
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
 # ADR-004: TS bindings are generated only with `--features ts`; release builds never compile ts-rs.
 ts-rs = { version = "=12.0.1", optional = true }
 # ADR-015: the WebDriver plugin exists only under `e2e`, never in release (release::no_webdriver).

@@ -285,6 +285,16 @@ impl Decisions<'_> {
         }
     }
 
+    /// Why the approved copy of `kind` can't be used (a schema newer than this Foreman, or
+    /// unparsable), when it exists but can't (AC-F018-07, AC-F030-03): the project is read-only.
+    #[must_use]
+    pub fn approved_problem(&self, kind: DecisionFileKind) -> Option<String> {
+        let (bytes, _) = self.approved(kind).ok()?;
+        typed_ok(kind, &bytes)
+            .err()
+            .map(|why| format!("{}: {why}", kind.repo_path()))
+    }
+
     /// The effective project file.
     ///
     /// # Errors

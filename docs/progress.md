@@ -17,7 +17,7 @@ the commit named, until someone checks it against its acceptance criteria.
 | Milestone | Status | Notes |
 | --------- | ------ | ----- |
 | M1 | done | Domain core (Stage 6). M1-33's exit review (`code-reviewer`, Gate A–C, the Stage 6 packet) is Billy's gate run. |
-| M2 | in-progress | 49/61 required tests present. |
+| M2 | done | Every ticket is done except M2-28, Billy's gate run (`billy`; evidence list under M2 tickets). 61/61 required tests present. Mac checks 18–22 belong to M2. |
 | M3 | done | Every ticket is done except M3-29, M3-30 and M3-31, which are Billy's (`billy`): run them with [`docs/runbooks/p1-kill-check.md`](runbooks/p1-kill-check.md). 72/73 required tests present on Linux; the one missing is `network::blocked_network_run` (M3-29, macOS only). Mac checks 5, 8–10 and 13–15 belong to M3. |
 | M4 | in-progress | Every ticket is done except M4-02 and M4-03 (each `in-progress` with its "Left" items: M4-02 template/event pruning, the project-removal UI and APFS checks; M4-03 the mockup cross-check) and M4-35 (`billy`, the exit gate; evidence under "M4 exit evidence"). M4-29 has Mac check 16 pending. |
 | M5 (UI wave) | in-progress | M5-02, M5-03 and M5-04 done (component tests, Playwright flows and the 7:1 contrast pairs); M5-01, M5-05 and later are not started. |
@@ -69,6 +69,11 @@ Everything that only Billy's Mac can settle, to record in the Stage 5 packet.
 | 15 | Key routing and screen reader mode with the real TUI: S-0 A5–A8 (⌘K, ⌘C/⌘V/⌘A/⌘F, ⌘⇧E out of the terminal, VoiceOver with Settings → Screen reader mode). | M3-11 |
 | 16 | S-23 on the real Claude Code and Desktop (`pnpm spikes s23 prepare` / `check`): record shared or copied; then Open in Desktop on a `surface=desktop` step (Desktop opens on the step folder, the prompt is on the clipboard) and Open this session in Desktop on an ended CLI tab. If S-23 is copied, set `desktop::DESKTOP_SHARE` to `Copied` (the tests already cover that branch). Also confirm `claude --desktop --resume <uuid>` opens that session in Desktop (the flag is in 2.1.304's `--help`; its pairing with `--resume` and the 2.1.285 floor aren't documented). | M4-29 |
 | 17 | The Now/Next strip's live mode with the sensor on a real session: switch modes with Shift-Tab and check the strip follows and flags a mode outside the step's plan in the attention color, in Night and Vellum. | M4-11 |
+| 18 | AC-XC-27 in the real webview: `pnpm test:e2e` runs `e2e/specs/03-navigation.e2e.ts` (a navigation and a `window.open` to a remote URL are refused). Linux proves the handlers (`webview::navigation_denied_to_remote`, `webview::window_open_denied`) and the Playwright flows, not WKWebView. | M2-03 |
+| 19 | `/usr/bin/open -b <editor bundle id> <path>` opens a `.md`, `.json` and `.txt` file in the chosen editor (never the default app) and `open -R` reveals it. Linux proves the argv through the `Os::open_request` seam. | M2-13 |
+| 20 | A real `claude auth status` on the Mac: Doctor's sign-in row reads "Signed in with your plan", and signing out turns it into the Sign-in failure with the `/login` instruction. Linux uses `fake-claude`. | M2-15 |
+| 21 | Setup refuses an unwritable folder (`setup::unsafe_folders_are_refused_before_any_write`): that case runs only for a non-root user, and the sandbox is root. Run `cargo test -p foreman-app --test setup` as Billy. | M2-17 |
+| 22 | NFR-01, NFR-02 and NFR-07 in the real app: after launching, read `perf: startup` and `perf: project switch` in `~/Library/Application Support/<app>/logs/foreman.log` and the `fm:cold-start`, `fm:project-switch`, `fm:long-task` and `fm:input` User Timing entries. Also run `tests/flows/perf.spec.ts` and `a11y.spec.ts` in the WebKit project (not installed in the sandbox; chromium passes). Targets are enforced in M5-09. | M2-27 |
 
 ## M1 tickets
 
@@ -117,34 +122,58 @@ branches. APIs: design doc §3.2.3. A command not built yet answers `Unsupported
 
 | Ticket | Status | Title | Req. tests | Built, and what's left |
 | ------ | ------ | ----- | ---------- | ---------------------- |
-| M2-01 | review-pending | IPC command framework | 2/3 | 91 commands registered, granted and validated; §2.4 types; ts-rs bindings; drift tests. The checker doesn't find `ipc::fuzz_*`. |
-| M2-02 | in-progress | Mock IPC and contract tests | 1/1 | Built in `77a4db4` (typed IPC contract for all 91 commands and 9 events, stateful mock with TradeLog fixtures); no status recorded. |
-| M2-03 | todo | Rust-built main window and startup hardening | 1/3 | No branch recorded this ticket. Missing `webview::navigation_denied_to_remote`, `webview::window_open_denied`. |
-| M2-04 | in-progress | App shell, routes and UI primitives | none named | Built in `5e8d9c5` (app shell, tokens, safe rendering, shortcuts and the palette); no status recorded. |
-| M2-05 | in-progress | Safe rendering: node trees and visible escapes | 1/5 | Built in `5e8d9c5`, tests in `ab50a98`; no status recorded. Missing `render::escapes_html_in_packet`, `render::no_raw_html_passthrough`, `render::bidi_visible_in_diff`, `render::hostile_filename_escaped`. |
-| M2-06 | in-progress | Argv builder | 8/8 | Runner: argv builder, fixed flags, prompt last, `--name`; `argv::*`, `spawn::no_shell_in_any_code_path`, abuse argv. App: `clipboard_copy { target: "command" }` done (`stage/05-chat`). Left: the preview UI. |
-| M2-07 | in-progress | Child environment and PATH | 5/5 | Runner: child env and PATH sanitizing; `env::*`. Left: the pass-through setting. |
-| M2-08 | in-progress | Child process lifecycle | 2/2 | Runner: PTY/non-PTY lifecycle, no inherited fds, SIGHUP quit path. App: run table and startup scan done, `lifecycle::crash_leaves_interrupted` passes (`src-tauri/tests/launch.rs`). Left: the quit guard (M3-13). |
-| M2-09 | in-progress | Run settings file | 4/4 | Runner: run settings file (fresh, `0600`); `run_settings::*`. Nothing listed as left for the app. |
-| M2-10 | in-progress | Run record and redacted run log | 4/4 | No row of its own; its tests landed with M3-10's app part (`run.json` before spawn, index lines, `runlog::record_before_spawn`/`argv_prompt_redacted`/`no_env_values`). No status recorded. |
-| M2-11 | in-progress | `claude -v` and `claude auth status` readers | 3/3 | Runner: the readers (fail closed). Left: Doctor. |
-| M2-12 | in-progress | Settings backend and tool paths | 2/3 | `settings_get`, `settings_update`, `settings_pick_tool`; screen-reader mode in memory until settings v2. Missing `settings::security_fields_require_native_confirm`. |
-| M2-13 | in-progress | File opening and reveal | 0/2 | `file_open`, `file_reveal` through `foreman-sys::spawn`. Missing `opener::open_file_refuses_executable_types`, `opener::uses_editor_bundle_id`. |
-| M2-14 | in-progress | Settings screen (P1) | none named | Built in `6637582`; no status recorded. |
-| M2-15 | in-progress | Doctor (P1) | none named | `doctor_run`: claude path and version, git; the auth row waits for M3-01/M3-04. |
-| M2-16 | in-progress | First run | 1/1 | `blueprint_pick_repo`. |
-| M2-17 | in-progress | Project setup backend | 2/2 | `setup_*`; `docs/templates/` content from the pinned kit not written yet. |
-| M2-18 | in-progress | Setup form | none named | Built in `6637582`; no status recorded. |
-| M2-19 | in-progress | Project open, registry and read-only states | 2/2 | `project_open`, `projects_list`. |
-| M2-20 | in-progress | Today (P1) | none named | `today_get`, `do_next`; CLI steps wait for `launch_prepare`. |
-| M2-21 | in-progress | Stage workspace: step rows and spec line | 1/1 | `step_view`, `step_skip`, `action_preview`, `action_apply`. |
-| M2-22 | in-progress | Run inputs and prompt block | 1/1 | `run_input_set`, `optional_part_set`. |
-| M2-23 | todo | Redacted config and decision snapshots | 2/2 | No branch recorded this ticket; the checker finds its two required test names. |
-| M2-24 | in-progress | Conditions, variables and the outside-change review | 1/2 | `condition_set`, `variable_set`, `pending_*`. Missing `decisions::reject_restores_via_cas`. |
-| M2-25 | in-progress | Launch preview and native confirmations | 6/7 | `launch_prepare`, `chain_resume_prepare`, `do_next` → `prepare_launch`; plans held 60 s, one use. Missing `preflight::confirm_required_for_*`. |
-| M2-26 | in-progress | Core shortcuts and the terminal drawer shell | none named | The app table listed `step_mark_done` under this ticket. Shortcuts built in `5e8d9c5`, tests in `ab50a98`. |
-| M2-27 | in-progress | Screen component tests, e2e smoke and performance marks | none named | Built in `ab50a98` (screen component tests, P1 keyboard flow, axe in both themes, token lint); no status recorded. |
-| M2-28 | todo | M2 exit | none named | |
+| M2-01 | done | IPC command framework | 3/3 | 91 commands registered, granted and validated; one request struct each with `deny_unknown_fields`; §2.4 types; ts-rs bindings; drift tests; `ipc::fuzz_*` (`src-tauri/tests/ipc_fuzz.rs`) and a handler panic returning a typed error without its payload (`logging::redaction`). |
+| M2-02 | done | Mock IPC and contract tests | 1/1 | Typed IPC contract for all 91 commands and 9 events; stateful mock with TradeLog fixtures; `contract.test.ts`, `mock.coverage.test.ts` and `fixtures.test.ts` run the same cases against the mock and the recorded Rust responses. |
+| M2-03 | done (Mac check 18 pending) | Rust-built main window and startup hardening | 3/3 | `window.rs` builds the main window with `on_navigation` (app origin, dev server in debug builds) and `on_new_window` returning Deny; `webview::navigation_denied_to_remote`, `webview::window_open_denied` and the startup umask/permission hardening (`startup::harden`) pass. The real-webview refusal is `e2e/specs/03-navigation.e2e.ts` (Mac only). |
+| M2-04 | done | App shell, routes and UI primitives | none named | App shell, tokens, hand-built primitives, shortcuts and the palette. "One component test per route stub" is the Playwright `routes.spec.ts` (every route renders under the root layout) and `a11y.spec.ts` (axe in both themes). |
+| M2-05 | done | Safe rendering: node trees and visible escapes | 5/5 | `render::*` including `escapes_html_in_packet`, `no_raw_html_passthrough`, `bidi_visible_in_diff` and `hostile_filename_escaped`; AC-XC-32 comp tests. `render::no_raw_html_passthrough` can fail only while `tests/lint-plants.test.ts` is writing its `__plant_*` temporary file (fixed on `stage/05-site-prep`, `15c607d`). |
+| M2-06 | done | Argv builder | 8/8 | `argv::*`, `spawn::no_shell_in_any_code_path`, abuse argv; the one argv function is `foreman-sys::spawn::argv`. `clipboard_copy { target: "command" }` and the exact-command preview (AC-F008-17) pass. |
+| M2-07 | done | Child environment and PATH | 5/5 | `env::*`: cleared environment plus the allowlist, PATH sanitizing and the settings pass-through (also used by Doctor's `claude auth status`). |
+| M2-08 | done | Child process lifecycle | 2/2 | PTY/non-PTY lifecycle, no inherited fds, SIGHUP quit path (the quit guard is M3-13); run table, startup scan and `lifecycle::crash_leaves_interrupted`. |
+| M2-09 | done | Run settings file | 4/4 | Run settings file (fresh, `0600`); `run_settings::*`. |
+| M2-10 | done | Run record and redacted run log | 4/4 | `run.json` before spawn, index lines, `runlog::record_before_spawn`/`argv_prompt_redacted`/`no_env_values`; landed with M3-10's app part. |
+| M2-11 | done | `claude -v` and `claude auth status` readers | 3/3 | The readers fail closed; Doctor now uses both (M2-15). A missing or non-executable claude path reports `notExecutable`, not `missing`. |
+| M2-12 | done | Settings backend and tool paths | 3/3 | `settings_get`, `settings_update`, `settings_pick_tool`; `settings::security_fields_require_native_confirm`; screen-reader mode in memory until settings v2. |
+| M2-13 | done (Mac check 19 pending) | File opening and reveal | 2/2 | `file_open`, `file_reveal` through `foreman-sys::spawn` and the `Os::open_request` seam; `opener::open_file_refuses_executable_types`, `opener::uses_editor_bundle_id`. AC-XC-28 holds because no opener plugin is used. |
+| M2-14 | done | Settings screen (P1) | none named | Tool paths are read-only and picked through `settings_pick_tool`; an invalid editor is refused inline; AC-F029-07 through the Packet screen (`Settings.acs.svelte.test.ts`). |
+| M2-15 | done (Mac check 20 pending) | Doctor (P1) | none named | `doctor_run`: claude path and version, git (shown without a floor) and the sign-in row (`claude auth status`, subscription methods only; an allowlisted auth key is a failure). Doctor runs at start and after a launch failure that points at claude or sign-in (AC-F019-07). `doctor_checks.rs`. |
+| M2-16 | done | First run | 1/1 | `blueprint_pick_repo`; a configured blueprint repo that is gone sends Billy back to first run (AC-F001-18); the fixed auto-detect candidates only. `first_run.rs`, `FirstRun.acs.svelte.test.ts`. |
+| M2-17 | done (Mac check 21 pending) | Project setup backend | 2/2 | `setup_*`; writes the three kit templates (`docs/templates/{handoff-packet,change-request,postmortem}.md`, embedded in the app) and never overwrites an existing file; `src-tauri/tests/setup.rs`. |
+| M2-18 | done | Setup form | none named | `Setup.acs.svelte.test.ts` (AC-F018-01, -02 and the review-before-write list). |
+| M2-19 | done | Project open, registry and read-only states | 2/2 | `project_open`, `projects_list`; a lock mismatch or a decision file from a newer Foreman opens read-only with its reason and no Run action, including when a folder with a newer `.foreman/` is adopted. `project_open.rs`. |
+| M2-20 | done | Today (P1) | none named | `today_get`, `do_next`; the row says why there is no next step (Decide ... to continue, Waiting until, Sign Stage N first, Nothing in Stage N can run yet, Project folder not found). `today.rs`, `Today.acs.svelte.test.ts`. |
+| M2-21 | done | Stage workspace: step rows and spec line | 1/1 | `step_view`, `step_skip`, `action_preview`, `action_apply`; `StageWorkspace.acs.svelte.test.ts`. |
+| M2-22 | done | Run inputs and prompt block | 1/1 | `run_input_set`, `optional_part_set`. |
+| M2-23 | done | Redacted config and decision snapshots | 2/2 | The checker finds both required tests and they pass; the extended `looks_secret` covers more key shapes. |
+| M2-24 | done | Conditions, variables and the outside-change review | 2/2 | `condition_set`, `variable_set`, `pending_*`; `decisions::reject_restores_via_cas`; `decisions::current()` no longer reports a stale approved copy as current. |
+| M2-25 | done | Launch preview and native confirmations | 7/7 | `launch_prepare`, `chain_resume_prepare`, `do_next` → `prepare_launch`; plans held 60 s, one use, bound to the project revision (`launch_plan.rs`); `preflight::confirm_required_for_*`. The preview names why Rust will ask while `launch_start` carries only `{ planId }` (AC-F008-18). |
+| M2-26 | done | Core shortcuts and the terminal drawer shell | none named | `shortcuts.test.ts`, `dispatch.svelte.test.ts`, `StageWorkspace.shortcuts.svelte.test.ts` (⌘↵, ⌘⇧V, ⌘D over IPC; one-line reasons where they don't apply) and the drawer test (⌃`, height remembered). |
+| M2-27 | done (Mac check 22 pending) | Screen component tests, e2e smoke and performance marks | none named | One component test per screen, the P1 keyboard flow, axe in both themes. `src/lib/perf.ts` marks `fm:cold-start` (NFR-01), `fm:project-switch` (NFR-02), long tasks and slow inputs (NFR-07); Rust logs `perf: startup` (`ms`, `since_start_ms`) and `perf: project switch` in `logs/foreman.log` (`perf_marks.rs`). Targets are enforced in M5-09. |
+| M2-28 | billy | M2 exit | none named | Billy's gate run: the evidence list is below. |
+
+### M2-28 evidence checklist (Billy's gate run)
+
+Nothing below is signed or run by the build. Record each result in the Stage 7 packet.
+
+| # | Evidence | How |
+| - | -------- | --- |
+| 1 | EX-M2-04: first run completes on Billy's Mac and creates a project with the setup form (AC-F019-01, AC-F018-03). | Launch the built app with an empty app-data folder: choose the blueprint repo, check the template, confirm the name, run Doctor, then Start your first project. Check the new folder has `.foreman/` and the three files in `docs/templates/`. |
+| 2 | EX-M2-05: every M2 criterion passes. | `pnpm verify` green on the Mac (it runs `cargo test --workspace`, Vitest, rustfmt, clippy, audits and the required-test checker: `node scripts/check-required-tests.mjs --milestone=M2` prints 61/61). |
+| 3 | EX-M2-05: AC-XC-01, -03, -05, -06, -27, -28, -31, -32. | -01: clippy `disallowed-methods` in `pnpm verify`. -03: `argv::*` and `spawn::no_shell_in_any_code_path`. -05: `ipc.rs`, `ipc_fuzz.rs`. -06: `settings_backend.rs`, `setup.rs`, `opener.rs`. -27 and -28: Mac checks 16 and 17. -31: `env::*`, `lifecycle::*`, `launch.rs`. -32: `render::*` and the safe-rendering comp tests. |
+| 4 | EX-M2-06: no shell, no flag outside the fixed list, no `claude -p`. | `spawn::no_shell_in_any_code_path`, `argv::*`, the abuse-argv test; `rg -n "Command::new|CommandBuilder::new" src-tauri crates` finds only `foreman-sys::spawn`. |
+| 5 | EX-M2-03: the e2e smoke starts the built app and reaches Today. | `pnpm test:e2e` (`e2e/specs/01-launch.e2e.ts`); Linux runs the Playwright smoke against the mock. |
+| 6 | The Mac checks that belong to M2. | Mac checks 18 to 22, and items 1 and 8 of the list for the APFS and keyboard-only loops. |
+| 7 | The Stage 7 packet. | `docs/handoff/stage-07.md`: Billy signs it; the build never fills in APPROVED BY. |
+
+### M2 documents that disagree (resolved without a change request)
+
+- AC-F001-18 says projects "open read-only from their cached lock"; DR-156 and AC-F002-04/-06 say the template comes from the app-data cache first. The build follows DR-156: read-only only when the cache is also missing, the hash mismatches or git is missing.
+- AC-F018-03 says the templates come "from the pinned kit", but the blueprint fixture holds no kit templates. The build writes the three kit templates shipped in Foreman's own `docs/templates/` (embedded at build time).
+- AC-F019-04 and AC-F019-07 asked for a Doctor sign-in row and Doctor runs at start and after a launch failure; the earlier note deferred auth to M3. Both are built.
+- AC-F017-04's reason texts differed from the Rust `next_step` ones and the Today rows mislabeled some states; both now match the AC.
+- The step row's button reads "Copy and open" while AC-F030-01 says "Copy for chat"; the label is unchanged (it also opens the browser).
+- Doctor's UI shows `detail` and `found` only (it ignores `DoctorCheck.summary`), so the rows put the full sentence in `detail`.
+- NFR-01 asks for "process start to first Today render in the run log". There is no IPC command for the webview to write a log line (the contract is frozen), so the log has process start to bootstrap (`perf: startup`) and the first Today render is a User Timing mark. A command for it would be a change request in M5-09.
 
 ## M3 tickets
 

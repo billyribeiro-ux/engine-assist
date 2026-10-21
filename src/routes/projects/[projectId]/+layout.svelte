@@ -11,12 +11,21 @@
 	import type { ProjectView } from '#lib/ipc/types.ts';
 	import { registerShortcuts } from '#lib/keyboard/registry.ts';
 	import { to } from '#lib/nav/routes.ts';
+	import { markSwitchEnd, markSwitchStart } from '#lib/perf.ts';
 	import { current } from '#lib/stores/project.svelte.ts';
 
 	let { children }: { children: Snippet } = $props();
 
 	const projectId = $derived(page.params.projectId ?? '');
 	const stageParam = $derived(page.params.stage === undefined ? null : Number(page.params.stage));
+
+	// NFR-02: the switch starts when the route's project changes and ends once its screen is up.
+	$effect(() => {
+		if (projectId && current.project?.summary.id !== projectId) markSwitchStart(projectId);
+	});
+	$effect(() => {
+		if (projectId && current.project?.summary.id === projectId) markSwitchEnd(projectId);
+	});
 
 	onMount(() =>
 		registerShortcuts({
