@@ -25,7 +25,7 @@ For browser-mode Vitest and Playwright without Playwright's own browser download
 ## Dependency freshness
 
 - **Check:** `pnpm outdated` skips versions still inside the 7-day window. On 2026-10-20 it listed only `typescript` and `@types/node`, hiding six newer dev-tool releases. For the true latest, run `npm view <pkg> version`, and `npm view <pkg> time --json` for publish dates.
-- **Drop the exceptions:** on or after 2026-10-21, delete the 14 `minimumReleaseAgeExclude` entries in `pnpm-workspace.yaml` (kit 3.1.0, `@tauri-apps/api` 2.12.4, `@tauri-apps/cli` 2.12.3 and its 11 binaries), run `pnpm verify`, and log the removal in ADR-024. The pinned versions don't change.
+- **Drop the exceptions:** after 2026-10-21 22:36 UTC (6:36 PM ET; kit 3.1.0 was published 2026-10-14 22:35 UTC, the last of the three), delete the 14 `minimumReleaseAgeExclude` entries in `pnpm-workspace.yaml` (kit 3.1.0, `@tauri-apps/api` 2.12.4, `@tauri-apps/cli` 2.12.3 and its 11 binaries), run `pnpm verify`, and log the removal in ADR-024. The pinned versions don't change.
 - **Pins vs latest (2026-10-20):**
 
 | Package | Pinned | Latest | Status |
