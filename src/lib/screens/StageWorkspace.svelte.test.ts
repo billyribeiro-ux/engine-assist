@@ -44,7 +44,7 @@ describe('StageWorkspace', () => {
 		const callout = row.element().querySelector<HTMLElement>('.callout');
 		expect(callout?.textContent).toBe('+1');
 		const text = document.createRange();
-		text.selectNodeContents(callout as HTMLElement);
+		text.selectNodeContents(callout!);
 		expect(text.getBoundingClientRect().width).toBeLessThan(callout?.clientWidth ?? 0);
 		expect(row.element().querySelector('.vh')?.textContent).toContain('x‑2‑1');
 		// A template step keeps its number.

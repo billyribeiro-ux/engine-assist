@@ -69,7 +69,7 @@ describe('SheetStrip', () => {
 		expect(dims).toHaveLength(6);
 		for (const d of dims) {
 			const st = getComputedStyle(d);
-			expect(st.overflowY, d.textContent ?? '').toBe('visible');
+			expect(st.overflowY, d.textContent).toBe('visible');
 			const label = d.querySelector('span');
 			// A label that is hidden at this width (the last one, below 920 px) has no box.
 			const h = label?.getBoundingClientRect().height ?? 0;

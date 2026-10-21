@@ -183,13 +183,7 @@ mod retention {
             "a pinned template's last use is now"
         );
         // The project still opens from the kept text.
-        assert!(
-            foreman_app::ipc::commands::projects::project_open(
-                &p.t.app,
-                req(json!({ "projectId": p.id }))
-            )
-            .is_ok()
-        );
+        assert!(projects::project_open(&p.t.app, req(json!({ "projectId": p.id }))).is_ok());
     }
 
     /// If a project's lock can't be read, nothing is called unused: no deletes at all.
