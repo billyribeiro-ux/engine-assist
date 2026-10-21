@@ -34,7 +34,10 @@ describe('TerminalDrawer', () => {
 		localStorage.removeItem('fm.drawerOpen');
 		ui.drawerOpen = true;
 		ui.setDrawerHeight(216);
-		terminal.add({ runId: 'a0000000-0000-4000-8000-0000000000c3', chain: 'c3', tabName: 'fm-x' }, null);
+		terminal.add(
+			{ runId: 'a0000000-0000-4000-8000-0000000000c3', chain: 'c3', tabName: 'fm-x' },
+			null
+		);
 		const s = await render(TerminalDrawer);
 		const grip = s.getByRole('separator', { name: 'Resize terminal drawer' });
 		await expect.element(grip).toHaveAttribute('aria-valuenow', '216');

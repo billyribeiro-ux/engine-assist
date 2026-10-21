@@ -9,7 +9,7 @@ import { refresh } from '#lib/stores/bus.ts';
 import { pendingOutput, terminal } from '#lib/stores/terminal.svelte.ts';
 import { ui } from '#lib/stores/ui.svelte.ts';
 
-import { blockerText, failureText } from './words.ts';
+import { blockerText, confirmText, failureText } from './words.ts';
 
 export interface RunTarget {
 	projectId: string;
@@ -19,12 +19,25 @@ export interface RunTarget {
 	mode?: PrepareMode;
 }
 
+/** Blockers that Doctor explains: it runs again in the background, so its dot is current (AC-F019-07). */
+const DOCTOR_BLOCKERS = new Set([
+	'claudeMissing',
+	'versionBelowFloor',
+	'authFailed',
+	'authKeyBlocked'
+]);
+
+function recheckDoctor(client: IpcClient): void {
+	void client.doctorRun({ scope: 'p1' }).catch(() => undefined);
+}
+
 async function start(
 	client: IpcClient,
 	t: RunTarget,
 	prep: PrepareOutcome
 ): Promise<true | string> {
 	if (prep.kind === 'blocked') {
+		if (prep.blockers.some((b) => DOCTOR_BLOCKERS.has(b.kind))) recheckDoctor(client);
 		const first = prep.blockers[0];
 		return first ? blockerText(first) : 'This step is blocked.';
 	}
@@ -44,6 +57,10 @@ async function start(
 			old ? { label: old.tabName, lines: terminal.lines(old.runId) } : null
 		);
 	} else {
+		// AC-F008-18: the preview lists why Rust is about to ask. It is context only; the native
+		// dialog is the confirmation and `launch_start` carries nothing but the plan ID.
+		if (prep.confirm.length)
+			ui.toast(`Foreman will ask you to confirm. ${prep.confirm.map(confirmText).join(' ')}`);
 		const res = await client.launchStart({ planId: prep.planId }, out.cb);
 		out.bind(res.runId);
 		terminal.add(res, t.projectId);
@@ -87,6 +104,8 @@ export async function runStep(t: RunTarget): Promise<true | string> {
 	} catch (e: unknown) {
 		const f = toIpcFailure(e);
 		if (f.code === 'cancelled') return 'Cancelled. Nothing was launched.';
+		// A launch that failed to start: Doctor looks again, in the background (AC-F019-07).
+		if (f.code === 'toolMissing' || f.code === 'toolFailed') recheckDoctor(client);
 		return failureText(f);
 	}
 }
@@ -98,6 +117,7 @@ export async function runPrepared(t: RunTarget, prep: PrepareOutcome): Promise<t
 		return await start(client, t, prep);
 	} catch (e: unknown) {
 		const f = toIpcFailure(e);
+		if (f.code === 'toolMissing' || f.code === 'toolFailed') recheckDoctor(client);
 		return f.code === 'cancelled' ? 'Cancelled. Nothing was launched.' : failureText(f);
 	}
 }

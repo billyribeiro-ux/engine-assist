@@ -92,6 +92,7 @@
 		!repo ? 1 : !health ? 2 : !savedName || editingName ? 3 : !doctor || trust === 'todo' ? 4 : 5
 	);
 	const checks = $derived((doctor?.checks ?? []).filter((c) => c.id !== 'path'));
+	const claudePath = $derived(doctor?.checks.find((c) => c.id === 'path')?.found ?? null);
 	const doctorOk = $derived(!!doctor && trust !== 'todo');
 	const tone = (l: string) =>
 		l === 'ok' ? 'pass' : l === 'failing' ? 'fail' : l === 'warning' ? 'attention' : 'muted';
@@ -244,8 +245,12 @@
 														: ch.name}</span
 										>
 										<span>
-											{#if ch.id === 'version'}{ch.found} at /opt/homebrew/bin/claude{:else if ch.id === 'auth'}claude.ai
-												(your plan){:else}{ch.found}{/if}
+											{#if ch.id === 'version'}{ch.found ?? '—'}{#if claudePath}
+													at {claudePath}{/if}{:else if ch.id === 'auth'}{ch.found
+													? ch.level === 'ok'
+														? `${ch.found} (your plan)`
+														: ch.found
+													: 'not checked yet'}{:else}{ch.found}{/if}
 											{#if ch.level === 'failing'}<span class="err"><Text spans={ch.detail} /></span
 												>{/if}
 										</span>
