@@ -116,8 +116,9 @@ where
     // SR-54: the command's name, its error code and how long it took; never request or response
     // values. Errors and slow commands only (a keystroke is a command too).
     let ms = started.elapsed().as_millis();
+    let command = command_name::<F>();
+    crate::logging::perf_command(command, u64::try_from(ms).unwrap_or(u64::MAX));
     if out.is_err() || ms >= 500 {
-        let command = command_name::<F>();
         let code = out.as_ref().err().map_or("ok", |e| e.code.as_str());
         tracing::info!(target: "ipc", command, code, ms = u64::try_from(ms).unwrap_or(u64::MAX), "command");
     }

@@ -4,10 +4,9 @@
 //! before anything opens it (SR-31).
 
 use std::path::Path;
-use std::time::Duration;
 
 use foreman_core::pathpolicy::{self, ReadClass};
-use foreman_sys::spawn::{self, Cwd, RunOpts, SpawnRequest};
+use foreman_sys::spawn::SpawnRequest;
 
 use crate::ipc::IpcError;
 use crate::ipc::dto::requests::{FileOpenReq, FileRevealReq, TerminalOpenHereReq};
@@ -35,33 +34,9 @@ fn checked(app: &App, project_id: &str, path: &str) -> Result<std::path::PathBuf
 
 fn opener(app: &App, req: &SpawnRequest) -> Result<(), IpcError> {
     let ctx = app.spawn_ctx_now()?;
-    let opts = RunOpts {
-        env: vec![
-            ("HOME".to_owned(), app.paths().home.display().to_string()),
-            ("PATH".to_owned(), "/usr/bin:/bin".to_owned()),
-        ],
-        timeout: Duration::from_secs(10),
-        output_cap: 64 * 1024,
-        cwd: Cwd::AppData,
-    };
-    let out = spawn::run(req, &opts, &ctx).map_err(|e| {
-        IpcError::tool_failed(
-            "open",
-            None,
-            matches!(e, spawn::SpawnError::Timeout(_)),
-            String::new(),
-        )
-    })?;
-    if out.code == Some(0) {
-        Ok(())
-    } else {
-        Err(IpcError::tool_failed(
-            "open",
-            out.code,
-            false,
-            String::new(),
-        ))
-    }
+    app.os()
+        .open_request(req, &ctx)
+        .map_err(|e| IpcError::tool_failed("open", None, e.starts_with("timed out"), String::new()))
 }
 
 /// `file_open` (P1): `/usr/bin/open -b <editor> <file>` for `.md`, `.json` and `.txt` only.

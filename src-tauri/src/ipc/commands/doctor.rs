@@ -26,8 +26,10 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
+use foreman_core::pathpolicy;
 use foreman_core::probe::{ProbeOutcome as CoreOutcome, ProbeResult as CoreResult};
 use foreman_core::schema::settings::{Contract, LoginPath, SettingsFile};
+use foreman_core::store::dirs;
 use foreman_core::store::outside::{self, OutsideRead, UserClaudeEntry};
 use foreman_sys::spawn::{
     self, Cwd, LoginShellConsent, Program, RunOpts, SpawnError, SpawnRequest,
@@ -143,6 +145,147 @@ fn check(
         found_mono: found.is_some(),
         found,
         action: None,
+    }
+}
+
+/// The Sign-in row (AC-F019-04, SR-08): `claude auth status` in `<app-data>/probe/` with the
+/// launch environment, only after the configuration fingerprint passes SR-07's scan there. Only
+/// the method (`claude.ai` or `oauth_token`) and the exit code are read; a logged-out, unknown,
+/// unparsable or API-key answer fails with how to fix it.
+fn auth_row(
+    app: &App,
+    settings: &SettingsFile,
+    ctx: &spawn::SpawnCtx,
+    claude_ready: bool,
+) -> DoctorCheck {
+    let row = |level: DoctorLevel, summary: Option<String>, detail: &str, found: Option<String>| {
+        let name = if level == DoctorLevel::Ok {
+            "Signed in with your plan"
+        } else {
+            "Sign-in"
+        };
+        DoctorCheck {
+            found_mono: false,
+            ..check("auth", name, level, summary, detail, found)
+        }
+    };
+    let how = "Run claude in a terminal and sign in with your Claude plan (/login). Foreman launches only with a subscription sign-in, never an API key.";
+    if !claude_ready {
+        return row(
+            DoctorLevel::Unknown,
+            Some("Needs Claude Code first.".to_owned()),
+            "Foreman checks the sign-in once Claude Code is found at the right version.",
+            None,
+        );
+    }
+    let Ok(root) = app.app_root() else {
+        return row(
+            DoctorLevel::Unknown,
+            Some("Foreman's data folder isn't available.".to_owned()),
+            how,
+            None,
+        );
+    };
+    let probe = ctx.app_data.join("probe");
+    let made = pathpolicy::check_app_data("probe")
+        .ok()
+        .is_some_and(|p| dirs::ensure_dir(&root, &p).is_ok());
+    if !made {
+        return row(
+            DoctorLevel::Unknown,
+            Some("The probe folder couldn't be prepared.".to_owned()),
+            how,
+            None,
+        );
+    }
+    let probe = spawn::canonical(&probe);
+    let own_env = app.own_env();
+    let config_dir = own_env
+        .iter()
+        .find(|(k, _)| k == "CLAUDE_CONFIG_DIR")
+        .map(|(_, v)| PathBuf::from(v));
+    let home = app.paths().home.clone();
+    let gathered = foreman_sys::fingerprint::gather(
+        &foreman_sys::fingerprint::Where {
+            cwd: &probe,
+            repo_root: &probe,
+            home: &home,
+            config_dir: config_dir.as_deref(),
+            managed: Path::new(foreman_core::fingerprint::MANAGED_DIR),
+            projects: &ctx.projects,
+        },
+        &[],
+    );
+    let g = match gathered {
+        Ok(g) => g,
+        Err(_) => {
+            return row(
+                DoctorLevel::Failing,
+                Some("Foreman couldn't read the Claude Code settings it checks first.".to_owned()),
+                "A settings file is unreadable, too large or a symlink into a project. Fix it, then check again.",
+                None,
+            );
+        }
+    };
+    let allow: Vec<foreman_core::fingerprint::AllowlistEntry> = settings
+        .auth_key_allowlist
+        .iter()
+        .map(|a| foreman_core::fingerprint::AllowlistEntry {
+            key: a.key.clone(),
+            sha256: a.sha256.clone(),
+        })
+        .collect();
+    if let Some(hit) = foreman_core::fingerprint::auth_key_hits(&g.files, &allow)
+        .into_iter()
+        .next()
+    {
+        let problem = format!(
+            "{} sets {}, which would replace your plan sign-in",
+            escape_visible(&hit.file),
+            escape_visible(&hit.key)
+        );
+        return row(
+            DoctorLevel::Failing,
+            Some(problem.clone()),
+            &format!(
+                "{problem}. Remove that setting (Foreman never edits it), then check again. A launch shows the same file and key."
+            ),
+            None,
+        );
+    }
+    let sources = crate::launch::path_sources(
+        app,
+        settings
+            .login_path
+            .as_ref()
+            .map(|l| l.entries.clone())
+            .unwrap_or_default(),
+    );
+    let env = foreman_sys::launch::child_env(
+        &own_env,
+        &settings.env_passthrough,
+        &sources,
+        &ctx.projects,
+        Uuid::new_v4(),
+    )
+    .0;
+    let check_ = foreman_sys::claude::auth_status(ctx, &probe, &env);
+    match check_.result {
+        Ok(method) => row(
+            DoctorLevel::Ok,
+            None,
+            "Claude Code reports a subscription sign-in. Foreman reads only the method and the exit code.",
+            Some(escape_visible(&method)),
+        ),
+        Err(why) => {
+            let problem = escape_visible(&foreman_sys::launch::describe(&why));
+            row(
+                DoctorLevel::Failing,
+                Some(problem.clone()),
+                &format!("{problem}. {how}"),
+                check_.method.map(|m| escape_visible(&m)),
+            )
+        }
     }
 }
 
@@ -799,17 +942,10 @@ pub fn doctor_run(app: &App, req: DoctorRunReq) -> Result<DoctorReport, IpcError
             }
         }
     }
-    checks.push(DoctorCheck {
-        found_mono: false,
-        ..check(
-            "auth",
-            "Sign-in",
-            DoctorLevel::Unknown,
-            Some("Checked before the first launch.".to_owned()),
-            "Foreman runs claude auth status in the step's folder before a launch, only after the configuration check passes (subscription sign-in only).",
-            None,
-        )
-    });
+    let claude_ready = checks
+        .iter()
+        .any(|c| c.id == "version" && c.level == DoctorLevel::Ok);
+    checks.push(auth_row(app, &settings, &ctx, claude_ready));
     if full {
         checks.push(sensor_row(app));
         checks.push(probe_folder_row(&settings));

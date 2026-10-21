@@ -47,6 +47,37 @@ pub const CONTENT_FIELDS: [&str; 8] = [
 ];
 
 static CAUGHT: AtomicU32 = AtomicU32::new(0);
+static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+/// Notes when the process started (the first call wins), so the log can say how long after start
+/// the first screen's data was served (NFR-01).
+pub fn mark_process_start() {
+    let _ = STARTED.set(std::time::Instant::now());
+}
+
+/// Milliseconds since [`mark_process_start`], or `None` when it was never called (tests).
+#[must_use]
+pub fn since_process_start_ms() -> Option<u64> {
+    STARTED
+        .get()
+        .map(|t| u64::try_from(t.elapsed().as_millis()).unwrap_or(u64::MAX))
+}
+
+/// The run-log line for a timed command (NFR-01, NFR-02): the commands behind cold start and a
+/// project switch always log how long they took, and `app_bootstrap` how long after process start.
+/// Names and numbers only (SR-54).
+pub fn perf_command(command: &str, ms: u64) {
+    match command {
+        "app_bootstrap" => {
+            let since = since_process_start_ms().unwrap_or(0);
+            tracing::info!(target: "perf", command, ms, since_start_ms = since, "startup");
+        }
+        "project_open" => {
+            tracing::info!(target: "perf", command, ms, "project switch");
+        }
+        _ => {}
+    }
+}
 
 struct Sink {
     root: Root,

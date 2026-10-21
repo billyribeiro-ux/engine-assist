@@ -197,6 +197,22 @@ pub const SETUP_DIRS: [&str; 5] = [
     "docs/postmortems",
     "spec",
 ];
+/// The kit's templates setup writes into `docs/templates/` (AC-F018-03): the packet, Change
+/// Request and postmortem templates, as shipped with this build of Foreman.
+pub const KIT_TEMPLATES: [(&str, &str); 3] = [
+    (
+        "docs/templates/handoff-packet.md",
+        include_str!("../../../../docs/templates/handoff-packet.md"),
+    ),
+    (
+        "docs/templates/change-request.md",
+        include_str!("../../../../docs/templates/change-request.md"),
+    ),
+    (
+        "docs/templates/postmortem.md",
+        include_str!("../../../../docs/templates/postmortem.md"),
+    ),
+];
 /// The decision files setup creates.
 const SETUP_FILES: [DecisionFileKind; 3] = [
     DecisionFileKind::Project,
@@ -216,6 +232,17 @@ fn exists(root: Option<&Root>, rel: &str) -> bool {
     root.is_some_and(|r| {
         pathpolicy::check_read(rel.trim_end_matches('/'), ReadClass::Decision)
             .is_ok_and(|p| r.exists(&p))
+    })
+}
+
+/// Whether the file at `rel` exists with exactly `text`.
+fn same_text(root: Option<&Root>, rel: &str, text: &str) -> bool {
+    root.is_some_and(|r| {
+        pathpolicy::check_read(rel, ReadClass::Decision)
+            .ok()
+            .and_then(|p| r.read_opt(&p, ReadClass::Decision).ok())
+            .and_then(|(bytes, _)| bytes)
+            .is_some_and(|b| b == text.as_bytes())
     })
 }
 
@@ -250,6 +277,23 @@ fn plan_writes(folder: &Path, git_init: bool, adopt: bool) -> Vec<PlannedWrite> 
             ));
         } else {
             out.push(planned(&shown, PlannedAction::Create, None));
+        }
+    }
+    for (path, text) in KIT_TEMPLATES {
+        if !exists(root.as_ref(), path) {
+            out.push(planned(path, PlannedAction::Create, None));
+        } else if same_text(root.as_ref(), path, text) {
+            out.push(planned(
+                path,
+                PlannedAction::LeaveAlone,
+                Some("Already there and the same as the kit's."),
+            ));
+        } else {
+            out.push(planned(
+                path,
+                PlannedAction::Refuse,
+                Some("Differs from the pinned kit. Move it aside to let Foreman write it."),
+            ));
         }
     }
     if exists(root.as_ref(), "docs/lessons.md") {
@@ -622,6 +666,12 @@ pub fn setup_apply(app: &App, req: SetupApplyReq) -> Result<ProjectSummary, IpcE
     for dir in SETUP_DIRS {
         if creates(&plan, &format!("{dir}/")) {
             dirs::ensure_dir(&root, &pathpolicy::check_read(dir, ReadClass::Decision)?)?;
+        }
+    }
+    for (path, text) in KIT_TEMPLATES {
+        if creates(&plan, path) {
+            let rel = pathpolicy::check_write(path, WritePurpose::Repo)?;
+            root.write(&rel, text.as_bytes(), &ReadStamp::Absent)?;
         }
     }
     if creates(&plan, "docs/lessons.md") {

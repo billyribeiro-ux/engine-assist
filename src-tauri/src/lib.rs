@@ -20,6 +20,7 @@ pub mod runs;
 pub mod sensor;
 pub mod sensor_ingest;
 pub mod signing;
+pub mod startup;
 pub mod state;
 pub mod text;
 pub mod watch;
@@ -142,6 +143,7 @@ pub fn builder<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 /// # Errors
 /// Any error from building or running the Tauri app.
 pub fn run() -> tauri::Result<()> {
+    logging::mark_process_start();
     logging::install();
     builder(Builder::default())
         .setup(|app| {
@@ -153,6 +155,7 @@ pub fn run() -> tauri::Result<()> {
                 tracing::info!(target: "app", version = env!("CARGO_PKG_VERSION"), "started");
             }
             let os = Arc::new(os::TauriOs::new(app.handle().clone()));
+            startup::harden(&paths.app_data)?;
             let state = state::App::new(os, paths);
             watch::start(state.weak());
             inbox::start(&state);

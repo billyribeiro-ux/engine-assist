@@ -147,7 +147,9 @@ mod config {
     fn drag_drop_disabled_in_rust_builder() {
         let src = include_str!("../src/window.rs");
         assert!(src.contains(".disable_drag_drop_handler()"));
-        assert!(src.contains(".on_new_window(|_, _| NewWindowResponse::Deny)"));
+        // `new_window_response` is the one place that answers (always `Deny`; window::webview).
+        assert!(src.contains(".on_new_window(|requested, _| new_window_response(&requested))"));
+        assert!(src.contains("NewWindowResponse::Deny"));
         assert!(src.contains(".on_navigation(navigation_allowed)"));
     }
 }
