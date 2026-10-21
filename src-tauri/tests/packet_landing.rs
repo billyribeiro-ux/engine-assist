@@ -11,6 +11,27 @@
 
 mod common;
 
+/// Every file under `dir` (relative path → bytes), the diagnostic log aside.
+fn tree(dir: &std::path::Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).unwrap() {
+            let path = e.unwrap().path();
+            let rel = path.strip_prefix(dir).unwrap().display().to_string();
+            if rel == "logs" {
+                continue;
+            }
+            if std::fs::symlink_metadata(&path).unwrap().is_dir() {
+                stack.push(path);
+            } else {
+                out.insert(rel, std::fs::read(&path).unwrap_or_default());
+            }
+        }
+    }
+    out
+}
+
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -396,23 +417,93 @@ mod watcher {
         );
     }
 
-    /// ADR-013, SR-18, IPC-R6: the app's watch module maps hints to state and events only; it
-    /// can't reach a command handler, a launch, a re-arm, a spawn or git.
+    /// ADR-013, SR-18, IPC-R6 (code review W8: a runtime proof, not a text search): what the
+    /// app's watch module does with each kind of change. A packet, an `out` file and the lessons
+    /// file give events only: the repo (`.git` included) and app data stay byte for byte, no run
+    /// starts and `claude` never runs. A decision file updates the
+    /// pending review in `progress.json` (as opening the project would) and nothing else.
     #[test]
     fn app_events_never_act() {
-        let src =
-            std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/watch.rs"))
-                .unwrap();
-        for s in [
-            "ipc::commands",
-            "rearm",
-            "launch::",
-            "PtySession",
-            "spawn::",
-            "git::",
-            ".write(",
-        ] {
-            assert!(!src.contains(s), "watch.rs reaches {s}");
+        use foreman_core::interest::Interest;
+        use foreman_sys::watch::Change;
+        let p = ProjectApp::new(json!({}));
+        projects::project_open(&p.t.app, req(json!({ "projectId": p.id }))).unwrap();
+        let out = foreman_app::ipc::commands::steps::step_view(
+            &p.t.app,
+            req(json!({ "projectId": p.id, "step": "2.2" })),
+        )
+        .unwrap()
+        .outs[0]
+            .path
+            .as_str()
+            .to_owned();
+        let files = [
+            ("docs/handoff/stage-02.md", "=== HANDOFF PACKET\nbody\n"),
+            (out.as_str(), "# out\n"),
+            ("docs/lessons.md", "# Lessons\n"),
+        ];
+        for (rel, body) in files {
+            let f = p.project.join(rel);
+            std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+            std::fs::write(&f, body).unwrap();
         }
+        let calls = || {
+            std::fs::read_to_string(format!("{}.calls.jsonl", p.record.display()))
+                .unwrap_or_default()
+                .lines()
+                .count()
+        };
+        let (repo, data, n, events) = (
+            tree(&p.project),
+            tree(&p.t.app_data()),
+            calls(),
+            p.t.os.events().len(),
+        );
+        let change = |interest: Interest, path: &str| Change::Changed {
+            interest,
+            path: path.to_owned(),
+            stamp: foreman_core::store::ReadStamp::Absent,
+        };
+        for c in [
+            change(Interest::Packet { stage: 2 }, "docs/handoff/stage-02.md"),
+            change(Interest::Out { path: out.clone() }, &out),
+            change(Interest::Lessons, "docs/lessons.md"),
+        ] {
+            foreman_app::watch::handle(&p.t.app, &p.id, &c);
+        }
+        assert_eq!(tree(&p.project), repo, "the repo changed");
+        assert_eq!(tree(&p.t.app_data()), data, "app data changed");
+        assert_eq!(calls(), n, "claude ran");
+        assert!(p.t.app.runs().live().is_empty(), "a run started");
+        let names: Vec<&str> = p.t.os.events()[events..].iter().map(|e| e.name()).collect();
+        assert!(
+            names
+                .iter()
+                .all(|n| ["packet:changed", "project:changed"].contains(n)),
+            "{names:?}"
+        );
+        // A decision file: the pending review only.
+        let pj = p.project.join(".foreman/project.json");
+        let mut v: Value = serde_json::from_str(&std::fs::read_to_string(&pj).unwrap()).unwrap();
+        v["conditions"]["commercial"] = json!("yes");
+        std::fs::write(&pj, serde_json::to_string_pretty(&v).unwrap()).unwrap();
+        let repo = tree(&p.project);
+        let mut data = tree(&p.t.app_data());
+        foreman_app::watch::handle(
+            &p.t.app,
+            &p.id,
+            &change(
+                Interest::Decision {
+                    file: "project".into(),
+                },
+                ".foreman/project.json",
+            ),
+        );
+        assert_eq!(tree(&p.project), repo, "the repo changed");
+        let mut now = tree(&p.t.app_data());
+        let progress = format!("projects/{}/progress.json", p.id);
+        assert!(now.remove(&progress).is_some() && data.remove(&progress).is_some());
+        assert_eq!(now, data, "app data beyond progress.json changed");
+        assert_eq!(calls(), n, "claude ran");
     }
 }

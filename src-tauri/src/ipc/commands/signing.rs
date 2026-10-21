@@ -60,8 +60,8 @@ pub fn sign_apply_with(
         _ => return Err(IpcError::expired()),
     };
     // ADR-013: re-stat before signing (outside the write lock: a decision change takes it).
+    // The write lock is taken inside, after the native dialog (W3).
     crate::watch::restat_before_acting(app, &held.project_id);
-    let _w = app.writing();
     let send = |m: SignProgress| {
         let _ = progress.send(m);
     };

@@ -598,8 +598,7 @@ pub fn setup_apply(app: &App, req: SetupApplyReq) -> Result<ProjectSummary, IpcE
         for k in SETUP_FILES {
             let rel = pathpolicy::check_read(k.repo_path(), ReadClass::Decision)?;
             if let (Some(bytes), _) = root.read_opt(&rel, ReadClass::Decision)? {
-                d.approve(k, &bytes, false)
-                    .map_err(|e| IpcError::io(e.to_string()))?;
+                d.approve(k, &bytes, false)?;
             }
         }
         register(app, &id, &plan.project.name, &plan.folder)?;
@@ -650,9 +649,7 @@ pub fn setup_apply(app: &App, req: SetupApplyReq) -> Result<ProjectSummary, IpcE
     ] {
         let bytes = bytes.map_err(|e| IpcError::io(e.to_string()))?;
         // No commit at setup (AC-F018-03): the change is approved and written, not committed.
-        let _: OwnChange = d
-            .own_change(kind, bytes.as_bytes(), false, &now)
-            .map_err(|e| IpcError::io(e.to_string()))?;
+        let _: OwnChange = d.own_change(kind, bytes.as_bytes(), false, &now)?;
     }
     let pinned = lock::pin(&root, &app_root, BLUEPRINT_FILE, &state, false, &now)?;
     let lock_bytes =
@@ -807,22 +804,38 @@ pub fn blueprint_repin(app: &App, req: BlueprintRepinReq) -> Result<ProjectView,
     };
     d.approve(DecisionFileKind::BlueprintLock, bytes.as_bytes(), false)
         .map_err(|e| IpcError::io(e.to_string()))?;
+    let sha256 = foreman_core::store::sha256_hex(bytes.as_bytes());
     let change = OwnChange::CommitNow {
         file: DecisionFileKind::BlueprintLock,
         path: DecisionFileKind::BlueprintLock.repo_path().to_owned(),
-        sha256: foreman_core::store::sha256_hex(bytes.as_bytes()),
+        sha256: sha256.clone(),
     };
     let opts = foreman_sys::git::commit::CommitOpts {
         app_data: app.paths().app_data.clone(),
         ..Default::default()
     };
-    if !p.signed().contains(&5)
-        && foreman_sys::decisions::commit_own(root, &change, &opts, &ctx).is_ok()
-        && let OwnChange::CommitNow { sha256, .. } = &change
-    {
-        let _ = d.mark_committed(DecisionFileKind::BlueprintLock, sha256);
+    // W6: a failed commit is reported as `own_change` reports it (the pin stands, approved and
+    // written; the next own change or signing commits it, DR-153).
+    let mut commit_error = None;
+    if !p.signed().contains(&5) {
+        match foreman_sys::decisions::commit_own(root, &change, &opts, &ctx) {
+            Ok(_) => {
+                if let Err(e) = d.mark_committed(DecisionFileKind::BlueprintLock, &sha256) {
+                    tracing::warn!(target: "project", error = %e, "the re-pin's commit wasn't recorded in approvals");
+                }
+            }
+            Err(e) => commit_error = Some(e.to_string()),
+        }
     }
     p.save_progress(app)?;
+    if let Some(e) = commit_error {
+        return Err(IpcError::tool_failed(
+            "git",
+            None,
+            false,
+            escape_visible(&e),
+        ));
+    }
     project::reopen_view(app, req.project_id.as_str())
 }
 
@@ -835,27 +848,30 @@ pub fn blueprint_repin(app: &App, req: BlueprintRepinReq) -> Result<ProjectView,
 /// # Errors
 /// `Cancelled`, `NotFound`, `NotAllowed("runs-live")`, `Io`.
 pub fn project_remove(app: &App, req: ProjectRemoveReq) -> Result<Vec<ProjectSummary>, IpcError> {
-    let _w = app.writing();
-    let (mut reg, stamp) = app.registry()?;
-    let Some(e) = reg
-        .projects
-        .iter()
-        .find(|p| p.project_id == req.project_id.as_str())
-        .cloned()
-    else {
-        return Err(IpcError::not_found("That project isn't registered."));
+    let removable = || -> Result<_, IpcError> {
+        let (reg, stamp) = app.registry()?;
+        let Some(e) = reg
+            .projects
+            .iter()
+            .find(|p| p.project_id == req.project_id.as_str())
+            .cloned()
+        else {
+            return Err(IpcError::not_found("That project isn't registered."));
+        };
+        if app
+            .runs()
+            .live()
+            .iter()
+            .any(|r| r.project_id == e.project_id)
+        {
+            return Err(IpcError::not_allowed(
+                "runs-live",
+                "A Claude Code session is still running in this project. End it first.",
+            ));
+        }
+        Ok((reg, stamp, e))
     };
-    if app
-        .runs()
-        .live()
-        .iter()
-        .any(|r| r.project_id == e.project_id)
-    {
-        return Err(IpcError::not_allowed(
-            "runs-live",
-            "A Claude Code session is still running in this project. End it first.",
-        ));
-    }
+    let (_, _, e) = removable()?;
     let ok = app.os().confirm(&Confirm::new(
         format!("Remove {}?", escape_visible(&e.name)),
         format!(
@@ -868,6 +884,9 @@ pub fn project_remove(app: &App, req: ProjectRemoveReq) -> Result<Vec<ProjectSum
     if !ok {
         return Err(IpcError::cancelled());
     }
+    // W3: the dialog is shown without the write lock; everything is checked again under it.
+    let _w = app.writing();
+    let (mut reg, stamp, e) = removable()?;
     // App data first: if a delete fails the project is still registered and Remove can be retried.
     let root = app.app_root()?;
     let data = foreman_core::retention::project_data(&e.project_id);

@@ -353,6 +353,20 @@ impl From<foreman_core::lock::LockError> for IpcError {
     }
 }
 
+/// The one mapping of a decision-file error (code review N4): a store error as any store error,
+/// an outside change waiting for review as `Conflict` naming the file (ipc.md §2.4), anything
+/// else as `Io`.
+impl From<foreman_core::decisions::DecisionError> for IpcError {
+    fn from(e: foreman_core::decisions::DecisionError) -> Self {
+        use foreman_core::decisions::DecisionError as D;
+        match e {
+            D::Store(s) => s.into(),
+            D::OutsidePending(p) => Self::conflict(&p, Vec::new()),
+            other => Self::io(other.to_string()),
+        }
+    }
+}
+
 impl From<foreman_core::store::StoreError> for IpcError {
     fn from(e: foreman_core::store::StoreError) -> Self {
         use foreman_core::store::StoreError as S;
@@ -368,5 +382,26 @@ impl From<foreman_core::store::StoreError> for IpcError {
 impl From<foreman_core::pathpolicy::PolicyViolation> for IpcError {
     fn from(p: foreman_core::pathpolicy::PolicyViolation) -> Self {
         Self::policy(&p.to_string(), p.rule())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use foreman_core::decisions::DecisionError;
+
+    /// N4: one mapping of a decision-file error.
+    #[test]
+    fn decision_error_maps_once() {
+        let e = IpcError::from(DecisionError::OutsidePending(
+            ".foreman/project.json".into(),
+        ));
+        assert_eq!(e.code, IpcErrorCode::Conflict);
+        let e = IpcError::from(DecisionError::Corrupt("bad".into()));
+        assert_eq!(e.code, IpcErrorCode::Io);
+        let e = IpcError::from(DecisionError::Store(
+            foreman_core::store::StoreError::NotFound("x".into()),
+        ));
+        assert_eq!(e.code, IpcErrorCode::NotFound);
     }
 }

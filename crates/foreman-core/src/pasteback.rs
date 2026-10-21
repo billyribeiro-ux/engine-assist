@@ -111,10 +111,13 @@ pub struct PasteInput<'a> {
 /// A normalizer: text in, normalized text and notes out (DR-131's `packet::normalize_packet`).
 pub type Normalize<'a> = &'a dyn Fn(&str) -> (String, Vec<String>);
 
-/// The structural part of DR-131 that splitting needs: BOM, CR/CRLF → LF, trailing whitespace,
-/// and a code fence wrapping the whole paste. Field-level normalization (unsigned forms, `none`,
-/// smart quotes, NBSP, header variants) is `packet::normalize_paste` (M3-20), which
-/// `paste_back_preview` passes; this stays as the structural baseline for the planner's tests.
+/// The structural part of DR-131: BOM, CR/CRLF → LF, trailing whitespace, blank lines around the
+/// paste, and a code fence wrapping the whole paste. It is the production normalizer for pastes
+/// that aren't packets (lessons, ADR sets, the assembler's package), whose text must not be
+/// touched beyond that; packet pastes get the field-level normalization too (unsigned forms,
+/// `none`, smart quotes, NBSP, header variants) from `packet::normalize_paste` (M3-20), which
+/// `paste_back_preview` passes. The two agree on every structural step
+/// (`pasteback::structural_steps_match_packet_normalizer`), so they can't drift apart.
 #[must_use]
 pub fn prepare(text: &str) -> (String, Vec<String>) {
     let mut notes = Vec::new();

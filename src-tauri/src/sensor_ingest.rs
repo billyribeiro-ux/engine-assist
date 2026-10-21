@@ -119,6 +119,10 @@ pub fn watch_run(app: &App, run_id: &str) {
                 let live = app.runs().get(&run).is_some_and(|r| r.session.is_live());
                 let _ = ingest_once(&app, &run);
                 if !live {
+                    // N2: the run is over (its last pass read `SessionEnd`): its token and
+                    // derived state go; `run.json` keeps the token for later reads.
+                    app.sensor().forget(&run);
+                    lock(&app.sessions().states).remove(&run);
                     return;
                 }
             }

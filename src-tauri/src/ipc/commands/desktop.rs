@@ -208,6 +208,15 @@ pub fn desktop_open(
             "This step doesn't run in Claude Desktop.",
         ));
     }
+    // W4: the step must be able to take Copy (`copied` until Billy marks it done) before
+    // anything opens.
+    crate::ipc::commands::steps::apply_event(
+        app,
+        &mut p,
+        s.key.as_str(),
+        &StepEvent::Copy,
+        "not-runnable",
+    )?;
     let r = crate::ipc::commands::steps::resolve(&p, &s)?;
     let Ok(resolved) = r.result else {
         return Err(IpcError::not_allowed(
@@ -224,20 +233,19 @@ pub fn desktop_open(
     send(LaunchProgress::Spawning);
     spawn_desktop(&d, &cwd, argv::desktop_open().as_slice().to_vec())?;
     send(LaunchProgress::Done);
-    // Like Copy and open: the step is `copied` until Billy marks it done.
-    {
-        let _w = app.writing();
-        if crate::ipc::commands::steps::apply_event(
+    // Like Copy and open: the step is `copied` until Billy marks it done (W1: on the project as
+    // it is now, under the write lock). Desktop is open, so a failure here is logged.
+    let recorded = project::with_project_mut(app, req.project_id.as_str(), |p| {
+        crate::ipc::commands::steps::apply_event(
             app,
-            &mut p,
+            p,
             s.key.as_str(),
             &StepEvent::Copy,
             "not-runnable",
         )
-        .is_ok()
-        {
-            p.save_progress(app)?;
-        }
+    });
+    if let Err(e) = recorded {
+        tracing::warn!(target: "launch", code = e.code.as_str(), "the Desktop step's copy wasn't recorded");
     }
     Ok(DesktopOpened {
         chips: desktop_chips(&p, &s),
@@ -275,7 +283,7 @@ pub fn desktop_handoff(app: &App, req: DesktopHandoffReq) -> Result<(), IpcError
     }
     let (reg, _) = app.registry()?;
     for e in &reg.projects {
-        let Ok(mut p) = project::open(app, &e.project_id) else {
+        let Ok(p) = project::open(app, &e.project_id) else {
             continue;
         };
         let Some(c) = p.progress.chains.iter().find(|c| c.id == id).cloned() else {
@@ -294,10 +302,11 @@ pub fn desktop_handoff(app: &App, req: DesktopHandoffReq) -> Result<(), IpcError
             if !app.os().confirm(&desktop_closed_confirm()) {
                 return Err(IpcError::cancelled());
             }
-            let _w = app.writing();
-            p.progress.chains = chain::desktop_closed(&p.progress.chains, uuid);
-            p.save_progress(app)?;
-            return Ok(());
+            // W1: reopened under the write lock after the dialog.
+            return project::with_project_mut(app, &e.project_id, |p| {
+                p.progress.chains = chain::desktop_closed(&p.progress.chains, uuid);
+                Ok(())
+            });
         }
         let root = p.root()?.path().to_path_buf();
         let cwd = foreman_sys::spawn::canonical(&match c.cwd {
@@ -308,11 +317,10 @@ pub fn desktop_handoff(app: &App, req: DesktopHandoffReq) -> Result<(), IpcError
         let a = argv::desktop(uuid)
             .map_err(|e| IpcError::tool_failed("claude", None, false, e.to_string()))?;
         spawn_desktop(&d, &cwd, a.as_slice().to_vec())?;
-        let _w = app.writing();
-        let mut p = project::open(app, &e.project_id)?;
-        p.progress.chains = chain::after_handoff(&p.progress.chains, uuid, DESKTOP_SHARE);
-        p.save_progress(app)?;
-        return Ok(());
+        return project::with_project_mut(app, &e.project_id, |p| {
+            p.progress.chains = chain::after_handoff(&p.progress.chains, uuid, DESKTOP_SHARE);
+            Ok(())
+        });
     }
     Err(IpcError::not_found(
         "That session chain isn't in any project.",

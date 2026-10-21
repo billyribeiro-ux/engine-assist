@@ -173,9 +173,8 @@ pub fn pending_change_accept(
     app: &App,
     req: PendingChangeAcceptReq,
 ) -> Result<ProjectView, IpcError> {
-    let _w = app.writing();
-    let mut p = project::open(app, req.project_id.as_str())?;
-    let (x, bytes, _) = current(&p, req.change.as_str(), req.seen_sha256.as_str())?;
+    let p = project::open(app, req.project_id.as_str())?;
+    let (x, _, _) = current(&p, req.change.as_str(), req.seen_sha256.as_str())?;
     let keys: Vec<String> = x.diff.iter().map(|e| escape_visible(&e.key_path)).collect();
     let ok = app.os().confirm(&Confirm::new(
         format!("Accept this change to {}?", x.file.repo_path()),
@@ -192,6 +191,10 @@ pub fn pending_change_accept(
     if !ok {
         return Err(IpcError::cancelled());
     }
+    // W3: the dialog is shown without the write lock; the change is checked again under it.
+    let _w = app.writing();
+    let mut p = project::open(app, req.project_id.as_str())?;
+    let (x, bytes, _) = current(&p, req.change.as_str(), req.seen_sha256.as_str())?;
     let stage5 = p.signed().contains(&5);
     let mut commit_error = None;
     {
@@ -201,8 +204,7 @@ pub fn pending_change_accept(
             app: &p.app_root,
             project_id: &p.entry.project_id,
         };
-        d.approve(x.file, &bytes, false)
-            .map_err(|e| IpcError::io(e.to_string()))?;
+        d.approve(x.file, &bytes, false)?;
         if !stage5 {
             let sha = sha256_hex(&bytes);
             let change = OwnChange::CommitNow {
@@ -217,7 +219,9 @@ pub fn pending_change_accept(
             };
             match foreman_sys::decisions::commit_own(root, &change, &opts, &ctx) {
                 Ok(_) => {
-                    let _ = d.mark_committed(x.file, &sha);
+                    if let Err(e) = d.mark_committed(x.file, &sha) {
+                        tracing::warn!(target: "project", error = %e, "an accepted change's commit wasn't recorded in approvals");
+                    }
                 }
                 Err(e) => commit_error = Some(e.to_string()),
             }
@@ -255,9 +259,7 @@ pub fn pending_change_reject(
             app: &p.app_root,
             project_id: &p.entry.project_id,
         };
-        let (approved, _) = d
-            .approved(x.file)
-            .map_err(|e| IpcError::io(e.to_string()))?;
+        let (approved, _) = d.approved(x.file)?;
         let dp = foreman_core::decisions::decision_path(x.file);
         let rel = pathpolicy::check_write(&dp.path(), WritePurpose::DecisionFile(dp))?;
         root.write(&rel, &approved, &stamp).map_err(|e| match e {

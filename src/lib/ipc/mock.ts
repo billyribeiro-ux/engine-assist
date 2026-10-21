@@ -169,6 +169,8 @@ export class MockIpcClient implements IpcClient {
 		this.overrides.clear();
 		this.outputs.clear();
 		this.sensor.clear();
+		this.tamperSent.clear();
+		this.calls.clear();
 		this.emit('projects:changed', { rev: ++this.revCounter });
 		this.emit('settings:changed', { rev: this.world.settings.rev });
 	}
@@ -206,6 +208,12 @@ export class MockIpcClient implements IpcClient {
 
 	// ---------------------------------------------------------------- plumbing
 	private revCounter = 100;
+	/** The app-wide `packet:changed` counter (Rust's `Inner.packet_rev`, ipc.md §6). */
+	private packetRev = 0;
+	/** The tampered packets `tamper:detected` was sent for (Rust's `Inner.tamper_emitted`). */
+	private tamperSent = new Set<string>();
+	/** How many times each command ran (flows count refetches, code review C1). */
+	readonly calls = new Map<string, number>();
 	private uuid(prefix = 'b'): string {
 		this.counter += 1;
 		return `${prefix}0000000-0000-4000-8000-${this.counter.toString(16).padStart(12, '0')}`;
@@ -223,6 +231,7 @@ export class MockIpcClient implements IpcClient {
 		body: () => Responses[C]
 	): Promise<Responses[C]> {
 		await Promise.resolve();
+		this.calls.set(cmd, (this.calls.get(cmd) ?? 0) + 1);
 		this.guard(cmd, req);
 		return clone(body());
 	}
@@ -1357,7 +1366,20 @@ export class MockIpcClient implements IpcClient {
 		});
 	}
 	projectOpen(req: Requests['project_open']): Promise<T.ProjectView> {
-		return this.run('project_open', req, () => this.projectView(this.project(req.projectId)));
+		return this.run('project_open', req, () => {
+			const p = this.project(req.projectId);
+			// As Rust's project_open (code review C1): tamper:detected once per tampered packet
+			// version; the refetch it causes finds the same version and stays quiet.
+			for (const [stage, pk] of Object.entries(p.packets)) {
+				const key = `${p.id}:${stage}`;
+				if (!pk.tampered) this.tamperSent.delete(key);
+				else if (!this.tamperSent.has(key)) {
+					this.tamperSent.add(key);
+					this.emit('tamper:detected', { projectId: p.id, stage: Number(stage), rev: p.rev });
+				}
+			}
+			return this.projectView(p);
+		});
 	}
 	projectUrlSet(req: Requests['project_url_set']): Promise<number> {
 		return this.run('project_url_set', req, () => {
@@ -1808,7 +1830,11 @@ export class MockIpcClient implements IpcClient {
 				stage.packetExists = true;
 				stage.status = 'waiting';
 				stage.statusWhy = 'packet waiting for your signature';
-				this.emit('packet:changed', { projectId: p.id, stage: stage.stage, rev: p.rev });
+				this.emit('packet:changed', {
+					projectId: p.id,
+					stage: stage.stage,
+					rev: ++this.packetRev
+				});
 			}
 			return { written: d.targets, stepDone: true };
 		});
@@ -2568,7 +2594,8 @@ export class MockIpcClient implements IpcClient {
 				pk.normalization = [];
 				pk.sha = `${pk.sha.slice(0, 56)}${String(p.rev + 1).padStart(8, '0')}`;
 			}
-			this.emit('packet:changed', { projectId: p.id, stage: req.stage, rev: ++p.rev });
+			p.rev += 1;
+			this.emit('packet:changed', { projectId: p.id, stage: req.stage, rev: ++this.packetRev });
 			return this.packet(p, req.stage);
 		});
 	}
@@ -3023,7 +3050,8 @@ export class MockIpcClient implements IpcClient {
 			if (pk) pk.tampered = false;
 			const st = p.stages[req.stage];
 			if (st) st.packetProblems = 0;
-			this.emit('packet:changed', { projectId: p.id, stage: req.stage, rev: ++p.rev });
+			p.rev += 1;
+			this.emit('packet:changed', { projectId: p.id, stage: req.stage, rev: ++this.packetRev });
 			return this.packet(p, req.stage);
 		});
 	}

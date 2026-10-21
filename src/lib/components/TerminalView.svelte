@@ -234,6 +234,8 @@
 		mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 		return () => {
 			off();
+			// W5: bytes still queued in this xterm never call back; resume a paused PTY.
+			void terminal.release(id);
 			links.dispose();
 			data.dispose();
 			resized.dispose();

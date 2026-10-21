@@ -161,6 +161,7 @@
 	});
 
 	async function run(): Promise<true | string> {
+		await flushInputs();
 		if (!v) return 'Open the step first.';
 		if (project.readOnly) return `Open read-only: ${project.readOnly.detail}`;
 		if (v.blockers[0]) return blockerText(v.blockers[0]);
@@ -200,6 +201,7 @@
 		return r;
 	}
 	async function copy(target: 'prompt' | 'command'): Promise<true | string> {
+		await flushInputs();
 		if (target === 'command' && step.surface !== 'cli') return 'Only CLI steps have a command.';
 		if (isNa || step.state === 'needsAnnotation')
 			return step.whyNotRunnable ?? 'This step has no prompt.';
@@ -264,19 +266,36 @@
 		}
 	}
 
-	const timers: Record<string, ReturnType<typeof setTimeout>> = {};
+	// Run inputs are saved 300 ms after typing stops. N5: a run or copy inside that window, and
+	// leaving the row, first send what is still waiting, so ⌘↵ never launches the old value.
+	const timers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
+	const waiting: Record<string, string | undefined> = {};
+	async function sendInput(name: string): Promise<void> {
+		clearTimeout(timers[name]);
+		timers[name] = undefined;
+		const value = waiting[name];
+		if (value === undefined) return;
+		waiting[name] = undefined;
+		const c = await ipc();
+		try {
+			view.set(await c.runInputSet({ projectId: pid, step: step.key, name, value }));
+		} catch (e: unknown) {
+			ui.say(failureText(toIpcFailure(e)));
+		}
+	}
+	async function flushInputs(): Promise<void> {
+		for (const name of Object.keys(waiting)) await sendInput(name);
+	}
 	function setInput(name: string, value: string): void {
 		clearTimeout(timers[name]);
+		waiting[name] = value;
 		timers[name] = setTimeout(() => {
-			void ipc().then(async (c) => {
-				try {
-					view.set(await c.runInputSet({ projectId: pid, step: step.key, name, value }));
-				} catch (e: unknown) {
-					ui.say(failureText(toIpcFailure(e)));
-				}
-			});
+			void sendInput(name);
 		}, 300);
 	}
+	$effect(() => () => {
+		void flushInputs();
+	});
 	async function setPart(partId: string, include: boolean): Promise<void> {
 		const c = await ipc();
 		try {

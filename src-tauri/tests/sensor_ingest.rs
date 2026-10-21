@@ -303,7 +303,14 @@ mod sensor {
             .lines()
             .count();
         say(&p, &id, "again");
-        std::thread::sleep(Duration::from_millis(1500));
+        // W8: wait until the app has ingested the new events (a condition, not a sleep), then
+        // check that ingesting them did nothing else.
+        wait_until("ingested", || {
+            foreman_app::sensor_ingest::live_state(&p.t.app, &id)
+                .and_then(|s| s.last_assistant_message)
+                .as_deref()
+                == Some("ECHO: again")
+        });
         assert_eq!(p.t.app.runs().live().len(), 1, "no run started");
         let calls_after = std::fs::read_to_string(format!("{}.calls.jsonl", p.record.display()))
             .unwrap_or_default()
@@ -317,6 +324,13 @@ mod sensor {
         wait_until("exit", || p.t.app.runs().live().is_empty());
         wait_until("observed", || !run_json(&p, &id)["observed"].is_null());
         assert_eq!(run_json(&p, &id)["observed"]["model"], "fable");
+        // N2: once the run is over its token and derived state are forgotten in memory (run.json
+        // keeps the token for later reads).
+        wait_until("forgotten", || {
+            p.t.app.sensor().token(&id).is_none()
+                && foreman_app::sensor_ingest::live_state(&p.t.app, &id).is_none()
+        });
+        assert!(run_json(&p, &id)["sensorToken"].is_string());
         let st = foreman_app::sensor_ingest::session_state(
             &foreman_core::store::Root::open_app_data(&p.t.app_data()).unwrap(),
             &id,

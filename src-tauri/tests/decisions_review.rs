@@ -288,3 +288,114 @@ mod decisions {
         assert_eq!(project_json(), before);
     }
 }
+
+fn progress_bytes(p: &ProjectApp) -> Vec<u8> {
+    std::fs::read(
+        p.t.app_data()
+            .join(format!("projects/{}/progress.json", p.id)),
+    )
+    .unwrap()
+}
+
+/// Code review W1: one locked path writes `progress.json`.
+mod writes {
+    use super::*;
+
+    /// A `Read` open has no side effects: an outside change it classifies is in the view (with
+    /// the same change ID every time), and `progress.json` is written only by `project_open`
+    /// (or a mutation), under the write lock.
+    #[test]
+    fn read_open_writes_nothing() {
+        let p = ProjectApp::new(json!({}));
+        open(&p);
+        let before = progress_bytes(&p);
+        edit_condition(&p, "yes");
+        let a = foreman_app::project::open(&p.t.app, &p.id).unwrap();
+        let b = foreman_app::project::open(&p.t.app, &p.id).unwrap();
+        assert_eq!(a.progress.pending_outside.len(), 1);
+        assert!(a.dirty);
+        assert_eq!(
+            a.progress.pending_outside[0].id, b.progress.pending_outside[0].id,
+            "the same change has the same ID"
+        );
+        assert_eq!(
+            progress_bytes(&p),
+            before,
+            "a Read open wrote progress.json"
+        );
+        let v = open(&p);
+        assert_eq!(v["pendingChanges"], 1);
+        assert_ne!(progress_bytes(&p), before);
+        assert_eq!(list(&p)[0]["id"], json!(a.progress.pending_outside[0].id));
+    }
+
+    /// `with_project_mut` reopens and runs the change again once when `progress.json` changed
+    /// underneath (an outside writer), so the change isn't lost.
+    #[test]
+    fn with_project_mut_retries_once_on_conflict() {
+        let p = ProjectApp::new(json!({}));
+        open(&p);
+        let file =
+            p.t.app_data()
+                .join(format!("projects/{}/progress.json", p.id));
+        let mut runs = 0;
+        foreman_app::project::with_project_mut(&p.t.app, &p.id, |o| {
+            runs += 1;
+            if runs == 1 {
+                // Another writer rewrites the file between this open and its save.
+                let t = std::fs::read_to_string(&file).unwrap();
+                std::fs::write(&file, format!("{t}\n")).unwrap();
+            }
+            o.progress.first_launch_done = true;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(runs, 2, "reopened and applied again");
+        let pr: Value = serde_json::from_slice(&progress_bytes(&p)).unwrap();
+        assert_eq!(pr["firstLaunchDone"], true);
+    }
+}
+
+/// Code review W3: no native dialog is shown while the write lock is held.
+mod dialogs {
+    use super::*;
+
+    fn lock_probe(p: &ProjectApp) -> std::sync::Arc<std::sync::Mutex<Vec<bool>>> {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let s = std::sync::Arc::clone(&seen);
+        let app = std::sync::Arc::clone(&p.t.app);
+        p.t.os.while_dialog_open(Some(Box::new(move |_| {
+            s.lock().unwrap().push(app.write_lock_held());
+        })));
+        seen
+    }
+
+    /// Accept's dialog, then the change is checked again under the lock.
+    #[test]
+    fn accept_dialog_without_write_lock() {
+        let p = ProjectApp::new(json!({}));
+        git_identity(&p);
+        open(&p);
+        let seen = pending_events(&p);
+        edit_condition(&p, "yes");
+        wait_pending(&p, seen + 1);
+        let c = list(&p).pop().unwrap();
+        let held = lock_probe(&p);
+        dec::pending_change_accept(&p.t.app, req(args(&p, &c))).unwrap();
+        p.t.os.while_dialog_open(None);
+        assert_eq!(*held.lock().unwrap(), vec![false]);
+        assert!(list(&p).is_empty());
+    }
+
+    /// Remove's dialog, then the registry and live runs are checked again under the lock.
+    #[test]
+    fn remove_dialog_without_write_lock() {
+        let p = ProjectApp::new(json!({}));
+        open(&p);
+        let held = lock_probe(&p);
+        projects::project_remove(&p.t.app, req(json!({ "projectId": p.id }))).unwrap();
+        p.t.os.while_dialog_open(None);
+        assert_eq!(*held.lock().unwrap(), vec![false]);
+        assert!(projects::summaries(&p.t.app).unwrap().is_empty());
+    }
+}

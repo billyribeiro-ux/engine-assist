@@ -344,11 +344,14 @@ pub fn check_clipboard(text: String) -> Result<String, ClipboardProblem> {
     }
 }
 
+/// What a test runs while a native dialog is open (another session exits, a file changes).
+pub type WhileOpen = Box<dyn Fn(&Confirm) + Send + Sync>;
+
 /// The test seam: dialogs answer from a script (default OK), picks come from a queue, the clipboard
 /// is a string, the clock is fixed, and emitted events are recorded. Only Rust code can construct
 /// it; `run()` never does.
-#[derive(Debug)]
 pub struct ScriptedOs {
+    while_open: Mutex<Option<WhileOpen>>,
     answers: Mutex<VecDeque<bool>>,
     default_answer: Mutex<bool>,
     asked: Mutex<Vec<Confirm>>,
@@ -368,9 +371,16 @@ pub struct ScriptedOs {
     now: Mutex<jiff::Timestamp>,
 }
 
+impl std::fmt::Debug for ScriptedOs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ScriptedOs").finish_non_exhaustive()
+    }
+}
+
 impl Default for ScriptedOs {
     fn default() -> Self {
         Self {
+            while_open: Mutex::new(None),
             answers: Mutex::new(VecDeque::new()),
             default_answer: Mutex::new(true),
             asked: Mutex::new(Vec::new()),
@@ -398,6 +408,11 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 impl ScriptedOs {
+    /// Runs `f` inside every native dialog from now on (before it is answered), as if Billy
+    /// left the dialog open while something else happened. `None` stops it.
+    pub fn while_dialog_open(&self, f: Option<WhileOpen>) {
+        *lock(&self.while_open) = f;
+    }
     /// The answer for every dialog without a scripted one (`true` = OK).
     pub fn answer_all(&self, ok: bool) {
         *lock(&self.default_answer) = ok;
@@ -485,6 +500,9 @@ impl ScriptedOs {
 impl Os for ScriptedOs {
     fn confirm(&self, c: &Confirm) -> bool {
         lock(&self.asked).push(c.clone());
+        if let Some(f) = lock(&self.while_open).as_ref() {
+            f(c);
+        }
         let next = lock(&self.answers).pop_front();
         next.unwrap_or_else(|| *lock(&self.default_answer))
     }

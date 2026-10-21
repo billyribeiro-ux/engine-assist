@@ -45,6 +45,38 @@ fn write(root: &Path, rel: &str, body: &str) {
     std::fs::write(root.join(rel), body).unwrap();
 }
 
+/// Every file under `dir` with its bytes and modification time.
+fn tree(dir: &Path) -> std::collections::BTreeMap<String, (Vec<u8>, std::time::SystemTime)> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).unwrap() {
+            let p = e.unwrap().path();
+            let m = std::fs::symlink_metadata(&p).unwrap();
+            if m.is_dir() {
+                stack.push(p);
+            } else {
+                out.insert(
+                    p.display().to_string(),
+                    (std::fs::read(&p).unwrap_or_default(), m.modified().unwrap()),
+                );
+            }
+        }
+    }
+    out
+}
+
+/// This test process's child processes (Linux `/proc`; empty elsewhere).
+fn children() -> Vec<String> {
+    let Ok(tasks) = std::fs::read_dir("/proc/self/task") else {
+        return Vec::new();
+    };
+    tasks
+        .filter_map(|t| std::fs::read_to_string(t.ok()?.path().join("children")).ok())
+        .flat_map(|s| s.split_whitespace().map(str::to_owned).collect::<Vec<_>>())
+        .collect()
+}
+
 mod watcher {
     use super::*;
 
@@ -178,21 +210,45 @@ mod watcher {
         );
     }
 
-    /// SR-18: the watcher module produces data only.
+    /// SR-18 (code review W8: a runtime proof, not a text search): the watcher turns every kind
+    /// of change into data and does nothing else. While it reports a packet, a decision file, an
+    /// `out` file and the lessons file, the project tree (`.git` included) stays exactly as the
+    /// test left it and no child process exists.
     #[test]
     fn events_never_act() {
-        let src =
-            std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/watch.rs"))
-                .unwrap();
-        for s in [
-            "rearm",
-            "launch::",
-            "PtySession",
-            "spawn::",
-            "git::",
-            ".write(",
-        ] {
-            assert!(!src.contains(s), "watch.rs reaches {s}");
+        let (_d, root) = repo();
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::create_dir_all(root.join("spec")).unwrap();
+        write(&root, ".git/HEAD", "ref: refs/heads/main\n");
+        let w = ProjectWatcher::start(&root, vec!["spec/out.md".into()]).unwrap();
+        write(
+            &root,
+            "docs/handoff/stage-02.md",
+            "=== HANDOFF PACKET\nbody\n",
+        );
+        write(&root, ".foreman/project.json", "{}\n");
+        write(&root, "spec/out.md", "# out\n");
+        write(&root, "docs/lessons.md", "# lessons\n");
+        let before = tree(&root);
+        let mut seen = std::collections::BTreeSet::new();
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        while seen.len() < 4 {
+            assert!(std::time::Instant::now() < deadline, "only saw {seen:?}");
+            if let Some(Change::Changed { interest, .. }) = w.next(Duration::from_millis(100)) {
+                seen.insert(match interest {
+                    Interest::Packet { .. } => "packet",
+                    Interest::Decision { .. } => "decision",
+                    Interest::Out { .. } => "out",
+                    Interest::Lessons => "lessons",
+                    _ => "other",
+                });
+            }
         }
+        assert_eq!(tree(&root), before, "the watcher changed the project");
+        assert!(
+            children().is_empty(),
+            "the watcher spawned {:?}",
+            children()
+        );
     }
 }

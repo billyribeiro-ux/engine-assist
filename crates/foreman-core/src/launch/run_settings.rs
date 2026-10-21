@@ -155,6 +155,29 @@ pub fn build(
     })
 }
 
+/// The sensor command a run settings file's hooks run (`None`: no hooks, or not a run settings
+/// file).
+#[must_use]
+pub fn sensor_command(bytes: &[u8]) -> Option<String> {
+    let f: RunSettingsFile = serde_json::from_slice(bytes).ok()?;
+    f.hooks?
+        .values()
+        .flatten()
+        .flat_map(|g| g.hooks.iter())
+        .map(|h| h.command.clone())
+        .next()
+}
+
+/// The same run settings without the sensor hooks, as canonical bytes and their SHA-256
+/// (SR-15: a sensor that no longer matches its hash at spawn time gets no hooks). `None` when the
+/// bytes aren't a run settings file.
+#[must_use]
+pub fn without_hooks(bytes: &[u8]) -> Option<(Vec<u8>, String)> {
+    let mut f: RunSettingsFile = serde_json::from_slice(bytes).ok()?;
+    f.hooks = None;
+    Some(to_bytes(&f))
+}
+
 /// Canonical bytes (FILE-R1) and their SHA-256.
 #[must_use]
 pub fn to_bytes(f: &RunSettingsFile) -> (Vec<u8>, String) {

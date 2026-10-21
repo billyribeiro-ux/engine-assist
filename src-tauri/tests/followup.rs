@@ -72,11 +72,25 @@ mod steps_m3 {
         assert_eq!(c["focusRun"], json!(r.run_id), "{c}");
         assert!(p.t.os.clipboard().unwrap().starts_with("ultrathink."));
         assert_eq!(view(&p, "2.3")["summary"]["state"], "copied");
-        std::thread::sleep(Duration::from_millis(400));
+        // W8: a probe typed after the copy comes back through the same ordered PTY stream; had
+        // the copy typed anything, its echo would be there first (a condition, not a sleep).
+        terminal::pty_write(
+            &p.t.app,
+            req(json!({ "runId": r.run_id, "data": "probe-after-copy\r" })),
+        )
+        .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !String::from_utf8_lossy(&buf.lock().unwrap()[before..])
+            .contains("ECHO: probe-after-copy")
+        {
+            assert!(Instant::now() < deadline, "the probe never came back");
+            std::thread::sleep(Duration::from_millis(20));
+        }
         let after = String::from_utf8_lossy(&buf.lock().unwrap()[before..]).into_owned();
-        assert!(
-            !after.contains("ECHO"),
-            "nothing typed into the PTY: {after:?}"
+        assert_eq!(
+            after.matches("ECHO").count(),
+            1,
+            "nothing typed into the PTY but the probe: {after:?}"
         );
         // The chain ends: no live tab.
         p.t.os.answer_next(true);

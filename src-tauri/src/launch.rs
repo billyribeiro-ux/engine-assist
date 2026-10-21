@@ -4,7 +4,6 @@
 //! `PlanId` valid 60 s (IPC-R7), and starts the session: `run.json` before spawn (SR-19), then
 //! `start_session`, then the chain and step updates.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -42,7 +41,7 @@ use crate::ipc::types::{
 use crate::os::Confirm;
 use crate::project::Opened;
 use crate::runs::{self, LiveRun, Outputs, RunSink};
-use crate::state::{App, OneTime, PLAN_TTL};
+use crate::state::{App, Expiring, OneTime, PLAN_TTL, Writing};
 
 /// A prepared plan held between `launch_prepare` and `launch_start`/`rearm_start`.
 #[derive(Debug, Clone)]
@@ -97,11 +96,11 @@ pub struct LaunchState {
     /// One-time plans (60 s).
     pub plans: OneTime<HeldPlan>,
     /// A changed fingerprint awaiting `config_ack`, by (project, cwd): fingerprint and snapshot.
-    pub acks: HashMap<(String, String), (String, Vec<SnapshotEntry>)>,
+    pub acks: Expiring<(String, String), (String, Vec<SnapshotEntry>)>,
     /// Where each SR-07 hit was found: hit ID → (project, cwd name).
-    pub hits: HashMap<String, (String, String)>,
+    pub hits: Expiring<String, (String, String)>,
     /// "End it yourself, then press Continue": the confirmed plan per chain.
-    pub rearms: HashMap<String, HeldPlan>,
+    pub rearms: Expiring<String, HeldPlan>,
 }
 
 fn cwd_name(c: CoreCwd) -> String {
@@ -585,13 +584,66 @@ pub struct Started {
     pub tab_name: String,
 }
 
+/// C2: the configuration fingerprint of a plan's cwd as it is now (stat-cached through the cwd's
+/// fingerprint cache). `None` when a source can't be read safely now, which counts as a change.
+#[must_use]
+pub fn fingerprint_now(app: &App, p: &Opened, held: &HeldPlan) -> Option<String> {
+    let root = foreman_sys::spawn::canonical(p.root().ok()?.path());
+    let (reg, _) = app.registry().ok()?;
+    let projects: Vec<PathBuf> = reg
+        .projects
+        .iter()
+        .map(|e| PathBuf::from(&e.path))
+        .collect();
+    let cfg = app.config_dir_env();
+    let w = foreman_sys::fingerprint::Where {
+        cwd: &held.plan.cwd,
+        repo_root: &root,
+        home: &app.paths().home,
+        config_dir: cfg.as_deref(),
+        managed: Path::new(MANAGED_DIR),
+        projects: &projects,
+    };
+    let stat = sl::load_cache(&p.app_root, &held.plan.cwd)
+        .map(|(c, _)| c.stat)
+        .unwrap_or_default();
+    foreman_sys::fingerprint::gather(&w, &stat)
+        .ok()
+        .map(|g| g.fingerprint)
+}
+
+/// SR-15 again at spawn (security review N-1): the sensor binary's hash is checked right before
+/// the run settings are written. A plan whose hooks run a binary that no longer matches (or that
+/// moved) loses its hooks and its token; the run gets the P1 manual behaviors (AC-F011-02).
+fn recheck_sensor(app: &App, plan: &mut LaunchPlan, run_id: &str) {
+    let Some(cmd) = plan.sensor_command() else {
+        return;
+    };
+    let ok = matches!(
+        crate::sensor::check(app),
+        crate::sensor::Check::Ok(path) if path.display().to_string() == cmd
+    );
+    if !ok {
+        plan.drop_sensor_hooks();
+        app.sensor().forget(run_id);
+        plan.warnings.push(crate::sensor::HASH_WARNING.to_owned());
+        tracing::warn!(target: "launch", run_id, "sensor no longer matches its hash; this run has no sensor");
+    }
+}
+
 /// Starts a session from a confirmed plan: `run.json` first (SR-19), then the spawn, then the
 /// chain, the step (`Spawn`), `firstLaunchDone` and `lastSeenClaudeVersion`; `run:status`.
+/// The caller holds the write lock (`w`) and has re-checked the plan against the project.
+///
+/// Once the session is spawned this never fails (C2): the step and chain updates go to a freshly
+/// opened project (retried once on a conflict), and a failure there is logged, so a live session
+/// always gets its tab.
 ///
 /// # Errors
-/// `ToolFailed` (the spawn), `Conflict`, `Io`.
+/// Before the spawn only: `ToolFailed` (the spawn), `Conflict`, `Io`.
 pub fn start(
     app: &App,
+    w: &Writing<'_>,
     p: &mut Opened,
     held: &HeldPlan,
     kind: RunKind,
@@ -599,6 +651,8 @@ pub fn start(
 ) -> Result<Started, IpcError> {
     let s = p.step(&held.step)?.clone();
     let run_id = held.plan.run_id.hyphenated().to_string();
+    let mut plan = held.plan.clone();
+    recheck_sensor(app, &mut plan, &run_id);
     let entry = match (kind, held.entry) {
         (RunKind::Rearm, _) => RunEntry::Rearm,
         (_, EntryPoint::DoNext) => RunEntry::DoNext,
@@ -610,7 +664,7 @@ pub fn start(
         project_id: p.id(),
         stage: s.stage,
         step: s.key.clone(),
-        plan: &held.plan,
+        plan: &plan,
         intended: held.intended,
         over: held.over,
         entry,
@@ -639,11 +693,14 @@ pub fn start(
     });
     let ctx = app.spawn_ctx_now()?;
     let size = foreman_sys::pty::size(120, 32).map_err(|e| IpcError::io(e.to_string()))?;
-    let session = match sl::start_session(&p.app_root, &ctx, &held.plan, size, sink) {
+    let session = match sl::start_session(&p.app_root, &ctx, &plan, size, sink) {
         Ok(s) => s,
         Err(e) => {
             file.status = foreman_core::schema::run::RunStatus::Errored;
-            let _ = runs::write_run(&p.app_root, &file, &stamp);
+            if let Err(we) = runs::write_run(&p.app_root, &file, &stamp) {
+                tracing::warn!(target: "launch", run_id = run_id.as_str(), error = %we.message, "run.json not updated after a failed spawn");
+            }
+            app.sensor().forget(&run_id);
             tracing::warn!(target: "launch", run_id = run_id.as_str(), "spawn failed");
             runs::emit_status(app, &run_id, RunStatus::Errored);
             return Err(IpcError::tool_failed(
@@ -654,57 +711,73 @@ pub fn start(
             ));
         }
     };
+    // From here on the session is live: nothing returns an error (C2).
     let spawned = u64::try_from(held.started.elapsed().as_millis()).unwrap_or(u64::MAX);
     file.t.spawned = Some(spawned);
     file.time_to_start_ms = Some(spawned);
     file.pid = session.pid();
-    let _ = runs::write_run(&p.app_root, &file, &stamp);
+    if let Err(e) = runs::write_run(&p.app_root, &file, &stamp) {
+        tracing::warn!(target: "launch", run_id = run_id.as_str(), error = %e.message, "run.json not updated after spawn");
+    }
     tracing::info!(target: "launch", run_id = run_id.as_str(), ms = spawned, "spawned");
-    let chain = runs::chain_of(&held.plan).unwrap_or_default();
+    let chain = runs::chain_of(&plan).unwrap_or_default();
     app.runs().insert(Arc::new(LiveRun {
         run_id: run_id.clone(),
         project_id: p.id().to_owned(),
         chain: chain.clone(),
         step: held.step.clone(),
-        tab_name: held.plan.tab_name.clone(),
+        tab_name: plan.tab_name.clone(),
         session,
         outputs,
-        plan: held.plan.clone(),
-        cwd: held.plan.cwd.clone(),
+        plan: plan.clone(),
+        cwd: plan.cwd.clone(),
         config_changed: AtomicBool::new(false),
         started: held.started,
     }));
     crate::sensor_ingest::watch_run(app, &run_id);
     runs::watch_output(app, &run_id);
-    // The chain, the step and the first-launch flag (DR-065, DR-110). A detached run (Fix this)
-    // leaves the step and its chains as they were.
-    if !held.detached {
-        p.progress.chains =
-            chain::apply_launch(&p.progress.chains, &s, &held.plan.session, held.intended);
-        let ctx_step = p.step_ctx(app, &s);
-        let cur = p.step_progress(&held.step);
-        if let Ok(mut next) = foreman_core::steps::transition(&cur, &ctx_step, &StepEvent::Spawn) {
-            next.last_run_id = Some(run_id.clone());
-            next.started_at = Some(app.now());
-            p.progress.steps.insert(s.key.clone(), next);
+    // The chain, the step and the first-launch flag (DR-065, DR-110), on the project as it is
+    // now. A detached run (Fix this) leaves the step and its chains as they were.
+    let now = app.now();
+    let recorded = crate::project::with_project_mut_locked(app, w, &held.project_id, |p| {
+        if !held.detached {
+            p.progress.chains =
+                chain::apply_launch(&p.progress.chains, &s, &plan.session, held.intended);
+            let ctx_step = p.step_ctx(app, &s);
+            let cur = p.step_progress(&held.step);
+            if let Ok(mut next) =
+                foreman_core::steps::transition(&cur, &ctx_step, &StepEvent::Spawn)
+            {
+                next.last_run_id = Some(run_id.clone());
+                next.started_at = Some(now.clone());
+                p.progress.steps.insert(s.key.clone(), next);
+            }
         }
+        p.progress.first_launch_done = true;
+        // DR-103: an override is for the next run only; this run used it (logged in `run.json`).
+        if held.over {
+            p.progress.overrides.remove(&s.key);
+        }
+        Ok(())
+    });
+    if let Err(e) = recorded {
+        tracing::error!(target: "launch", run_id = run_id.as_str(), code = e.code.as_str(), "the step and chain weren't recorded for a live run");
     }
-    p.progress.first_launch_done = true;
-    // DR-103: an override is for the next run only; this run used it (logged in `run.json`).
-    if held.over {
-        p.progress.overrides.remove(&s.key);
-    }
-    p.save_progress(app)?;
-    if let Ok((mut st, sstamp, _)) = app.settings()
-        && st.last_seen_claude_version.as_deref() != Some(held.plan.claude_version.as_str())
-    {
-        st.last_seen_claude_version = Some(held.plan.claude_version.chars().take(64).collect());
-        let _ = app.save_settings(&st, &sstamp);
+    match app.settings() {
+        Ok((mut st, sstamp, _))
+            if st.last_seen_claude_version.as_deref() != Some(plan.claude_version.as_str()) =>
+        {
+            st.last_seen_claude_version = Some(plan.claude_version.chars().take(64).collect());
+            if let Err(e) = app.save_settings(&st, &sstamp) {
+                tracing::warn!(target: "launch", code = e.code.as_str(), "lastSeenClaudeVersion not saved");
+            }
+        }
+        _ => {}
     }
     runs::emit_status(app, &run_id, RunStatus::Running);
     Ok(Started {
         run_id,
         chain,
-        tab_name: held.plan.tab_name.clone(),
+        tab_name: plan.tab_name.clone(),
     })
 }

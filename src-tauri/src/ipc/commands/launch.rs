@@ -153,6 +153,21 @@ pub fn chain_resume_prepare(
     ))
 }
 
+/// The project for a held plan, refused when it can't be written or its revision moved
+/// (IPC-R7: `Stale` with a fresh preview).
+fn current_plan(app: &App, held: &HeldPlan) -> Result<project::Opened, IpcError> {
+    let p = project::open(app, &held.project_id)?;
+    p.writable()?;
+    if p.progress.rev != held.rev {
+        return Err(IpcError::stale(
+            StaleWhat::ProjectRev,
+            "The project changed since this preview.",
+            fresh(app, held),
+        ));
+    }
+    Ok(p)
+}
+
 /// Re-prepares a plan for `Stale` (IPC-R7: the fresh preview goes in the error).
 fn fresh(app: &App, held: &HeldPlan) -> Option<serde_json::Value> {
     let mut p = project::open(app, &held.project_id).ok()?;
@@ -169,9 +184,11 @@ fn fresh(app: &App, held: &HeldPlan) -> Option<serde_json::Value> {
     serde_json::to_value(launch::hold(app, prepared)).ok()
 }
 
-/// `launch_start` (P1): the plan is single-use and valid 60 s; a changed project revision is
-/// `Stale` with a fresh preview; the plan's confirmation reasons are a native dialog (SR-19,
-/// SR-24a; Cancel spawns nothing and writes no run record); `run.json` is written before spawn.
+/// `launch_start` (P1): the plan is single-use and valid 60 s; a changed project revision or
+/// configuration fingerprint is `Stale` with a fresh preview, checked before the native dialog
+/// and again after it under the write lock (IPC-R7, C2); the plan's confirmation reasons are a
+/// native dialog (SR-19, SR-24a; Cancel spawns nothing and writes no run record); `run.json` is
+/// written before spawn. Once the session is spawned the call succeeds.
 ///
 /// # Errors
 /// `Expired`, `Stale`, `Cancelled`, `NotAllowed("needs-rearm")`, `ToolFailed`, `Io`.
@@ -183,15 +200,8 @@ pub fn launch_start(
     let held = app.launch().plans.take(req.plan_id.as_str())?;
     // ADR-013: a change a missed event hid lands now, so the revision check below sees it.
     crate::watch::restat_before_acting(app, &held.project_id);
-    let mut p = project::open(app, &held.project_id)?;
-    p.writable()?;
-    if p.progress.rev != held.rev {
-        return Err(IpcError::stale(
-            StaleWhat::ProjectRev,
-            "The project changed since this preview.",
-            fresh(app, &held),
-        ));
-    }
+    // A plan that is already stale never asks.
+    current_plan(app, &held)?;
     if held.rearm.is_some() {
         return Err(IpcError::not_allowed(
             "needs-rearm",
@@ -201,8 +211,20 @@ pub fn launch_start(
     if !launch::confirm_launch(app, &held) {
         return Err(IpcError::cancelled());
     }
-    let _w = app.writing();
-    let started = launch::start(app, &mut p, &held, RunKind::Launch, Some(output))?;
+    // C2: the dialog may have been open a long time. A session may have exited (rewriting
+    // `progress.json`), a decision file or the configuration may have changed: everything is
+    // checked again under the write lock, before anything spawns.
+    crate::watch::restat_before_acting(app, &held.project_id);
+    let w = app.writing();
+    let mut p = current_plan(app, &held)?;
+    if launch::fingerprint_now(app, &p, &held).as_deref() != Some(held.plan.fingerprint.as_str()) {
+        return Err(IpcError::stale(
+            StaleWhat::Fingerprint,
+            "The Claude Code configuration changed since this preview.",
+            fresh(app, &held),
+        ));
+    }
+    let started = launch::start(app, &w, &mut p, &held, RunKind::Launch, Some(output))?;
     Ok(RunStarted {
         run_id: RunId::from_trusted(started.run_id),
         chain: ChainId::from_trusted(started.chain),
@@ -285,7 +307,8 @@ pub fn auth_key_allowlist_add(
     app: &App,
     req: AuthKeyAllowlistAddReq,
 ) -> Result<SettingsView, IpcError> {
-    let Some((project_id, cwd)) = app.launch().hits.get(req.hit.as_str()).cloned() else {
+    let hit_id = req.hit.as_str().to_owned();
+    let Some((project_id, cwd)) = app.launch().hits.get(&hit_id).cloned() else {
         return Err(IpcError::expired());
     };
     let p = project::open(app, &project_id)?;
@@ -308,7 +331,12 @@ pub fn auth_key_allowlist_add(
         managed: Path::new(MANAGED_DIR),
         projects: &ctx.projects,
     };
-    let gathered = foreman_sys::fingerprint::gather(&w, &[]).map_err(|_| IpcError::expired())?;
+    // N4: a source that can't be read now is an I/O problem, not an expired hit.
+    let gathered = foreman_sys::fingerprint::gather(&w, &[]).map_err(|_| {
+        IpcError::io(
+            "Foreman couldn't read the Claude Code configuration again to confirm this key. Run the step again to see what blocks it.",
+        )
+    })?;
     let allow: Vec<AllowlistEntry> = settings
         .auth_key_allowlist
         .iter()
@@ -355,7 +383,7 @@ pub fn auth_key_allowlist_add(
         });
     }
     app.save_settings(&s, &stamp)?;
-    app.launch().hits.remove(req.hit.as_str());
+    app.launch().hits.remove(&hit_id);
     crate::ipc::commands::settings::view(app, &s)
 }
 

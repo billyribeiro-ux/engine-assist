@@ -162,18 +162,23 @@ mod pty {
         )
         .unwrap();
         s.set_flow(true);
-        std::thread::sleep(Duration::from_millis(400));
+        // W8: wait for the reader to park (a condition, not a fixed window); once parked it
+        // delivers nothing more until resumed.
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
+        while !s.reader_parked() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the reader never parked"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
         let a = sink.len();
-        std::thread::sleep(Duration::from_millis(400));
-        let b = sink.len();
         assert!(
             a < 1_048_576,
             "paused reader still delivered everything ({a})"
         );
-        assert!(
-            b <= a + 64 * 1024,
-            "reader kept reading while paused ({a} → {b})"
-        );
+        assert!(s.reader_parked());
+        assert_eq!(sink.len(), a, "reader kept reading while paused");
         assert!(s.is_live(), "the child is blocked, not gone");
         s.set_flow(false);
         sink.wait_for("BURST-END", 20);

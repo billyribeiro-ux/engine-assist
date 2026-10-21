@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 
+import { current } from '#lib/stores/project.svelte.ts';
 import { ui } from '#lib/stores/ui.svelte.ts';
 import { failing, fresh, IDS, project, said } from '#lib/test/screen.ts';
 
@@ -16,6 +17,17 @@ describe('StageWorkspace', () => {
 		await vi.waitFor(() =>
 			expect(m.getClipboard()).toContain('Recommend the best stack for TradeLog')
 		);
+	});
+
+	// Code review N6: the palette reads the selected step and stage; they go with the workspace.
+	it('workspace::unmount_clears_selection', async () => {
+		const m = fresh('happy');
+		const p = await project(m, IDS.tradelog);
+		const s = await render(StageWorkspace, { project: p, stageNo: 2 });
+		await vi.waitFor(() => expect(current.stage).toBe(2));
+		await s.unmount();
+		expect(current.step).toBeNull();
+		expect(current.stage).toBeNull();
 	});
 
 	it('locked: a step that waits for a running step says why next to Run', async () => {

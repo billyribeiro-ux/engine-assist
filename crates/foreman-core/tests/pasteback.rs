@@ -40,6 +40,23 @@ fn input<'a>(text: &'a str, out: &'a [String], fmt: &'a PacketFormat) -> PasteIn
 }
 
 mod pasteback {
+    /// N3b: the structural normalizer (lessons, ADR sets, the assembler) and the packet
+    /// normalizer (`packet::normalize_paste`) give the same text for structural cases.
+    #[test]
+    fn structural_steps_match_packet_normalizer() {
+        for input in [
+            "\u{feff}# A\r\nline  \r\n",
+            "\n\n```\n# A\nbody\n```\n\n",
+            "```markdown\r\n# A\r\n\r\nbody\t\r\n```",
+            "plain\rold mac\r",
+            "# A\n\n\nkept   \n",
+        ] {
+            let (a, _) = prepare(input);
+            let (b, _) = foreman_core::packet::normalize_paste(input);
+            assert_eq!(a, b, "{input:?}");
+        }
+    }
+
     use super::*;
 
     /// AC-F012-06 / DR-132: header through the last key's value is the packet, the rest goes to

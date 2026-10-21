@@ -118,8 +118,10 @@ pub fn display_state(p: &StepProgress, ctx: &StepCtx) -> StepState {
     }
 }
 
+/// A step that runs in a Claude Code session Foreman spawns. A Desktop step isn't one: Foreman
+/// copies its prompt and opens Desktop, so it is `copied` until Mark done (code review W4).
 fn cli(ctx: &StepCtx) -> bool {
-    matches!(ctx.surface, Some(Surface::Cli | Surface::Desktop))
+    matches!(ctx.surface, Some(Surface::Cli))
 }
 
 fn with(p: &StepProgress, state: StoredState) -> StepProgress {

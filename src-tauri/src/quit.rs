@@ -24,8 +24,9 @@ pub fn message(n: usize) -> String {
 }
 
 /// Whether Foreman may quit now. With no live session it may, without asking. Otherwise Billy is
-/// asked in a native dialog; on OK every live session is hung up (SIGHUP) and the answer is yes,
-/// on Cancel nothing is sent and the answer is no.
+/// asked in a native dialog; on OK every live session is hung up (SIGHUP), their exit handlers
+/// get up to [`EXIT_WAIT`] to finish, and the answer is yes; on Cancel nothing is sent and the
+/// answer is no.
 pub fn guard(app: &App) -> bool {
     if CONFIRMED.load(Ordering::SeqCst) {
         return true;
@@ -42,9 +43,17 @@ pub fn guard(app: &App) -> bool {
         return false;
     }
     tracing::info!(target: "app", sessions = n, "quit with live sessions");
-    app.runs().hangup_all();
+    let hung = app.runs().hangup_all();
+    // C3: the exit handlers record each run's end and its step (DR-065) before the app exits;
+    // a session that doesn't end within the bound is found `interrupted` at the next start.
+    if !app.runs().wait_exits(&hung, EXIT_WAIT) {
+        tracing::warn!(target: "app", "a session didn't end within 2 s of the quit");
+    }
     true
 }
+
+/// How long the quit waits for the hung-up sessions' exit handlers.
+pub const EXIT_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Claims the dialog: false when one is already up.
 pub fn begin_asking() -> bool {

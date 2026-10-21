@@ -145,6 +145,44 @@ describe('StageWorkspace selected step (AC-F030-01, AC-F006, AC-F008)', () => {
 		return { m, s, r };
 	}
 
+	// Code review N5: a run input is saved 300 ms after typing stops; ⌘↵ inside that window sends
+	// the typed value first, so the run never uses the old one.
+	it('steprow::run_flushes_pending_input', async () => {
+		const { m, r } = await open(ADDED_KEY);
+		const order: string[] = [];
+		const sent: unknown[] = [];
+		const keep = (
+			name: 'runInputSet' | 'launchPrepare' | 'clipboardCopy' | 'chatCopyAndOpen' | 'desktopOpen'
+		) => {
+			const orig = m[name].bind(m) as (...a: unknown[]) => unknown;
+			vi.spyOn(m, name).mockImplementation(((...a: unknown[]) => {
+				order.push(name);
+				if (name === 'runInputSet') sent.push(a[0]);
+				return orig(...a);
+			}) as never);
+		};
+		for (const n of [
+			'runInputSet',
+			'launchPrepare',
+			'clipboardCopy',
+			'chatCopyAndOpen',
+			'desktopOpen'
+		] as const)
+			keep(n);
+		const input = r.querySelector<HTMLTextAreaElement>('textarea');
+		if (!input) throw new Error('no input');
+		input.value = 'typed just now';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		input.dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Enter', metaKey: true, bubbles: true })
+		);
+		await vi.waitFor(() => expect(order.length).toBeGreaterThan(1));
+		expect(order[0]).toBe('runInputSet');
+		expect(sent).toContainEqual(
+			expect.objectContaining({ name: 'notes', value: 'typed just now' })
+		);
+	});
+
 	it('AC-F030-01 / AC-F006-12: the step shows its spec line, its input above the prompt, and the primary action for its surface', async () => {
 		const { r } = await open(ADDED_KEY);
 		expect(r.querySelector('dl.spec-line')).not.toBeNull();

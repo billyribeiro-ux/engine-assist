@@ -117,6 +117,8 @@ struct Inner {
     ring: Mutex<Ring>,
     paused: Mutex<bool>,
     flow: Condvar,
+    /// The reader is parked by the flow gate (tests wait on it instead of sleeping).
+    parked: AtomicBool,
     status: Mutex<PtyStatus>,
     /// Set after the sink was told of the exit; what `wait_exit` waits on, so a caller that saw
     /// the exit also sees everything the sink did with it.
@@ -205,6 +207,7 @@ impl PtySession {
             }),
             paused: Mutex::new(false),
             flow: Condvar::new(),
+            parked: AtomicBool::new(false),
             status: Mutex::new(PtyStatus::Running),
             reported: Mutex::new(None),
             exited: Condvar::new(),
@@ -293,6 +296,12 @@ impl PtySession {
             .map_err(|e| PtyError::Pty(e.to_string()))
     }
 
+    /// Whether the reader is parked by a paused flow now: it reads nothing more until resumed.
+    #[must_use]
+    pub fn reader_parked(&self) -> bool {
+        self.inner.parked.load(Ordering::SeqCst)
+    }
+
     /// Pauses or resumes the reader (`pty_flow`, NFR-08).
     pub fn set_flow(&self, paused: bool) {
         *lock(&self.inner.paused) = paused;
@@ -377,12 +386,14 @@ fn read_loop(
         {
             let mut p = lock(&inner.paused);
             while *p {
+                inner.parked.store(true, Ordering::SeqCst);
                 p = inner
                     .flow
                     .wait_timeout(p, Duration::from_millis(200))
                     .unwrap_or_else(PoisonError::into_inner)
                     .0;
             }
+            inner.parked.store(false, Ordering::SeqCst);
         }
         match reader.read(&mut buf) {
             Ok(0) | Err(_) => break,

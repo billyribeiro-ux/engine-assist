@@ -153,6 +153,21 @@ pub struct LaunchPlan {
 }
 
 impl LaunchPlan {
+    /// The sensor binary the plan's run settings hooks run (`None`: no hooks).
+    #[must_use]
+    pub fn sensor_command(&self) -> Option<String> {
+        run_settings::sensor_command(&self.run_settings)
+    }
+
+    /// Drops the sensor hooks from the run settings (SR-15 re-check at spawn, security review
+    /// N-1): the bytes and their hash change; argv points at the same settings path.
+    pub fn drop_sensor_hooks(&mut self) {
+        if let Some((bytes, sha)) = run_settings::without_hooks(&self.run_settings) {
+            self.run_settings = bytes;
+            self.run_settings_sha256 = sha;
+        }
+    }
+
     /// DR-116: same argv (prompt hashed) and same prompt hash.
     #[must_use]
     pub fn same_as(&self, other: &Self) -> bool {

@@ -32,12 +32,13 @@ use crate::ipc::dto::app::{
     SignedInfo, SpecLine, SpecSurface, StageView, StepSummary,
 };
 use crate::ipc::dto::events::{DecisionPending, Event};
+use crate::ipc::error::IpcErrorCode;
 use crate::ipc::types::{
     Applicability, ConditionId, Explained, ProjectId, ReadOnly, ReadOnlyReason, RepoPath, Rev,
     RunId, Stage, StepKey, StepKind, StepState, Tag, ValueOrigin,
 };
 use crate::render::escape_visible;
-use crate::state::App;
+use crate::state::{App, Writing};
 use crate::text;
 
 /// A packet file as read on open.
@@ -90,6 +91,9 @@ pub struct Opened {
     /// `progress.json` was rebuilt from the repo on this open because it didn't exist
     /// (AC-F020-11).
     pub rebuilt: bool,
+    /// The open changed `progress` in memory (a new pending review, a manual step's out file, a
+    /// rebuild) and, in `Read` mode, didn't write it (code review W1).
+    pub dirty: bool,
 }
 
 /// How much `open` does beyond reading.
@@ -153,15 +157,21 @@ fn decision_kind_name(k: CoreKind) -> &'static str {
     k.repo_path()
 }
 
-/// Opens a project (read-only states are part of the result, not errors).
+/// Opens a project (read-only states are part of the result, not errors). `Read` writes
+/// nothing to `progress.json`; `Full` writes what the open found, under the write lock.
 ///
 /// # Errors
-/// `NotFound` (unknown ID); `Io`.
+/// `NotFound` (unknown ID); `Io`; `Conflict` (`Full`, when `progress.json` changed twice
+/// underneath).
+pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError> {
+    open_inner(app, id, mode, false)
+}
+
 #[allow(
     clippy::too_many_lines,
     reason = "the open sequence (DR-150, DR-156) in one place, in order"
 )]
-pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError> {
+fn open_inner(app: &App, id: &str, mode: OpenMode, retried: bool) -> Result<Opened, IpcError> {
     let entry = entry(app, id)?;
     let app_root = app.app_root()?;
     let (mut progress, progress_stamp, unreadable) = match read_progress(&app_root, id) {
@@ -184,7 +194,7 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
             project_id: id,
         }
         .approvals()
-        .map_err(|e| IpcError::io(e.to_string()))?,
+        .map_err(IpcError::from)?,
         Err(_) => (ApprovalsFile::new(id), ReadStamp::Absent),
     };
     let mut opened = Opened {
@@ -206,6 +216,7 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         tampered: BTreeMap::new(),
         progress_unreadable: unreadable,
         rebuilt: false,
+        dirty: false,
     };
     let folder = Path::new(&entry.path);
     if !folder.is_dir() {
@@ -224,78 +235,12 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         app: &app_root,
         project_id: id,
     };
-    // DR-151: classify every decision file against its approved copy. While HEAD names a branch a
-    // signing on another branch committed to, that branch's version is no change (ADR-022 §5).
-    let now = app.now();
-    let head_ref = if opened
-        .approvals
-        .files
-        .project
-        .committed_on_other_branches
-        .is_empty()
-        && opened
-            .approvals
-            .files
-            .overlay
-            .committed_on_other_branches
-            .is_empty()
-        && opened
-            .approvals
-            .files
-            .blueprint_lock
-            .committed_on_other_branches
-            .is_empty()
-    {
-        None
-    } else {
-        crate::signing::head_ref(app, folder)
-    };
-    for kind in CoreKind::ALL {
-        let outcome = match d.process_on(
-            kind,
-            &uuid::Uuid::new_v4().to_string(),
-            &now,
-            head_ref.as_deref(),
-        ) {
-            Ok(o) => o,
-            Err(DecisionError::NoApprovedCopy(_)) => {
-                opened.read_only.get_or_insert_with(|| {
-                    ro(
-                        ReadOnlyReason::DecisionFileInvalid,
-                        format!(
-                            "{} has no approved copy in this Foreman. Review it before Foreman uses it.",
-                            decision_kind_name(kind)
-                        ),
-                    )
-                });
-                continue;
-            }
-            Err(e) => return Err(IpcError::io(e.to_string())),
-        };
-        match outcome {
-            Processed::Unchanged | Processed::VariablesReloaded => {}
-            Processed::Pending(p) => {
-                let known = progress
-                    .pending_outside
-                    .iter()
-                    .any(|x| x.file == p.file && x.seen_sha256 == p.seen_sha256);
-                if !known {
-                    progress.pending_outside.retain(|x| x.file != p.file);
-                    progress.pending_outside.push(p);
-                    opened.new_pending += 1;
-                }
-            }
-            Processed::ReadOnly(why) => {
-                let reason = if why.contains("newer Foreman") {
-                    ReadOnlyReason::NewerSchema
-                } else {
-                    ReadOnlyReason::DecisionFileInvalid
-                };
-                opened
-                    .read_only
-                    .get_or_insert_with(|| ro(reason, escape_visible(&why)));
-            }
-        }
+    // DR-151: classify every decision file against its approved copy (shared with the watcher's
+    // `refresh_decisions`, code review W2).
+    let classified = classify_decisions(app, folder, &d, &opened.approvals, &mut progress)?;
+    opened.new_pending = classified.new_pending;
+    if let Some(r) = classified.read_only {
+        opened.read_only.get_or_insert(r);
     }
     // An approved copy this Foreman can't use (a newer schema, adopted from a folder set up by a
     // newer Foreman) leaves the project read-only (AC-F018-07, AC-F030-03).
@@ -311,8 +256,6 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
                 .get_or_insert_with(|| ro(reason, escape_visible(&why)));
         }
     }
-    // A decision file that no longer differs drops its stale pending entry.
-    progress.pending_outside.retain(|p| still_pending(&root, p));
     opened.project = d.effective_project().ok();
     let mut overlay_flags: Vec<String> = Vec::new();
     opened.overlay = d
@@ -404,41 +347,190 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
         let _ = foreman_sys::git::ensure_exclude(&root, &ctx);
         // ADR-012 4.7: a pending real-index refresh is retried on open.
         crate::signing::retry_index_refresh(app, &root, &mut progress);
-        for n in opened.tampered.keys() {
-            app.emit(Event::TamperDetected(
-                crate::ipc::dto::events::TamperDetected {
-                    project_id: ProjectId::from_trusted(id),
-                    stage: Stage(*n),
-                    rev: Rev(progress.rev),
-                },
-            ));
-        }
+        emit_tamper(app, id, &opened.tampered, progress.rev);
     }
     opened.root = Some(root);
     // AC-F020-11, NFR-17: missing app data is rebuilt from the repo's packets on open (nothing is
     // lost that the repo still has); an unreadable file waits for Billy's Rebuild (AC-F020-12).
+    // The revision continues from the highest this run has seen, as the explicit rebuild does
+    // (code review W9), so the bus doesn't ignore the next `project:changed`.
     if missing && mode != OpenMode::Rebuild && !opened.packets.is_empty() && opened.path.is_some() {
         let pending = std::mem::take(&mut progress.pending_outside);
-        progress = opened.rebuilt_progress(app, 0);
+        progress = opened.rebuilt_progress(app, rebuild_base_rev(app, id, progress.rev));
         progress.pending_outside = pending;
         opened.rebuilt = true;
     }
     opened.progress = progress;
     // AC-F007-04: a started manual step whose file changed since is done (re-stat on open).
     crate::ipc::commands::steps::manual_outs_changed(app, &mut opened);
-    if mode != OpenMode::Rebuild && opened.progress != original {
-        opened.save_progress(app)?;
+    opened.dirty = opened.progress != original;
+    // Code review W1: a `Read` open has no side effects on `progress.json`. What it found (a new
+    // pending review, a manual step's out file, a rebuild) is in `opened.progress` and `dirty`;
+    // the next locked save (`with_project_mut`, any mutating command) writes it with the rest.
+    // `project_open` (`Full`) writes it now, under the write lock.
+    if mode == OpenMode::Full && opened.dirty {
+        let w = app.writing();
+        match opened.save_progress_locked(app, &w) {
+            Ok(_) => {}
+            Err(e) if e.code == IpcErrorCode::Conflict && !retried => {
+                drop(w);
+                return open_inner(app, id, mode, true);
+            }
+            Err(e) => return Err(e),
+        }
+        if opened.new_pending > 0 {
+            app.emit(Event::DecisionPending(DecisionPending {
+                project_id: ProjectId::from_trusted(id),
+                count: u32::try_from(opened.progress.pending_outside.len()).unwrap_or(u32::MAX),
+            }));
+        }
     }
-    if opened.new_pending > 0 {
-        app.emit(Event::DecisionPending(DecisionPending {
-            project_id: ProjectId::from_trusted(id),
-            count: u32::try_from(opened.progress.pending_outside.len()).unwrap_or(u32::MAX),
-        }));
-    }
-    app.inner()
-        .summaries
-        .insert(id.to_owned(), opened.summary(app));
+    // N7: the summary is built before the in-memory lock is taken.
+    let summary = opened.summary(app);
+    app.inner().summaries.insert(id.to_owned(), summary);
     Ok(opened)
+}
+
+/// The revision a rebuilt `progress.json` continues from: the file's own or the highest this run
+/// has seen for the project, whichever is higher. The save that follows adds one.
+#[must_use]
+pub fn rebuild_base_rev(app: &App, id: &str, rev: u32) -> u32 {
+    let seen = app.inner().summaries.get(id).map_or(0, |s| s.rev.0);
+    rev.max(seen)
+}
+
+/// C1: `tamper:detected` once per tampered packet version. A stage whose working file differs
+/// from its committed blob is announced the first time `project_open` sees that version; the
+/// refetch the event causes finds the same version and stays quiet. A stage that is no longer
+/// tampered is forgotten, so tampering it again is announced again.
+fn emit_tamper(app: &App, id: &str, tampered: &BTreeMap<u8, PacketFile>, progress_rev: u32) {
+    let new: Vec<u8> = {
+        let mut i = app.inner();
+        i.tamper_emitted
+            .retain(|(pid, stage), _| pid != id || tampered.contains_key(stage));
+        tampered
+            .iter()
+            .filter_map(|(n, f)| {
+                let k = (id.to_owned(), *n);
+                (i.tamper_emitted.get(&k) != Some(&f.sha256)).then(|| {
+                    i.tamper_emitted.insert(k, f.sha256.clone());
+                    *n
+                })
+            })
+            .collect()
+    };
+    let rev = app.view_rev(id, progress_rev);
+    for n in new {
+        app.emit(Event::TamperDetected(
+            crate::ipc::dto::events::TamperDetected {
+                project_id: ProjectId::from_trusted(id),
+                stage: Stage(n),
+                rev: Rev(rev),
+            },
+        ));
+    }
+}
+
+/// What classifying the decision files found.
+#[derive(Debug, Default)]
+pub struct Classified {
+    /// Pending outside changes new to `progress.pending_outside`.
+    pub new_pending: usize,
+    /// A variables-only change was reloaded into its approved copy.
+    pub reloaded: bool,
+    /// The first read-only reason met (no approved copy, a newer schema, an invalid file).
+    pub read_only: Option<ReadOnly>,
+}
+
+/// DR-151 (code review W2): the one classifier of the decision files, for [`open_with`] and the
+/// watcher's [`refresh_decisions`]. Each file is compared with its approved copy; while HEAD
+/// names a branch a signing on another branch committed to, that branch's version is no change
+/// (ADR-022 §5). New pending reviews join `progress.pending_outside`; entries whose file no longer
+/// differs are dropped.
+///
+/// # Errors
+/// `Io` when a decision file can't be classified.
+pub fn classify_decisions(
+    app: &App,
+    folder: &Path,
+    d: &Decisions<'_>,
+    approvals: &ApprovalsFile,
+    progress: &mut ProgressFile,
+) -> Result<Classified, IpcError> {
+    let mut out = Classified::default();
+    let now = app.now();
+    let other_branches = !approvals
+        .files
+        .project
+        .committed_on_other_branches
+        .is_empty()
+        || !approvals
+            .files
+            .overlay
+            .committed_on_other_branches
+            .is_empty()
+        || !approvals
+            .files
+            .blueprint_lock
+            .committed_on_other_branches
+            .is_empty();
+    let head_ref = if other_branches {
+        crate::signing::head_ref(app, folder)
+    } else {
+        None
+    };
+    for kind in CoreKind::ALL {
+        let outcome = match d.process_on(
+            kind,
+            &pending_id(d.project, kind),
+            &now,
+            head_ref.as_deref(),
+        ) {
+            Ok(o) => o,
+            Err(DecisionError::NoApprovedCopy(_)) => {
+                out.read_only.get_or_insert_with(|| {
+                    ro(
+                        ReadOnlyReason::DecisionFileInvalid,
+                        format!(
+                            "{} has no approved copy in this Foreman. Review it before Foreman uses it.",
+                            decision_kind_name(kind)
+                        ),
+                    )
+                });
+                continue;
+            }
+            Err(e) => return Err(IpcError::from(e)),
+        };
+        match outcome {
+            Processed::Unchanged => {}
+            Processed::VariablesReloaded => out.reloaded = true,
+            Processed::Pending(p) => {
+                let known = progress
+                    .pending_outside
+                    .iter()
+                    .any(|x| x.file == p.file && x.seen_sha256 == p.seen_sha256);
+                if !known {
+                    progress.pending_outside.retain(|x| x.file != p.file);
+                    progress.pending_outside.push(p);
+                    out.new_pending += 1;
+                }
+            }
+            Processed::ReadOnly(why) => {
+                let reason = if why.contains("newer Foreman") {
+                    ReadOnlyReason::NewerSchema
+                } else {
+                    ReadOnlyReason::DecisionFileInvalid
+                };
+                out.read_only
+                    .get_or_insert_with(|| ro(reason, escape_visible(&why)));
+            }
+        }
+    }
+    // A decision file that no longer differs drops its stale pending entry.
+    progress
+        .pending_outside
+        .retain(|p| still_pending(d.project, p));
+    Ok(out)
 }
 
 /// Re-classifies a project's decision files after a watcher hint or a re-stat (DR-151, ADR-013,
@@ -450,53 +542,69 @@ pub fn open_with(app: &App, id: &str, mode: OpenMode) -> Result<Opened, IpcError
 /// # Errors
 /// `NotFound`, `Io` (an unreadable `progress.json` is left for the rebuild path).
 pub fn refresh_decisions(app: &App, id: &str) -> Result<usize, IpcError> {
-    let _w = app.writing();
+    let w = app.writing();
     let entry = entry(app, id)?;
     let app_root = app.app_root()?;
     let (mut progress, stamp) = read_progress(&app_root, id)?;
-    let root = Root::open(Path::new(&entry.path), RootKind::Project)?;
+    let folder = Path::new(&entry.path);
+    let root = Root::open(folder, RootKind::Project)?;
     let d = Decisions {
         project: &root,
         app: &app_root,
         project_id: id,
     };
+    let (approvals, _) = d.approvals().map_err(IpcError::from)?;
     let before = progress.clone();
-    let now = app.now();
-    let mut new_pending = 0;
-    let mut reloaded = false;
-    for kind in CoreKind::ALL {
-        match d.process(kind, &uuid::Uuid::new_v4().to_string(), &now) {
-            Ok(Processed::Pending(p)) => {
-                let known = progress
-                    .pending_outside
-                    .iter()
-                    .any(|x| x.file == p.file && x.seen_sha256 == p.seen_sha256);
-                if !known {
-                    progress.pending_outside.retain(|x| x.file != p.file);
-                    progress.pending_outside.push(p);
-                    new_pending += 1;
-                }
-            }
-            Ok(Processed::VariablesReloaded) => reloaded = true,
-            // Read-only states and missing approved copies show on the next open.
-            Ok(Processed::Unchanged | Processed::ReadOnly(_)) | Err(_) => {}
-        }
-    }
-    progress.pending_outside.retain(|p| still_pending(&root, p));
-    if progress != before || reloaded {
+    // Read-only states and missing approved copies show on the next open.
+    let c = classify_decisions(app, folder, &d, &approvals, &mut progress)?;
+    if progress != before || c.reloaded {
         progress.rev = progress.rev.wrapping_add(1);
         let rel = pathpolicy::check_app_data(&progress_path(id))?;
         let text = schema::to_file(&progress).map_err(|e| IpcError::io(e.to_string()))?;
         app_root.write(&rel, text.as_bytes(), &stamp)?;
+        drop(w);
         app.project_changed(id, progress.rev);
     }
-    if new_pending > 0 {
+    if c.new_pending > 0 {
         app.emit(Event::DecisionPending(DecisionPending {
             project_id: ProjectId::from_trusted(id),
             count: u32::try_from(progress.pending_outside.len()).unwrap_or(u32::MAX),
         }));
     }
-    Ok(new_pending)
+    Ok(c.new_pending)
+}
+
+/// The ID a pending review of `kind` gets: derived from the file and its current bytes (UUID v4
+/// form), so a `Read` open that doesn't write `progress.json` (W1) names the same change the same
+/// way every time, and a file that changes again gets a new ID (AC-F022-05).
+fn pending_id(root: &Root, kind: CoreKind) -> String {
+    let current = pathpolicy::check_read(kind.repo_path(), ReadClass::Decision)
+        .ok()
+        .and_then(|rel| root.read(&rel, ReadClass::Decision).ok())
+        .map(|(b, _)| sha256_hex(&b))
+        .unwrap_or_default();
+    let h = sha256_hex(format!("{}\n{current}", kind.repo_path()).as_bytes());
+    let mut c: Vec<char> = h.chars().take(32).collect();
+    if let Some(x) = c.get_mut(12) {
+        *x = '4';
+    }
+    if let Some(x) = c.get_mut(16) {
+        *x = match x.to_digit(16).unwrap_or(0) & 0x3 {
+            0 => '8',
+            1 => '9',
+            2 => 'a',
+            _ => 'b',
+        };
+    }
+    let s: String = c.into_iter().collect();
+    format!(
+        "{}-{}-{}-{}-{}",
+        &s[..8],
+        &s[8..12],
+        &s[12..16],
+        &s[16..20],
+        &s[20..32]
+    )
 }
 
 fn still_pending(root: &Root, p: &PendingOutside) -> bool {
@@ -514,15 +622,58 @@ pub fn open(app: &App, id: &str) -> Result<Opened, IpcError> {
     open_with(app, id, OpenMode::Read)
 }
 
+/// Code review W1: the one way to change a project's `progress.json`. Takes the write lock
+/// (re-entrant), opens the project, runs `f`, and saves when anything changed (what `f` did, and
+/// what the open itself found). A `Conflict` on the save (an outside writer) reopens and runs `f`
+/// again, once. `f` decides from the freshly opened project, so it must not carry state from a
+/// previous attempt.
+///
+/// # Errors
+/// What `open` or `f` return; `Conflict` when `progress.json` changed underneath twice.
+pub fn with_project_mut<T>(
+    app: &App,
+    id: &str,
+    mut f: impl FnMut(&mut Opened) -> Result<T, IpcError>,
+) -> Result<T, IpcError> {
+    let w = app.writing();
+    with_project_mut_locked(app, &w, id, &mut f)
+}
+
+/// [`with_project_mut`] for a caller that holds the write lock.
+///
+/// # Errors
+/// As [`with_project_mut`].
+pub fn with_project_mut_locked<T>(
+    app: &App,
+    w: &Writing<'_>,
+    id: &str,
+    mut f: impl FnMut(&mut Opened) -> Result<T, IpcError>,
+) -> Result<T, IpcError> {
+    let mut retried = false;
+    loop {
+        let mut p = open(app, id)?;
+        let before = p.progress.clone();
+        let out = f(&mut p)?;
+        if !p.dirty && p.progress == before {
+            return Ok(out);
+        }
+        match p.save_progress_locked(app, w) {
+            Ok(_) => return Ok(out),
+            Err(e) if e.code == IpcErrorCode::Conflict && !retried => retried = true,
+            Err(e) => return Err(e),
+        }
+    }
+}
+
 /// The light summary of a registry entry (NFR-01: `app_bootstrap` reads only `settings.json`,
 /// `projects.json` and each `progress.json`): the last full summary this run, refreshed with the
 /// progress revision, or one built from `progress.json` alone.
 #[must_use]
 pub fn light_summary(app: &App, e: &ProjectEntry, app_root: &Root) -> ProjectSummary {
     let progress = read_progress(app_root, &e.project_id).ok();
-    let rev = progress.as_ref().map_or(0, |(p, _)| p.rev);
-    if let Some(s) = app.inner().summaries.get(&e.project_id) {
-        let mut s = s.clone();
+    let rev = app.view_rev(&e.project_id, progress.as_ref().map_or(0, |(p, _)| p.rev));
+    let cached = app.inner().summaries.get(&e.project_id).cloned();
+    if let Some(mut s) = cached {
         s.rev = Rev(rev.max(s.rev.0));
         s.pinned = e.pinned;
         s.name.clone_from(&e.name);
@@ -765,29 +916,42 @@ impl Opened {
                 .as_ref()
                 .map_or_else(|| self.entry.name.clone(), |p| p.name.clone()),
             display_path: app.display(Path::new(&self.entry.path)),
-            rev: Rev(self.progress.rev),
+            rev: Rev(app.view_rev(self.id(), self.progress.rev)),
             read_only: self.read_only.clone(),
             current_stage: self.current_stage().map(Stage),
             pinned: self.entry.pinned,
         }
     }
 
-    /// Writes `progress.json` with the next revision (CAS) and emits `project:changed`.
+    /// Writes `progress.json` with the next revision (CAS) and emits `project:changed`. Takes the
+    /// write lock (re-entrant: a command that holds it keeps it).
     ///
     /// # Errors
     /// `Conflict` when it changed underneath; `Io`.
     pub fn save_progress(&mut self, app: &App) -> Result<u32, IpcError> {
-        self.progress.rev = self.progress.rev.wrapping_add(1);
+        let w = app.writing();
+        self.save_progress_locked(app, &w)
+    }
+
+    /// [`Opened::save_progress`] for a caller that holds the write lock.
+    ///
+    /// # Errors
+    /// `Conflict` when it changed underneath; `Io`.
+    pub fn save_progress_locked(&mut self, app: &App, _w: &Writing<'_>) -> Result<u32, IpcError> {
+        let next = self.progress.rev.wrapping_add(1);
+        let mut out = self.progress.clone();
+        out.rev = next;
         let rel = pathpolicy::check_app_data(&progress_path(self.id()))?;
-        let text = schema::to_file(&self.progress).map_err(|e| IpcError::io(e.to_string()))?;
+        let text = schema::to_file(&out).map_err(|e| IpcError::io(e.to_string()))?;
         let stamp = self
             .app_root
             .write(&rel, text.as_bytes(), &self.progress_stamp)?;
+        self.progress.rev = next;
         self.progress_stamp = stamp;
+        self.dirty = false;
         app.project_changed(self.id(), self.progress.rev);
-        app.inner()
-            .summaries
-            .insert(self.id().to_owned(), self.summary(app));
+        let summary = self.summary(app);
+        app.inner().summaries.insert(self.id().to_owned(), summary);
         Ok(self.progress.rev)
     }
 
@@ -813,13 +977,7 @@ impl Opened {
                 app: &self.app_root,
                 project_id: &self.entry.project_id,
             };
-            let change =
-                d.own_change(kind, bytes.as_bytes(), stage5, &now)
-                    .map_err(|e| match e {
-                        DecisionError::Store(s) => IpcError::from(s),
-                        DecisionError::OutsidePending(p) => IpcError::conflict(&p, Vec::new()),
-                        other => IpcError::io(other.to_string()),
-                    })?;
+            let change = d.own_change(kind, bytes.as_bytes(), stage5, &now)?;
             let mut pending = None;
             let mut commit_error = None;
             match &change {
@@ -832,7 +990,9 @@ impl Opened {
                     };
                     match foreman_sys::decisions::commit_own(root, &change, &opts, &ctx) {
                         Ok(_) => {
-                            let _ = d.mark_committed(kind, sha256);
+                            if let Err(e) = d.mark_committed(kind, sha256) {
+                                tracing::warn!(target: "project", error = %e, "an own change's commit wasn't recorded in approvals");
+                            }
                         }
                         // The change stands (approved and written); the commit is retried by the
                         // next own change or signing (DR-153). Reported after saving.
@@ -1425,7 +1585,8 @@ pub fn branch(app: &App, root: &Path) -> String {
     }
 }
 
-/// `project_open`'s view after a mutation (no git call for the branch: it doesn't change).
+/// `project_open`'s view after a mutation (one `symbolic-ref` for the branch, no other git call;
+/// the open is `Read`, so nothing is written).
 ///
 /// # Errors
 /// As [`open`].

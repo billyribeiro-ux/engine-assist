@@ -127,6 +127,8 @@ pub struct Runs {
     /// The last status `run:status` announced for each run (the Today inbox's blocked and
     /// your-turn sessions, AC-F017-07).
     observed: Mutex<HashMap<String, RunStatus>>,
+    /// Runs whose exit handler finished (the quit guard waits for them, C3).
+    exits: (Mutex<std::collections::HashSet<String>>, std::sync::Condvar),
 }
 
 /// What Billy did to a step's prompt since its last run (F-026, AC-F026-01): the proxies for a
@@ -218,10 +220,46 @@ impl Runs {
         lock(&self.observed).clear();
     }
 
-    /// Hangs up every live session (quit, after the native quit guard; SR-57).
-    pub fn hangup_all(&self) {
-        for r in self.live() {
+    /// Hangs up every live session (quit, after the native quit guard; SR-57). Returns the runs
+    /// it hung up.
+    pub fn hangup_all(&self) -> Vec<String> {
+        let live = self.live();
+        for r in &live {
             r.session.hangup();
+        }
+        live.iter().map(|r| r.run_id.clone()).collect()
+    }
+
+    /// Notes that a run's exit handler finished.
+    pub fn note_exit_handled(&self, run_id: &str) {
+        lock(&self.exits.0).insert(run_id.to_owned());
+        self.exits.1.notify_all();
+    }
+
+    /// Whether a run's exit handler finished.
+    #[must_use]
+    pub fn exit_handled(&self, run_id: &str) -> bool {
+        lock(&self.exits.0).contains(run_id)
+    }
+
+    /// Waits until the exit handler of every run in `ids` finished, at most `timeout`. Returns
+    /// whether they all did.
+    pub fn wait_exits(&self, ids: &[String], timeout: std::time::Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        let mut done = lock(&self.exits.0);
+        loop {
+            if ids.iter().all(|i| done.contains(i)) {
+                return true;
+            }
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return false;
+            }
+            done = self
+                .exits
+                .1
+                .wait_timeout(done, left)
+                .map_or_else(|e| e.into_inner().0, |(g, _)| g);
         }
     }
 }
@@ -445,8 +483,10 @@ fn append_line(app_root: &Root, line: &RunIndexLine) {
     if let (Ok(rel), Ok(text)) = (
         pathpolicy::check_app_data(&format!("runs/index-{month}.jsonl")),
         serde_json::to_string(line),
-    ) {
-        let _ = app_root.append_line(&rel, format!("{text}\n").as_bytes());
+    ) && let Err(e) = app_root.append_line(&rel, format!("{text}\n").as_bytes())
+    {
+        // W6: the index is the kill check's data; a lost line is logged, not dropped silently.
+        tracing::error!(target: "run", run_id = line.run_id.as_str(), error = %e, "run index line not appended");
     }
 }
 
@@ -475,8 +515,8 @@ pub fn on_exit(app: &App, run_id: &str, info: ExitInfo) {
         tracing::info!(target: "run", run_id, code = ?info.code, "exited");
         // P2: what the sensor saw (model, effort, mode); `null` without it (files.md §4.6).
         f.observed = crate::sensor_ingest::observed(&root, run_id).or(f.observed);
-        if write_run(&root, &f, &stamp).is_ok() {
-            append_index(
+        match write_run(&root, &f, &stamp) {
+            Ok(_) => append_index(
                 &root,
                 &f,
                 if status == RunStatus::Exited {
@@ -484,25 +524,53 @@ pub fn on_exit(app: &App, run_id: &str, info: ExitInfo) {
                 } else {
                     IndexStatus::Errored
                 },
-            );
+            ),
+            Err(e) => {
+                tracing::error!(target: "run", run_id, code = e.code.as_str(), "run.json not updated at exit");
+            }
         }
     }
-    let _w = app.writing();
-    if let Ok(mut p) = crate::project::open(app, &live.project_id)
-        && let Ok(s) = p.step(&live.step).cloned()
-    {
-        let ctx = p.step_ctx(app, &s);
-        let cur = p.step_progress(&live.step);
-        let ev = match info.code {
-            Some(c) => foreman_core::steps::StepEvent::Exited(c),
-            None => foreman_core::steps::StepEvent::Errored,
-        };
-        if let Ok(next) = foreman_core::steps::transition(&cur, &ctx, &ev) {
-            p.progress.steps.insert(s.key.clone(), next);
-            let _ = p.save_progress(app);
-        }
+    // W1: the step's `Exited`/`Errored` on the project as it is now, retried once on a conflict.
+    let ev = match info.code {
+        Some(c) => foreman_core::steps::StepEvent::Exited(c),
+        None => foreman_core::steps::StepEvent::Errored,
+    };
+    if let Err(e) = step_event_for_run(app, &live.project_id, &live.step, run_id, &ev) {
+        tracing::error!(target: "run", run_id, code = e.code.as_str(), "the step's exit wasn't recorded");
     }
+    app.runs().note_exit_handled(run_id);
     emit_status(app, run_id, status);
+}
+
+/// Applies a run's outcome to its step when the step's last run is still this one (an older
+/// run's exit doesn't touch a step that was launched again). Returns whether it applied.
+///
+/// # Errors
+/// What [`crate::project::with_project_mut`] returns.
+pub fn step_event_for_run(
+    app: &App,
+    project_id: &str,
+    step: &str,
+    run_id: &str,
+    ev: &foreman_core::steps::StepEvent,
+) -> Result<bool, IpcError> {
+    crate::project::with_project_mut(app, project_id, |p| {
+        let Ok(s) = p.step(step).cloned() else {
+            return Ok(false);
+        };
+        let cur = p.step_progress(step);
+        if cur.last_run_id.as_deref().is_some_and(|l| l != run_id) {
+            return Ok(false);
+        }
+        let ctx = p.step_ctx(app, &s);
+        match foreman_core::steps::transition(&cur, &ctx, ev) {
+            Ok(next) => {
+                p.progress.steps.insert(s.key.clone(), next);
+                Ok(true)
+            }
+            Err(_) => Ok(false),
+        }
+    })
 }
 
 /// What turning run records into [`RunSummary`] rows needs, gathered once per call: project
@@ -642,6 +710,45 @@ impl<'a> SummaryCx<'a> {
     }
 }
 
+/// C3 (DR-065): the step of each interrupted run goes back to `notStarted` when that run is
+/// still its last one (`running → notStarted`, "run again"), one locked save per project.
+fn interrupt_steps(app: &App, found: &[RunFile]) {
+    let mut by_project: HashMap<&str, Vec<(&str, &str)>> = HashMap::new();
+    for f in found {
+        by_project
+            .entry(f.project_id.as_str())
+            .or_default()
+            .push((f.step_id.as_str(), f.run_id.as_str()));
+    }
+    for (project, runs) in by_project {
+        let applied = crate::project::with_project_mut(app, project, |p| {
+            let mut n = 0;
+            for (step, run_id) in &runs {
+                let Ok(s) = p.step(step).cloned() else {
+                    continue;
+                };
+                let cur = p.step_progress(step);
+                if cur.last_run_id.as_deref() != Some(*run_id) {
+                    continue;
+                }
+                let ctx = p.step_ctx(app, &s);
+                if let Ok(next) = foreman_core::steps::transition(
+                    &cur,
+                    &ctx,
+                    &foreman_core::steps::StepEvent::Interrupted,
+                ) {
+                    p.progress.steps.insert(s.key.clone(), next);
+                    n += 1;
+                }
+            }
+            Ok(n)
+        });
+        if let Err(e) = applied {
+            tracing::error!(target: "run", project, code = e.code.as_str(), "interrupted runs' steps weren't reset");
+        }
+    }
+}
+
 /// Startup (SR-57, ADR-010 §6): every `run.json` still `running` with no live session in this
 /// Foreman becomes `interrupted` (once per app start); returns the interrupted runs, which are
 /// listed and never relaunched. The first scan also prunes output tails past 90 days (SR-53).
@@ -664,15 +771,23 @@ pub fn interrupted(app: &App) -> Result<Vec<RunSummary>, IpcError> {
             .is_some_and(|r| r.session.status() == PtyStatus::Running);
         if first && f.status == FileStatus::Running && !live {
             f.status = FileStatus::Interrupted;
-            if write_run(&root, &f, &stamp).is_ok() {
-                append_index(&root, &f, IndexStatus::Interrupted);
-                // AC-XC-18: after a crash the run-log entry is the run's `interrupted` status.
-                tracing::warn!(target: "run", run_id = id.as_str(), "interrupted by a crash or forced quit");
+            match write_run(&root, &f, &stamp) {
+                Ok(_) => {
+                    append_index(&root, &f, IndexStatus::Interrupted);
+                    // AC-XC-18: after a crash the run-log entry is the run's `interrupted` status.
+                    tracing::warn!(target: "run", run_id = id.as_str(), "interrupted by a crash or forced quit");
+                }
+                Err(e) => {
+                    tracing::error!(target: "run", run_id = id.as_str(), code = e.code.as_str(), "run.json not marked interrupted");
+                }
             }
         }
         if f.status == FileStatus::Interrupted {
             found.push(f);
         }
+    }
+    if first {
+        interrupt_steps(app, &found);
     }
     found.sort_by(|a, b| b.t.wall_start.cmp(&a.t.wall_start));
     let out = found.iter().map(|f| cx.summary(f)).collect();

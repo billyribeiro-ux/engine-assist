@@ -115,6 +115,27 @@ describe('Palette', () => {
 		await expect.element(s.getByRole('option')).not.toBeInTheDocument();
 	});
 
+	// Code review N6: with no query the Steps group is the open project's stage, found by the
+	// project's ID; two projects with the same name don't mix their steps.
+	it('palette::steps_filtered_by_project_id', async () => {
+		const m = fresh('happy');
+		for (const x of m.world.projects) if (x.id !== IDS.tradelog) x.name = 'TradeLog';
+		const p = await project(m, IDS.tradelog);
+		current.project = p;
+		current.stage = 2;
+		current.step = null;
+		ui.paletteOpen = true;
+		const s = await render(Palette);
+		await expect.element(s.getByRole('group', { name: 'Steps' })).toBeInTheDocument();
+		const titles = s
+			.getByRole('group', { name: 'Steps' })
+			.getByRole('option')
+			.elements()
+			.map((e) => e.textContent.split('TradeLog')[0]?.trim() ?? '');
+		expect(titles.length).toBeGreaterThan(0);
+		expect(new Set(titles).size).toBe(titles.length);
+	});
+
 	it('Esc closes the palette and returns focus to where it was', async () => {
 		fresh('happy');
 		const trigger = document.createElement('button');

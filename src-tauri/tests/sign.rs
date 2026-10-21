@@ -741,6 +741,111 @@ mod sign {
         assert_eq!(e.code, IpcErrorCode::NotAllowed);
     }
 
+    /// Code review C1: `project_open` announces a tampered packet once per version. The refetch
+    /// the event causes opens the project again and stays quiet; a new edit, or tampering again
+    /// after a restore, is announced again.
+    #[test]
+    fn tamper_event_once_per_version() {
+        let p = ProjectApp::new(json!({}));
+        ready(&p);
+        let pv = preview(&p, current()).unwrap();
+        apply(&p, &pv).unwrap();
+        let tampers = || {
+            p.t.os
+                .events()
+                .iter()
+                .filter(|e| e.name() == "tamper:detected")
+                .count()
+        };
+        let path = p.project.join("docs/handoff/stage-01.md");
+        let signed = std::fs::read_to_string(&path).unwrap();
+        let edited = signed.replace("APPROVED BY: Billy Ribeiro", "APPROVED BY: Mallory");
+        std::fs::write(&path, &edited).unwrap();
+        for _ in 0..3 {
+            projects_open(&p);
+        }
+        assert_eq!(tampers(), 1, "one event for one tampered version");
+        std::fs::write(&path, format!("{edited}more\n")).unwrap();
+        projects_open(&p);
+        projects_open(&p);
+        assert_eq!(tampers(), 2, "a new version is announced");
+        std::fs::write(&path, &signed).unwrap();
+        projects_open(&p);
+        std::fs::write(&path, &edited).unwrap();
+        projects_open(&p);
+        assert_eq!(tampers(), 3, "tampered again after a restore");
+    }
+
+    /// Code review W3: the sign dialog is shown without the write lock (PTY exit handlers, the
+    /// watcher and decision refreshes keep working while Billy reads it), and the packet is
+    /// checked again under the lock after it: a packet changed while the dialog was open is
+    /// `Stale` with a fresh preview, and nothing is written.
+    #[test]
+    fn dialog_without_lock_rechecks_after() {
+        let p = ProjectApp::new(json!({}));
+        ready(&p);
+        let pv = preview(&p, current()).unwrap();
+        let app = Arc::clone(&p.t.app);
+        let path = p.project.join("docs/handoff/stage-01.md");
+        let held = Arc::new(Mutex::new(None));
+        let h = Arc::clone(&held);
+        let file = path.clone();
+        p.t.os.while_dialog_open(Some(Box::new(move |_| {
+            *h.lock().unwrap() = Some(app.write_lock_held());
+            let t = std::fs::read_to_string(&file).unwrap();
+            std::fs::write(&file, format!("{t}\nEdited while the dialog was open.\n")).unwrap();
+        })));
+        let before_head = try_head(&p);
+        let e = apply(&p, &pv).unwrap_err();
+        p.t.os.while_dialog_open(None);
+        assert_eq!(*held.lock().unwrap(), Some(false), "the lock was held");
+        assert_eq!(e.code, IpcErrorCode::Stale, "{e:?}");
+        assert!(
+            matches!(
+                &e.detail,
+                Some(IpcErrorDetail::Stale { fresh: Some(_), .. })
+            ),
+            "{e:?}"
+        );
+        assert!(
+            !std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("APPROVED BY: Billy Ribeiro"),
+            "nothing was signed"
+        );
+        assert_eq!(try_head(&p), before_head, "nothing committed");
+    }
+
+    /// IPC-R10 (code review W6): a conflict in phase 1 names the file and what phase 1 already
+    /// wrote, so the next open doesn't take Foreman's own APPROVED BY for an outside signature
+    /// without telling Billy.
+    #[test]
+    fn conflict_reports_written_targets() {
+        let p = ProjectApp::new(json!({}));
+        ready(&p);
+        let pv = preview(&p, current()).unwrap();
+        let record = p.project.join(".foreman/stages/stage-01.json");
+        let r = record.clone();
+        let between = move || {
+            std::fs::create_dir_all(r.parent().unwrap()).unwrap();
+            std::fs::write(&r, "{\"written\":\"by someone else\"}\n").unwrap();
+        };
+        let seams = Seams {
+            after_packet_write: Some(&between),
+            ..Seams::default()
+        };
+        let e = apply_with(&p, &pv, &seams).unwrap_err();
+        assert_eq!(e.code, IpcErrorCode::Conflict, "{e:?}");
+        match &e.detail {
+            Some(IpcErrorDetail::Conflict { path, written }) => {
+                assert_eq!(path.as_str(), ".foreman/stages/stage-01.json");
+                let w: Vec<&str> = written.iter().map(|x| x.as_str()).collect();
+                assert_eq!(w, ["docs/handoff/stage-01.md"]);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
     /// M4-22 (AC-F014-15): `packet_view` of a tampered signed packet carries the tamper diff
     /// (committed → working); the fields are the committed text's, and the diff is gone once the
     /// committed text is back.
@@ -868,6 +973,64 @@ mod git {
 
 mod decisions {
     use super::*;
+
+    /// Code review W2: the watcher's re-classification (`refresh_decisions`) uses the same
+    /// classifier as opening the project: after a signing on another branch and a further own
+    /// change, checking that branch out records no false pending review.
+    #[test]
+    fn watcher_path_other_branch_no_false_drift() {
+        let p = ProjectApp::new(json!({}));
+        ready(&p);
+        let d = p.project.clone();
+        std::fs::write(d.join("README.md"), "base\n").unwrap();
+        git(&d, &["add", "README.md"]);
+        git(&d, &["commit", "-q", "-m", "base"]);
+        let own = |name: &str| {
+            let mut o = project::open(&p.t.app, &p.id).unwrap();
+            let mut pf = o.project.clone().unwrap();
+            pf.name = name.into();
+            let bytes = foreman_core::schema::to_file(&pf).unwrap();
+            {
+                let root = o.root().unwrap();
+                let dd = foreman_core::decisions::Decisions {
+                    project: root,
+                    app: &o.app_root,
+                    project_id: &p.id,
+                };
+                let ch = dd
+                    .own_change(
+                        DecisionFileKind::Project,
+                        bytes.as_bytes(),
+                        true,
+                        "2026-10-20T00:00:00Z",
+                    )
+                    .unwrap();
+                let foreman_core::decisions::OwnChange::Pending(po) = ch else {
+                    panic!()
+                };
+                o.progress.pending_own.retain(|x| x.file != po.file);
+                o.progress.pending_own.push(po);
+            }
+            o.save_progress(&p.t.app).unwrap();
+        };
+        own("TradeLog Pro");
+        let pv = preview(&p, json!({ "kind": "other", "branch": "handoff/stage-01" })).unwrap();
+        let SignResult::Signed { .. } = apply(&p, &pv).unwrap() else {
+            panic!()
+        };
+        // A further own change after the signing: the approved copy moves past the branch's.
+        own("TradeLog Max");
+        git(&d, &["stash", "-u", "-q"]);
+        git(&d, &["checkout", "-q", "handoff/stage-01"]);
+        let new = project::refresh_decisions(&p.t.app, &p.id).unwrap();
+        assert_eq!(new, 0, "the watcher recorded a false pending review");
+        let o = project::open(&p.t.app, &p.id).unwrap();
+        assert!(
+            o.progress.pending_outside.is_empty(),
+            "{:?}",
+            o.progress.pending_outside
+        );
+    }
 
     /// ADR-022 §5, AC-F014-14: a decision change pending after Stage 5 rides in the next signing
     /// commit; signed on another branch, `committedOnOtherBranches` records it, so checking that

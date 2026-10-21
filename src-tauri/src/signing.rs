@@ -464,9 +464,7 @@ pub fn preview(
     };
     let mut decisions_v = Vec::new();
     for po in &p.progress.pending_own {
-        let (bytes, _) = d
-            .approved(po.file)
-            .map_err(|e| IpcError::io(e.to_string()))?;
+        let (bytes, _) = d.approved(po.file)?;
         decisions_v.push((po.file, bytes));
     }
     let mut paths = vec![RepoPath::from_trusted(packet::file_name(n))];
@@ -570,6 +568,8 @@ pub struct Seams<'a> {
     pub index_retries: Option<(u32, std::time::Duration)>,
     /// Stop after phase 1 (Foreman killed between the phases, AC-F014-13).
     pub stop_after_phase1: bool,
+    /// Between the packet's write and the stage record's (another writer changes a file).
+    pub after_packet_write: Option<&'a dyn Fn()>,
 }
 
 fn sign_confirm(app: &App, h: &HeldSign) -> bool {
@@ -667,29 +667,16 @@ pub fn apply(
     seams: &Seams<'_>,
 ) -> Result<SignResult, IpcError> {
     let n = h.stage;
-    let mut p = crate::project::open(app, &h.project_id)?;
-    p.writable()?;
     send(SignProgress::ReRead);
-    // AC-F014-04: the packet must still be what Billy reviewed.
-    let now = p.packets.get(&n).map(|f| f.sha256.clone());
-    if now.as_deref() != Some(h.packet_sha256.as_str()) || p.tampered.contains_key(&n) {
-        return Err(stale_packet(app, &p, &h));
-    }
-    // Still signable (the gate, lessons, conditions may have moved since the preview).
-    let c = closeout::gather(app, &p, n)?;
-    let facts = SignFacts {
-        chain: ChainSession::BusyConfirmed,
-        ..c.sign.clone()
-    };
-    if c.locked_by.is_some() || !foreman_core::gate::signable(&facts) {
-        return Err(IpcError::not_allowed(
-            "not-signable",
-            format!("Stage {n} can't be signed: {}", c.why_not().join(" ")),
-        ));
-    }
+    still_signable(app, &crate::project::open(app, &h.project_id)?, &h)?;
     if !sign_confirm(app, &h) {
         return Err(IpcError::cancelled());
     }
+    // W3: the dialog is shown without the write lock; the packet and the stage are checked again
+    // under it, before anything is written.
+    let _w = app.writing();
+    let mut p = crate::project::open(app, &h.project_id)?;
+    still_signable(app, &p, &h)?;
     let root_path = p.root()?.path().to_path_buf();
     let packet_rel = packet_path(n)?;
     let record_rel = record_path(n)?;
@@ -703,16 +690,21 @@ pub fn apply(
             let root = p.root()?;
             let packet_stamp = p.packets[&n].stamp.clone();
             root.write(&packet_rel, h.packet_text.as_bytes(), &packet_stamp)
-                .map_err(|e| conflict_or(e, &packet_rel))?;
+                .map_err(|e| conflict_or(e, &packet_rel, &[]))?;
             send(SignProgress::Write {
                 path: RepoPath::from_trusted(packet_rel.to_string()),
             });
+            let mut written: Vec<CoreRepoPath> = vec![packet_rel.clone()];
             let (_, rstamp) = root.read_opt(&record_rel, ReadClass::Decision)?;
+            if let Some(f) = seams.after_packet_write {
+                f();
+            }
             root.write(&record_rel, &h.record, &rstamp)
-                .map_err(|e| conflict_or(e, &record_rel))?;
+                .map_err(|e| conflict_or(e, &record_rel, &written))?;
             send(SignProgress::Write {
                 path: RepoPath::from_trusted(record_rel.to_string()),
             });
+            written.push(record_rel.clone());
             for (kind, bytes) in &h.decisions {
                 let rel = decision_rel(*kind)?;
                 let (cur, st) = root.read_opt(&rel, ReadClass::Decision)?;
@@ -732,17 +724,18 @@ pub fn apply(
                 if outside || moved {
                     return Err(IpcError::conflict(
                         kind.repo_path(),
-                        vec![
-                            RepoPath::from_trusted(packet_rel.to_string()),
-                            RepoPath::from_trusted(record_rel.to_string()),
-                        ],
+                        written
+                            .iter()
+                            .map(|w| RepoPath::from_trusted(w.as_str()))
+                            .collect(),
                     ));
                 }
                 root.write(&rel, bytes, &st)
-                    .map_err(|e| conflict_or(e, &rel))?;
+                    .map_err(|e| conflict_or(e, &rel, &written))?;
                 send(SignProgress::Write {
                     path: RepoPath::from_trusted(rel.to_string()),
                 });
+                written.push(rel.clone());
             }
             p.progress.signing.insert(
                 n.to_string(),
@@ -805,11 +798,44 @@ pub fn apply(
     }
 }
 
-fn conflict_or(e: foreman_core::store::StoreError, rel: &CoreRepoPath) -> IpcError {
+/// AC-F014-04: the packet must still be what Billy reviewed, and the stage still signable (the
+/// gate, lessons, conditions may have moved since the preview).
+fn still_signable(app: &App, p: &Opened, h: &HeldSign) -> Result<(), IpcError> {
+    let n = h.stage;
+    p.writable()?;
+    let now = p.packets.get(&n).map(|f| f.sha256.clone());
+    if now.as_deref() != Some(h.packet_sha256.as_str()) || p.tampered.contains_key(&n) {
+        return Err(stale_packet(app, p, h));
+    }
+    let c = closeout::gather(app, p, n)?;
+    let facts = SignFacts {
+        chain: ChainSession::BusyConfirmed,
+        ..c.sign.clone()
+    };
+    if c.locked_by.is_some() || !foreman_core::gate::signable(&facts) {
+        return Err(IpcError::not_allowed(
+            "not-signable",
+            format!("Stage {n} can't be signed: {}", c.why_not().join(" ")),
+        ));
+    }
+    Ok(())
+}
+
+/// A store error from a phase 1 write; a `Conflict` names the file and what phase 1 already
+/// wrote (IPC-R10, code review W6).
+fn conflict_or(
+    e: foreman_core::store::StoreError,
+    rel: &CoreRepoPath,
+    written: &[CoreRepoPath],
+) -> IpcError {
     match e {
-        foreman_core::store::StoreError::Conflict { .. } => {
-            IpcError::conflict(rel.as_str(), Vec::new())
-        }
+        foreman_core::store::StoreError::Conflict { .. } => IpcError::conflict(
+            rel.as_str(),
+            written
+                .iter()
+                .map(|w| RepoPath::from_trusted(w.as_str()))
+                .collect(),
+        ),
         other => IpcError::from(other),
     }
 }
@@ -867,7 +893,7 @@ fn finish(
 ) -> Result<SignResult, IpcError> {
     let other = matches!(branch, Branch2::Other(_));
     let key = n.to_string();
-    let (commit, branch_ref, pending) = match out {
+    let (commit, branch_ref) = match out {
         Ok(CommitOutcome::Committed {
             commit,
             branch,
@@ -882,7 +908,7 @@ fn finish(
                     since: app.now(),
                 });
             }
-            (commit, branch, index_refresh_pending)
+            (commit, branch)
         }
         Ok(CommitOutcome::NothingToCommit) => {
             // Everything was already committed (a retry after a commit that landed).
@@ -895,11 +921,7 @@ fn finish(
             let Some(tip) = tip else {
                 return pending_result(app, p, n, other, "Nothing differed from the branch tip.");
             };
-            (
-                tip,
-                head_ref(app, p.root()?.path()).unwrap_or_default(),
-                false,
-            )
+            (tip, head_ref(app, p.root()?.path()).unwrap_or_default())
         }
         Err(CommitError::ReadbackMismatch { commit, path }) => {
             // The commit landed but holds other bytes: the stage stays commit pending (AC-F014-10).
@@ -971,10 +993,14 @@ fn finish(
             project_id: &p.entry.project_id,
         };
         for po in &p.progress.pending_own {
-            if other {
-                let _ = d.mark_committed_on_branch(po.file, &branch_ref, &po.sha256);
+            let marked = if other {
+                d.mark_committed_on_branch(po.file, &branch_ref, &po.sha256)
             } else {
-                let _ = d.mark_committed(po.file, &po.sha256);
+                d.mark_committed(po.file, &po.sha256)
+            };
+            // W6: approvals not knowing the commit makes the next open see an outside change.
+            if let Err(e) = marked {
+                tracing::error!(target: "sign", stage = n, file = po.file.repo_path(), error = %e, "a signed decision file wasn't recorded as committed");
             }
         }
         if let Ok((a, _)) = d.approvals() {
@@ -992,7 +1018,6 @@ fn finish(
         }
     }
     p.save_progress(app)?;
-    let _ = pending;
     send(SignProgress::Done {
         commit: commit.clone(),
     });
@@ -1188,7 +1213,7 @@ pub fn restore(app: &App, project_id: &str, n: u8, seen: &str) -> Result<Opened,
     let rel = packet_path(n)?;
     p.root()?
         .write(&rel, committed.text.as_bytes(), &w.stamp)
-        .map_err(|e| conflict_or(e, &rel))?;
+        .map_err(|e| conflict_or(e, &rel, &[]))?;
     crate::project::open(app, project_id)
 }
 

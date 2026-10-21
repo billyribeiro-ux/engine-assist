@@ -26,6 +26,9 @@
 		hint: string;
 		/** Extra words the search matches (the selected step's title for its actions). */
 		keywords?: string;
+		/** A step's project and stage (N6: the Steps group filters by ID, not by name). */
+		projectId?: string;
+		stage?: number;
 		open: () => unknown;
 		run?: () => unknown;
 	}
@@ -109,6 +112,8 @@
 						title: `${st.number} ${st.title}`,
 						sub: `${v.summary.name}, Stage ${s.stage}, ${state}`,
 						hint: '↵ open',
+						projectId: v.summary.id,
+						stage: s.stage,
 						open: () => goto(to.step(v.summary.id, s.stage, st.key)),
 						run: () =>
 							runStep({
@@ -287,13 +292,12 @@
 	const shown: Item[] = $derived.by(() => {
 		const q = query.trim().toLowerCase();
 		const stageNo = current.stage ?? current.project?.summary.currentStage ?? null;
-		const name = current.project?.summary.name ?? '\u0000';
+		const pid = current.project?.summary.id ?? null;
 		const list = q
 			? items.filter((i) => `${i.title} ${i.sub} ${i.keywords ?? ''}`.toLowerCase().includes(q))
 			: items.filter(
 					(i) =>
-						i.group !== 'Steps' ||
-						(i.sub.startsWith(`${name}, Stage ${stageNo},`) && stageNo !== null)
+						i.group !== 'Steps' || (stageNo !== null && i.projectId === pid && i.stage === stageNo)
 				);
 		const seen: Record<string, number> = {};
 		return list.filter((i) => (seen[i.group] = (seen[i.group] ?? 0) + 1) <= CAP[i.group]);

@@ -12,7 +12,9 @@
 //!   back and hashed. A mismatch re-installs once; if it still doesn't match, the run gets no hooks
 //!   and a warning, and the P1 manual behaviors apply (AC-F011-02).
 //! - **Token.** Two OS-random UUID v4 values in hex (244 random bits, ADR-009), stored only in the
-//!   run settings and `run.json` (here in memory until `run.json` is written).
+//!   run settings and `run.json`. In memory: a prepared run's token for [`PREPARED_TTL`] (an
+//!   unused plan's is forgotten), a started run's until its ingest thread ends after the exit
+//!   (code review N2).
 //! - **Retention (SR-53, AC-F011-07).** A run's events go 30 days after it ended (at the startup
 //!   scan); at sign the signing code deletes the stage's events.
 //!
@@ -21,6 +23,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::{Duration, Instant};
 
 use foreman_core::launch::run_settings::SensorHooks;
 use foreman_core::pathpolicy::{ReadClass, RepoPath};
@@ -28,6 +31,10 @@ use foreman_core::store::{Root, app_dirs, sha256_hex};
 use uuid::Uuid;
 
 use crate::state::App;
+
+/// How long a prepared run's token is kept when the run doesn't start: a plan lives 60 s
+/// (IPC-R7) and the native launch confirmation may stay open a while.
+pub const PREPARED_TTL: Duration = Duration::from_secs(600);
 
 /// `bin/foreman-sensor-` (files.md §2 row 24).
 pub const BIN_PREFIX: &str = "foreman-sensor-";
@@ -63,8 +70,9 @@ pub struct Sensor {
     bundle: Mutex<Option<(Arc<[u8]>, String)>>,
     /// Serializes installs (two prepares can't race the remove-and-write).
     install: Mutex<()>,
-    /// The token of each run that got hooks (prepared or live), by run ID.
-    tokens: Mutex<HashMap<String, String>>,
+    /// The token of each run that got hooks, by run ID: a prepared run's with the time it is
+    /// forgotten unless the run starts, a started run's with `None` (kept until it ends).
+    tokens: Mutex<HashMap<String, (String, Option<Instant>)>>,
 }
 
 impl std::fmt::Debug for Sensor {
@@ -109,15 +117,39 @@ impl Sensor {
         lock(&self.bundle).as_ref().map(|(_, h)| h.clone())
     }
 
-    /// The token a run was given (`None`: the run has no sensor).
+    /// The token a run was given (`None`: the run has no sensor, or its plan expired unused).
     #[must_use]
     pub fn token(&self, run_id: &str) -> Option<String> {
-        lock(&self.tokens).get(run_id).cloned()
+        lock(&self.tokens)
+            .get(run_id)
+            .filter(|(_, until)| until.is_none_or(|u| u > Instant::now()))
+            .map(|(t, _)| t.clone())
+    }
+
+    /// Remembers a prepared run's token for `ttl` ([`PREPARED_TTL`]); expired ones go.
+    fn remember(&self, run_id: String, token: String, ttl: Duration) {
+        let now = Instant::now();
+        let mut t = lock(&self.tokens);
+        t.retain(|_, (_, until)| until.is_none_or(|u| u > now));
+        t.insert(run_id, (token, Some(now + ttl)));
+    }
+
+    /// Keeps a started run's token until [`Sensor::forget`] (the run's ingest thread ends).
+    fn pin(&self, run_id: &str) {
+        if let Some((_, until)) = lock(&self.tokens).get_mut(run_id) {
+            *until = None;
+        }
     }
 
     /// Forgets a run's token (its `run.json` holds it from now on).
     pub fn forget(&self, run_id: &str) {
         lock(&self.tokens).remove(run_id);
+    }
+
+    /// How many tokens are held (tests).
+    #[must_use]
+    pub fn held(&self) -> usize {
+        lock(&self.tokens).len()
     }
 }
 
@@ -201,7 +233,8 @@ pub fn hooks_for_run(app: &App, run_id: Uuid) -> (Option<SensorHooks>, Option<St
         Check::Ok(path) => {
             let run = run_id.hyphenated().to_string();
             let token = new_token();
-            lock(&app.sensor().tokens).insert(run.clone(), token.clone());
+            app.sensor()
+                .remember(run.clone(), token.clone(), PREPARED_TTL);
             (
                 Some(SensorHooks {
                     command: path.display().to_string(),
@@ -219,6 +252,7 @@ pub fn hooks_for_run(app: &App, run_id: Uuid) -> (Option<SensorHooks>, Option<St
 #[must_use]
 pub fn begin_run(app: &App, root: &Root, run_id: &str) -> Option<String> {
     let token = app.sensor().token(run_id)?;
+    app.sensor().pin(run_id);
     app_dirs::reset_dir(root, &format!("events/{run_id}")).ok()?;
     Some(token)
 }
@@ -260,4 +294,29 @@ fn ended_at(f: &foreman_core::schema::run::RunFile) -> Option<jiff::Timestamp> {
     start
         .checked_add(jiff::SignedDuration::from_millis(ms))
         .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// N2: a prepared run's token is forgotten when its plan isn't used; a started run's stays
+    /// until it is forgotten at the end of the run.
+    #[test]
+    fn prepared_tokens_expire_started_ones_stay() {
+        let s = Sensor::default();
+        s.remember("a".into(), "ta".into(), Duration::ZERO);
+        s.remember("b".into(), "tb".into(), Duration::from_secs(600));
+        s.pin("b");
+        assert_eq!(s.token("a"), None, "an unused plan's token is gone");
+        s.remember("c".into(), "tc".into(), Duration::from_secs(600));
+        assert_eq!(
+            s.held(),
+            2,
+            "expired tokens are dropped on the next prepare"
+        );
+        assert_eq!(s.token("b").as_deref(), Some("tb"));
+        s.forget("b");
+        assert_eq!(s.token("b"), None);
+    }
 }

@@ -3,9 +3,10 @@
 //!
 //! Every file goes through `foreman_core::store` (FILE-R4); nothing here touches `std::fs`.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
 use std::time::{Duration, Instant};
 
 use foreman_core::pathpolicy::{self, ReadClass};
@@ -97,6 +98,67 @@ impl<T> OneTime<T> {
     }
 }
 
+/// A map whose entries expire (code review N2): what Rust holds between a prepare and Billy's
+/// next action (a config acknowledgement, an allowlisted key, a confirmed re-arm) is forgotten
+/// after [`PREVIEW_TTL`], so nothing grows for the life of the app.
+#[derive(Debug)]
+pub struct Expiring<K, V> {
+    items: HashMap<K, (V, Instant)>,
+    ttl: Duration,
+}
+
+impl<K, V> Default for Expiring<K, V> {
+    fn default() -> Self {
+        Self {
+            items: HashMap::new(),
+            ttl: PREVIEW_TTL,
+        }
+    }
+}
+
+impl<K: std::hash::Hash + Eq, V> Expiring<K, V> {
+    /// Holds `v` under `k` (replacing what was there) and drops expired entries.
+    pub fn insert(&mut self, k: K, v: V) {
+        let now = Instant::now();
+        self.items.retain(|_, (_, until)| *until > now);
+        self.items.insert(k, (v, now + self.ttl));
+    }
+
+    /// The live value under `k`.
+    #[must_use]
+    pub fn get(&self, k: &K) -> Option<&V> {
+        self.items
+            .get(k)
+            .filter(|(_, until)| *until > Instant::now())
+            .map(|(v, _)| v)
+    }
+
+    /// Takes the live value under `k`.
+    pub fn remove(&mut self, k: &K) -> Option<V> {
+        self.items
+            .remove(k)
+            .filter(|(_, until)| *until > Instant::now())
+            .map(|(v, _)| v)
+    }
+
+    /// How many entries are held, expired ones included (tests).
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether nothing is held.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Sets how long entries live (tests).
+    pub fn set_ttl(&mut self, ttl: Duration) {
+        self.ttl = ttl;
+    }
+}
+
 /// In-memory state behind the app's mutex.
 #[derive(Debug, Default)]
 pub struct Inner {
@@ -132,6 +194,41 @@ pub struct Inner {
     /// (M4-27) The knowledge-manifest files Billy marked "in the claude.ai Project", per
     /// project. Kept in memory: `progress.json` v1 has no field for it (CR-014).
     pub knowledge: HashMap<String, std::collections::BTreeSet<String>>,
+    /// The `tamper:detected` events already sent this run: (project, stage) → the working
+    /// file's SHA-256. `project_open` emits only for a new or changed tampered file, so the
+    /// refetch the event causes can't emit it again (code review C1).
+    pub tamper_emitted: HashMap<(String, u8), String>,
+    /// Per project, how many times a step's `out` file changed this run (the round tracker,
+    /// AC-F009-12). It moves the project's view revision without writing `progress.json`, so an
+    /// `out` write doesn't stale a held launch plan (code review N1).
+    pub outputs_rev: HashMap<String, u32>,
+}
+
+thread_local! {
+    /// The apps whose write lock this thread holds, so [`App::writing`] is re-entrant per thread
+    /// (a helper that takes the lock can be called by a command that already holds it).
+    static HELD: RefCell<Vec<usize>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Proof that this thread holds the app's write lock (from [`App::writing`]). Functions that
+/// write `progress.json` after a spawn or a dialog take `&Writing` so the type shows the lock.
+#[derive(Debug)]
+pub struct Writing<'a> {
+    guard: Option<MutexGuard<'a, ()>>,
+    key: usize,
+}
+
+impl Drop for Writing<'_> {
+    fn drop(&mut self) {
+        if self.guard.is_some() {
+            HELD.with(|h| {
+                let mut h = h.borrow_mut();
+                if let Some(i) = h.iter().rposition(|k| *k == self.key) {
+                    h.remove(i);
+                }
+            });
+        }
+    }
 }
 
 /// The app state.
@@ -299,9 +396,34 @@ impl App {
         guard(&self.inner)
     }
 
-    /// Held for the whole of a mutating command.
-    pub fn writing(&self) -> MutexGuard<'_, ()> {
-        guard(&self.write_lock)
+    /// Held for the whole of a mutating command (one writer at a time). Re-entrant on one
+    /// thread: a second call while this thread holds the lock returns a guard that doesn't lock.
+    pub fn writing(&self) -> Writing<'_> {
+        let key = std::ptr::from_ref(self).addr();
+        if HELD.with(|h| h.borrow().contains(&key)) {
+            return Writing { guard: None, key };
+        }
+        let g = guard(&self.write_lock);
+        HELD.with(|h| h.borrow_mut().push(key));
+        Writing {
+            guard: Some(g),
+            key,
+        }
+    }
+
+    /// Whether some thread holds the write lock now (tests: no native dialog is shown while it
+    /// is held, code review W3).
+    #[must_use]
+    pub fn write_lock_held(&self) -> bool {
+        matches!(self.write_lock.try_lock(), Err(TryLockError::WouldBlock))
+    }
+
+    /// The revision events and views carry for a project: `progress.json`'s revision plus the
+    /// in-memory `out`-file counter (N1). Both only grow, so the sum does too.
+    #[must_use]
+    pub fn view_rev(&self, id: &str, progress_rev: u32) -> u32 {
+        let outs = self.inner().outputs_rev.get(id).copied().unwrap_or(0);
+        progress_rev.wrapping_add(outs)
     }
 
     /// Now as RFC 3339 UTC.
@@ -326,8 +448,10 @@ impl App {
         }
     }
 
-    /// Emits `project:changed` with a project's new revision.
+    /// Emits `project:changed` with a project's new revision (`progress.json`'s; the view
+    /// revision, [`App::view_rev`], is what the event carries).
     pub fn project_changed(&self, id: &str, rev: u32) {
+        let rev = self.view_rev(id, rev);
         self.emit(Event::ProjectChanged(ProjectChanged {
             project_id: ProjectId::from_trusted(id),
             rev: Rev(rev),
@@ -485,5 +609,24 @@ impl App {
     #[must_use]
     pub fn display(&self, p: &Path) -> String {
         display_path(&self.paths.home, p)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// N2: what Rust holds between a prepare and Billy's next action is forgotten after its time.
+    #[test]
+    fn expiring_entries_go() {
+        let mut m: Expiring<String, u8> = Expiring::default();
+        m.set_ttl(Duration::ZERO);
+        m.insert("a".into(), 1);
+        assert_eq!(m.get(&"a".to_owned()), None, "expired");
+        m.set_ttl(Duration::from_secs(600));
+        m.insert("b".into(), 2);
+        assert_eq!(m.len(), 1, "the expired entry was dropped on insert");
+        assert_eq!(m.remove(&"b".to_owned()), Some(2));
+        assert!(m.is_empty());
     }
 }

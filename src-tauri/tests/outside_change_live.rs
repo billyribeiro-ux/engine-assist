@@ -110,6 +110,15 @@ mod decisions {
     }
 }
 
+/// Polls `f` until it holds (20 s at most).
+fn until(what: &str, f: impl Fn() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !f() {
+        assert!(Instant::now() < deadline, "timed out waiting: {what}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
 mod watcher {
     use super::*;
 
@@ -130,13 +139,16 @@ mod watcher {
             assert!(start.elapsed() < Duration::from_secs(20));
             std::thread::sleep(Duration::from_millis(20));
         }
-        // Let the config thread pick the run up and arm its watcher.
-        std::thread::sleep(Duration::from_millis(1200));
+        // W8: wait for the config thread to arm the run's watcher (a condition, not a sleep).
+        let run = r.run_id.as_str().to_owned();
+        let stats = || p.t.app.watchers().config_stats(&run).unwrap_or_default();
+        until("armed", || stats().arms >= 1 && stats().watched > 0);
         assert!(events(&p, "config:changed").is_empty());
-        // A local settings file appears in the project's `.claude/` (Claude editing its own config).
+        // A local settings file appears in the project's `.claude/` (Claude editing its own config):
+        // the new folder is seen and armed before the file is written into it.
         let dir = p.project.join(".claude");
         std::fs::create_dir_all(&dir).unwrap();
-        std::thread::sleep(Duration::from_millis(1200));
+        until("re-armed for .claude/", || stats().arms >= 2);
         std::fs::write(
             dir.join("settings.local.json"),
             r#"{ "permissions": { "allow": ["Bash(ls)"] } }"#,
@@ -152,7 +164,14 @@ mod watcher {
                 .load(std::sync::atomic::Ordering::SeqCst)
         );
         assert!(live.session.is_live(), "a warning only");
-        std::thread::sleep(Duration::from_millis(600));
+        // Another change is checked (the thread ran for it) and still emits nothing more.
+        let checks = stats().checks;
+        std::fs::write(
+            dir.join("settings.local.json"),
+            r#"{ "permissions": { "allow": ["Bash(pwd)"] } }"#,
+        )
+        .unwrap();
+        until("checked again", || stats().checks > checks);
         assert_eq!(events(&p, "config:changed").len(), 1, "once per run");
         p.t.app.runs().hangup_all();
     }

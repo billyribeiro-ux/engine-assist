@@ -154,6 +154,15 @@ mod lifecycle {
         assert_eq!(c["status"], "open");
         assert_eq!(c["steps"], json!(["2.2"]));
         assert!(v["stages"].is_array());
+        // C3 (DR-065): the interrupted run's step is back to "run again", not stuck running.
+        let s22 = stage(&v, 2)["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["key"] == "2.2")
+            .unwrap()
+            .clone();
+        assert_eq!(s22["state"], "notStarted", "{s22}");
         assert_eq!(calls(&p), calls_before, "nothing relaunched by itself");
         assert_eq!(p.run_files().len(), runs_before);
         // Resume: the preflight again, then launch_start's native confirmation.
@@ -187,6 +196,68 @@ mod lifecycle {
         }
         again.runs().hangup_all();
         p.t.app.runs().hangup_all();
+    }
+}
+
+mod quit {
+    use super::*;
+
+    /// C3: after Billy confirms the quit, the hung-up sessions' exit handlers finish before the
+    /// app may exit: each run's record and its step are final when the guard returns.
+    #[test]
+    fn guard_waits_for_exit_handlers() {
+        let p = ProjectApp::new(json!({}));
+        let pv = match p.prepare("2.2") {
+            PrepareOutcome::Ready(pv) => pv,
+            PrepareOutcome::Blocked { blockers, .. } => panic!("{blockers:?}"),
+        };
+        let (ch, buf) = collect();
+        let r = launch::launch_start(&p.t.app, req(json!({ "planId": pv.plan_id })), ch).unwrap();
+        let t0 = Instant::now();
+        while !String::from_utf8_lossy(&buf.lock().unwrap()).contains("FAKE-CLAUDE READY") {
+            assert!(t0.elapsed() < Duration::from_secs(20));
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        p.t.os.answer_all(true);
+        assert!(foreman_app::quit::guard(&p.t.app));
+        assert!(
+            p.t.app.runs().exit_handled(r.run_id.as_str()),
+            "exit handler done"
+        );
+        let run = p
+            .run_files()
+            .into_iter()
+            .find(|(_, v)| v["runId"] == json!(r.run_id.as_str()))
+            .unwrap()
+            .1;
+        assert_ne!(run["status"], "running", "{run}");
+        let pr = progress(&p);
+        assert_ne!(pr["steps"]["2.2"]["state"], "running", "{pr}");
+    }
+}
+
+/// Code review W9: a rebuild on open continues the revision this run has seen.
+mod revision {
+    use super::*;
+
+    #[test]
+    fn auto_rebuild_keeps_the_revision_moving() {
+        let p = with_signed_stage_1();
+        let v = open(&p.t.app, &p.id);
+        let seen = v["summary"]["rev"].as_u64().unwrap();
+        assert!(seen > 0);
+        std::fs::remove_file(
+            p.t.app_data()
+                .join(format!("projects/{}/progress.json", p.id)),
+        )
+        .unwrap();
+        let v = open(&p.t.app, &p.id);
+        assert!(
+            v["summary"]["rev"].as_u64().unwrap() > seen,
+            "the rebuilt revision is newer than {seen}: {}",
+            v["summary"]["rev"]
+        );
+        assert!(progress(&p)["rev"].as_u64().unwrap() > seen);
     }
 }
 

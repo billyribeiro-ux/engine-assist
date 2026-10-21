@@ -26,7 +26,7 @@ use crate::ipc::types::{ChainId, RunId, RunStatus};
 use crate::launch::{self, HeldPlan};
 use crate::os::Confirm;
 use crate::project;
-use crate::runs::{self, LiveRun};
+use crate::runs::LiveRun;
 use crate::state::App;
 
 fn live(app: &App, run_id: &str) -> Result<std::sync::Arc<LiveRun>, IpcError> {
@@ -256,11 +256,14 @@ fn drive(
     };
     let out_cell = RefCell::new(Some(output));
     let mut relaunch = |plan: &foreman_sys::launch::LaunchPlan| -> Result<pty::PtySession, String> {
+        // C2: the relaunch writes `progress.json` like any launch, under the write lock.
+        let w = app.writing();
         let mut p = project::open(app, &held.project_id).map_err(|e| e.message)?;
         let mut h = held.clone();
         h.plan = plan.clone();
         let s = launch::start(
             app,
+            &w,
             &mut p,
             &h,
             RunKind::Rearm,
@@ -392,7 +395,7 @@ pub fn rearm_continue(
     output: Channel<Response>,
     progress: Channel<LaunchProgress>,
 ) -> Result<RearmOutcome, IpcError> {
-    let Some(held) = app.launch().rearms.remove(req.chain.as_str()) else {
+    let Some(held) = app.launch().rearms.remove(&req.chain.as_str().to_owned()) else {
         return Err(IpcError::expired());
     };
     drive(app, &held, req.chain.as_str(), output, &progress, false)
@@ -432,10 +435,4 @@ pub fn terminal_link_open(app: &App, req: TerminalLinkOpenReq) -> Result<LinkOut
         .open_url(&url, &ctx)
         .map_err(|_| IpcError::tool_failed("open", None, false, String::new()))?;
     Ok(LinkOutcome::Opened)
-}
-
-#[allow(dead_code, reason = "used by the quit guard (M3-13)")]
-fn hang_up(app: &App) {
-    app.runs().hangup_all();
-    let _ = runs::emit_status;
 }

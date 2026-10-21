@@ -1,6 +1,8 @@
 // Invalidation bus (ipc.md §6): Rust events carry identifiers and revisions only; each turns into
 // refresh keys that resources listen for, and the resource refetches through a command. An event
-// whose `rev` is not newer than the one already seen for that project is ignored (§6.2).
+// whose `rev` is not newer than the one already seen is ignored (§6.2), for every event that carries
+// one: `project:changed` per project, `packet:changed` per project (its rev is an app-wide packet
+// counter), `tamper:detected` per project and stage (code review C1).
 import { ipc } from '#lib/ipc/index.ts';
 import { EVENT_NAMES, type EventName, type EventPayloads } from '#lib/ipc/types.ts';
 
@@ -35,10 +37,10 @@ export function refresh(...keys: RefreshKey[]): void {
 	for (const k of keys) for (const fn of listeners) fn(k);
 }
 
-function fresh(id: string, rev: number): boolean {
-	const seen = revs.get(id);
+function fresh(key: string, rev: number): boolean {
+	const seen = revs.get(key);
 	if (seen !== undefined && rev <= seen) return false;
-	revs.set(id, rev);
+	revs.set(key, rev);
 	return true;
 }
 
@@ -50,9 +52,14 @@ export function keysFor<E extends EventName>(event: E, p: EventPayloads[E]): Ref
 		}
 		case 'projects:changed':
 			return ['projects', 'today'];
-		case 'packet:changed':
-		case 'tamper:detected': {
+		case 'packet:changed': {
 			const e = p as EventPayloads['packet:changed'];
+			if (!fresh(`packet-rev:${e.projectId}`, e.rev)) return [];
+			return [`packet:${e.projectId}:${e.stage}`, `project:${e.projectId}`, 'today'];
+		}
+		case 'tamper:detected': {
+			const e = p as EventPayloads['tamper:detected'];
+			if (!fresh(`tamper-rev:${e.projectId}:${String(e.stage)}`, e.rev)) return [];
 			return [`packet:${e.projectId}:${e.stage}`, `project:${e.projectId}`, 'today'];
 		}
 		case 'decision:pending': {

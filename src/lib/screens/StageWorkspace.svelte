@@ -82,6 +82,11 @@
 		current.step = selected;
 		current.stage = stageNo;
 	});
+	// N6: leaving the workspace leaves no selected step or stage behind (the palette reads them).
+	$effect(() => () => {
+		current.step = null;
+		current.stage = null;
+	});
 
 	const rows: Record<string, RowApi | undefined> = {};
 	const selectable = $derived(

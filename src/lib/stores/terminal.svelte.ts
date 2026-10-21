@@ -1,6 +1,6 @@
 // Terminal tabs (F-009): one tab per run, named after the session. PTY bytes arrive through the
-// Channel callback; the store keeps each run's bytes so a tab can be re-mounted, and pauses the
-// PTY above 1 MB of unwritten output (NFR-08, ipc.md §5).
+// Channel callback; the store keeps each run's recent bytes (about the scrollback, W5) so a tab can
+// be re-mounted, and pauses the PTY above 1 MB of unwritten output (NFR-08, ipc.md §5).
 import type { IpcClient } from '#lib/ipc/contract.ts';
 import { splitPtyData } from '#lib/ipc/contract.ts';
 import { ipc } from '#lib/ipc/index.ts';
@@ -22,6 +22,21 @@ export interface Tab {
 
 type Sink = (bytes: Uint8Array) => void;
 const HIGH_WATER = 1024 * 1024;
+/** Bytes kept per scrollback line for output without line breaks (a cap on top of the lines). */
+const BYTES_PER_LINE = 512;
+
+interface Kept {
+	chunks: Uint8Array[];
+	lines: number[];
+	totalLines: number;
+	totalBytes: number;
+}
+
+function newlines(b: Uint8Array): number {
+	let n = 0;
+	for (const c of b) if (c === 10) n += 1;
+	return n;
+}
 
 class Terminal {
 	tabs = $state<Tab[]>([]);
@@ -31,7 +46,7 @@ class Terminal {
 	scrollback = SCROLLBACK_DEFAULT;
 	/** Bumped to move focus into the active tab's terminal (⌘⇧T, first-run probe). */
 	focusTick = $state(0);
-	private buffers = new Map<string, Uint8Array[]>();
+	private buffers = new Map<string, Kept>();
 	private sinks = new Map<string, Sink>();
 	private pending = new Map<string, number>();
 	private attached = new Set<string>();
@@ -41,14 +56,37 @@ class Terminal {
 	output(runId: string): (buf: ArrayBuffer) => void {
 		return (buf) => {
 			const bytes = new Uint8Array(buf);
-			let list = this.buffers.get(runId);
-			if (!list) {
-				list = [];
-				this.buffers.set(runId, list);
+			let kept = this.buffers.get(runId);
+			if (!kept) {
+				kept = { chunks: [], lines: [], totalLines: 0, totalBytes: 0 };
+				this.buffers.set(runId, kept);
 			}
-			list.push(bytes);
+			this.keep(kept, bytes);
 			this.sinks.get(runId)?.(bytes);
 		};
+	}
+
+	/** W5: keeps whole chunks while the rest still holds the scrollback (lines and bytes). */
+	private keep(k: Kept, bytes: Uint8Array): void {
+		const n = newlines(bytes);
+		k.chunks.push(bytes);
+		k.lines.push(n);
+		k.totalLines += n;
+		k.totalBytes += bytes.length;
+		const maxLines = this.scrollback;
+		const maxBytes = this.scrollback * BYTES_PER_LINE;
+		while (k.chunks.length > 1) {
+			const first = k.chunks[0];
+			const firstLines = k.lines[0] ?? 0;
+			if (!first) break;
+			const linesAfter = k.totalLines - firstLines;
+			const bytesAfter = k.totalBytes - first.length;
+			if (linesAfter < maxLines && bytesAfter < maxBytes) break;
+			k.chunks.shift();
+			k.lines.shift();
+			k.totalLines = linesAfter;
+			k.totalBytes = bytesAfter;
+		}
 	}
 
 	add(
@@ -138,7 +176,7 @@ class Terminal {
 
 	/** The raw output a run has sent so far (for its archive on re-arm). */
 	chunks(runId: string): readonly Uint8Array[] {
-		return this.buffers.get(runId) ?? [];
+		return this.buffers.get(runId)?.chunks ?? [];
 	}
 
 	/** The width a run's xterm last had (the archive replays at that width). */
@@ -151,7 +189,7 @@ class Terminal {
 
 	/** Connects a mounted xterm; replays what arrived before it mounted. */
 	connect(runId: string, sink: Sink): () => void {
-		for (const b of this.buffers.get(runId) ?? []) sink(b);
+		for (const b of this.buffers.get(runId)?.chunks ?? []) sink(b);
 		this.sinks.set(runId, sink);
 		return () => {
 			if (this.sinks.get(runId) === sink) this.sinks.delete(runId);
@@ -168,6 +206,19 @@ class Terminal {
 			await client.ptyFlow({ runId, paused: true }).catch(() => undefined);
 		if (before > HIGH_WATER && after <= HIGH_WATER)
 			await client.ptyFlow({ runId, paused: false }).catch(() => undefined);
+	}
+
+	/**
+	 * W5: a view went away with bytes still queued in its xterm (their write callbacks never come).
+	 * The count starts again from zero, and a PTY paused for that view is resumed.
+	 */
+	async release(runId: string): Promise<void> {
+		const before = this.pending.get(runId) ?? 0;
+		this.pending.set(runId, 0);
+		if (before > HIGH_WATER) {
+			const client = await ipc();
+			await client.ptyFlow({ runId, paused: false }).catch(() => undefined);
+		}
 	}
 
 	/** Writes input to the PTY in ≤ 64 KB pieces, in order (ipc.md §6.2). */

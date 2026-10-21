@@ -60,6 +60,20 @@ pub struct Watchers {
     failures: Mutex<BTreeMap<String, String>>,
     /// The stamps the last re-stat saw, per project.
     known: Mutex<HashMap<String, HashMap<String, ReadStamp>>>,
+    /// Per live run: how many times the config thread armed its hint watcher, and how many
+    /// re-checks it ran (tests wait on these instead of sleeping, code review W8).
+    config: Mutex<HashMap<String, ConfigStats>>,
+}
+
+/// What the config thread did for one live run.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct ConfigStats {
+    /// Times its hint watcher was armed (started, or started again after a source appeared).
+    pub arms: u64,
+    /// Paths the armed watcher watches.
+    pub watched: usize,
+    /// Re-checks run for it (a hint or the fallback).
+    pub checks: u64,
 }
 
 impl std::fmt::Debug for Watchers {
@@ -83,6 +97,16 @@ impl Watchers {
     #[must_use]
     pub fn is_watching(&self, project_id: &str) -> bool {
         guard(&self.projects).contains_key(project_id)
+    }
+
+    /// What the config thread did for a live run so far (`None`: it hasn't picked it up).
+    #[must_use]
+    pub fn config_stats(&self, run_id: &str) -> Option<ConfigStats> {
+        guard(&self.config).get(run_id).copied()
+    }
+
+    fn note_config(&self, run_id: &str, f: impl FnOnce(&mut ConfigStats)) {
+        f(guard(&self.config).entry(run_id.to_owned()).or_default());
     }
 }
 
@@ -140,13 +164,22 @@ pub fn handle(app: &App, project_id: &str, change: &Change) -> bool {
             true
         }
         Interest::Decision { .. } => crate::project::refresh_decisions(app, project_id).is_ok(),
-        // P2 round tracker (M4-11, AC-F009-12): an `out` file written bumps the project's
-        // revision, so `project:changed` refreshes the step's outputs and Open output.
+        // P2 round tracker (M4-11, AC-F009-12): an `out` file written moves the project's view
+        // revision, so `project:changed` refreshes the step's outputs and Open output. Nothing
+        // is written and `progress.json`'s revision stays (N1): a held launch plan isn't staled.
         Interest::Out { .. } => {
-            let _w = app.writing();
-            crate::project::open(app, project_id)
-                .and_then(|mut p| p.save_progress(app))
-                .is_ok()
+            let Ok(root) = app.app_root() else {
+                return false;
+            };
+            let progress_rev =
+                crate::project::read_progress(&root, project_id).map_or(0, |(p, _)| p.rev);
+            {
+                let mut i = app.inner();
+                let n = i.outputs_rev.entry(project_id.to_owned()).or_insert(0);
+                *n = n.wrapping_add(1);
+            }
+            app.project_changed(project_id, progress_rev);
+            true
         }
         Interest::Lessons | Interest::SensorEvent { .. } => false,
     }
@@ -161,17 +194,19 @@ pub fn ensure_project(app: &App, p: &Opened) {
     };
     let id = p.id().to_owned();
     let outs = p.watch_outs();
-    let mut projects = guard(&app.watchers().projects);
-    if let Some(h) = projects.get(&id) {
-        if h.root == root && h.cmd.send(Cmd::SetOuts(outs.clone())).is_ok() {
-            return;
+    {
+        let mut projects = guard(&app.watchers().projects);
+        if let Some(h) = projects.get(&id) {
+            if h.root == root && h.cmd.send(Cmd::SetOuts(outs.clone())).is_ok() {
+                return;
+            }
+            projects.remove(&id);
         }
-        projects.remove(&id);
     }
+    // N7: the watcher starts (file system I/O) without the watchers' lock held.
     let watcher = match ProjectWatcher::start(&root, outs) {
         Ok(w) => w,
         Err(e) => {
-            drop(projects);
             record_failure(
                 app,
                 &id,
@@ -193,17 +228,21 @@ pub fn ensure_project(app: &App, p: &Opened) {
         ))
         .spawn(move || run_project(&weak, &thread_id, &watcher, &rx));
     if spawned.is_ok() {
-        projects.insert(id.clone(), ProjectHandle { root, cmd: tx });
-        drop(projects);
+        // Another `project_open` that started one meanwhile is replaced: its thread sees it is
+        // no longer registered (by its command channel) and ends.
+        guard(&app.watchers().projects).insert(id.clone(), ProjectHandle { root, cmd: tx });
         guard(&app.watchers().failures).remove(&id);
     }
 }
 
 fn run_project(app: &Weak<App>, id: &str, w: &ProjectWatcher, rx: &Receiver<Cmd>) {
     loop {
-        for cmd in rx.try_iter() {
-            match cmd {
-                Cmd::SetOuts(outs) => w.set_outs(outs),
+        // The handle's sender goes when the watcher is stopped or replaced: this thread ends.
+        loop {
+            match rx.try_recv() {
+                Ok(Cmd::SetOuts(outs)) => w.set_outs(outs),
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
             }
         }
         let change = w.next(POLL);
@@ -240,13 +279,13 @@ pub fn restat_project(app: &App, p: &Opened) -> usize {
     };
     let stages: Vec<u8> = (0..=17).collect();
     let outs = p.watch_outs();
-    let first;
-    let changes = {
-        let mut known_all = guard(&app.watchers().known);
-        first = !known_all.contains_key(p.id());
-        let known = known_all.entry(p.id().to_owned()).or_default();
-        restat(&root, &stages, &outs, known)
-    };
+    // N7: the stamps are copied out, the re-stat (file system I/O) runs without the lock, and
+    // the new stamps go back.
+    let prev = guard(&app.watchers().known).get(p.id()).cloned();
+    let first = prev.is_none();
+    let mut known = prev.unwrap_or_default();
+    let changes = restat(&root, &stages, &outs, &mut known);
+    guard(&app.watchers().known).insert(p.id().to_owned(), known);
     if first {
         return 0;
     }
@@ -471,16 +510,22 @@ fn config_loop(app: &Weak<App>) {
         let Some(a) = app.upgrade() else { break };
         let live = live_runs(&a);
         runs.retain(|id, _| live.iter().any(|r| r.run_id == *id));
+        guard(&a.watchers().config).retain(|id, _| live.iter().any(|r| r.run_id == *id));
         let cfg = a.config_dir_env();
         for r in &live {
             runs.entry(r.run_id.clone()).or_insert_with(|| {
-                arm(config_targets(
+                let w = arm(config_targets(
                     &r.cwd,
                     &r.root,
                     &a.paths().home,
                     cfg.as_deref(),
                     Path::new(MANAGED_DIR),
-                ))
+                ));
+                a.watchers().note_config(&r.run_id, |s| {
+                    s.arms += 1;
+                    s.watched = w.armed;
+                });
+                w
             });
         }
         let tick = last_tick.elapsed() >= TICK;
@@ -501,6 +546,10 @@ fn config_loop(app: &Weak<App>) {
                     let last = w.last_check;
                     *w = arm(w.targets.clone());
                     w.last_check = last;
+                    a.watchers().note_config(id, |s| {
+                        s.arms += 1;
+                        s.watched = w.armed;
+                    });
                 }
                 w.last_check = Instant::now();
                 due.insert(id.clone());
@@ -508,6 +557,9 @@ fn config_loop(app: &Weak<App>) {
         }
         if !due.is_empty() {
             let _ = recheck_runs(&a, &|id| due.contains(id));
+            for id in &due {
+                a.watchers().note_config(id, |s| s.checks += 1);
+            }
         }
     }
 }

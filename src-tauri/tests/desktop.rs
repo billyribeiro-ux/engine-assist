@@ -275,6 +275,34 @@ mod desktop_open {
         );
     }
 
+    /// Code review W4: a Desktop step progresses: Open in Desktop leaves it `copied`, and Mark
+    /// done finishes it (a Desktop step isn't a CLI step that "finishes when its run exits").
+    #[test]
+    fn desktop_step_copied_then_marked_done() {
+        let p = ProjectApp::new(json!({}));
+        add_desktop_step(&p);
+        desktop::desktop_open(
+            &p.t.app,
+            req(json!({ "projectId": p.id, "step": "x-2-1" })),
+            channel(),
+        )
+        .unwrap();
+        let o = foreman_app::project::open(&p.t.app, &p.id).unwrap();
+        assert_eq!(
+            serde_json::to_value(o.step_progress("x-2-1").state).unwrap(),
+            "copied"
+        );
+        let v = foreman_app::ipc::commands::steps::step_mark_done(
+            &p.t.app,
+            req(json!({ "projectId": p.id, "step": "x-2-1" })),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(&v).unwrap()["summary"]["state"],
+            "done"
+        );
+    }
+
     /// Only a `surface=desktop` step opens in Desktop; a failed auth check opens nothing.
     #[test]
     fn refuses_other_steps_and_failed_auth() {
@@ -423,5 +451,43 @@ mod round_tracker {
             assert_eq!(now.len(), i + 1, "{now:?}");
             assert!(now.contains(out));
         }
+    }
+
+    /// Code review N1: an `out` file written moves the project's view revision in memory only:
+    /// `progress.json` isn't rewritten, and a launch plan held across it isn't stale.
+    #[test]
+    fn out_write_keeps_plans_fresh() {
+        let p = ProjectApp::new(json!({}));
+        std::fs::create_dir_all(p.project.join("spec/council")).unwrap();
+        projects::project_open(&p.t.app, req(json!({ "projectId": p.id }))).unwrap();
+        let out = steps::step_view(&p.t.app, req(json!({ "projectId": p.id, "step": "2.2" })))
+            .unwrap()
+            .outs[0]
+            .path
+            .as_str()
+            .to_owned();
+        let pv = ready(&p, "2.2");
+        let progress =
+            p.t.app_data()
+                .join(format!("projects/{}/progress.json", p.id));
+        let before = std::fs::read(&progress).unwrap();
+        let events = changed_events(&p);
+        let f = p.project.join(&out);
+        std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+        std::fs::write(&f, "# round 1\n").unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while changed_events(&p) == events {
+            assert!(Instant::now() < deadline, "no project:changed for {out}");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(
+            std::fs::read(&progress).unwrap(),
+            before,
+            "progress.json rewritten"
+        );
+        let (ch, _buf) = collect();
+        launch::launch_start(&p.t.app, req(json!({ "planId": pv.plan_id })), ch)
+            .expect("the plan is still fresh");
+        p.t.app.runs().hangup_all();
     }
 }

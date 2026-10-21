@@ -79,7 +79,12 @@ mod steps {
         ];
         let mut table = Vec::new();
         for kind in kinds {
-            for surface in [Some(Surface::Chat), Some(Surface::Cli), None] {
+            for surface in [
+                Some(Surface::Chat),
+                Some(Surface::Cli),
+                Some(Surface::Desktop),
+                None,
+            ] {
                 for a in derived() {
                     for s in [S::NotStarted, S::Copied, S::Running, S::Done] {
                         for e in all_events() {
@@ -108,6 +113,21 @@ mod steps {
         // Specific DR-065 rows.
         let chat = ctx(K::Prompt, Some(Surface::Chat), A::Applicable);
         let cli = ctx(K::Prompt, Some(Surface::Cli), A::Applicable);
+        // W4: a Desktop step is copied, then marked done; it never runs in Foreman's terminal.
+        let desktop = ctx(K::Prompt, Some(Surface::Desktop), A::Applicable);
+        assert_eq!(
+            transition(&at(S::NotStarted), &desktop, &E::Copy)
+                .unwrap()
+                .state,
+            S::Copied
+        );
+        assert_eq!(
+            transition(&at(S::Copied), &desktop, &E::MarkDone)
+                .unwrap()
+                .state,
+            S::Done
+        );
+        assert!(transition(&at(S::NotStarted), &desktop, &E::Spawn).is_err());
         assert_eq!(
             transition(&at(S::NotStarted), &chat, &E::Copy)
                 .unwrap()

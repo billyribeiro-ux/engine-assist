@@ -175,3 +175,21 @@ mod project_open {
         }
     }
 }
+
+/// Code review W6: a re-pin whose commit fails says so (`ToolFailed`, as `own_change` does)
+/// instead of reporting success; the pin itself stands and the next commit picks it up.
+mod repin {
+    use super::*;
+
+    #[test]
+    fn commit_failure_is_reported() {
+        let p = ProjectApp::new(json!({}));
+        open(&p);
+        // No git identity in this sandbox repo: the plumbing commit can't be made.
+        let e: IpcError =
+            projects::blueprint_repin(&p.t.app, req(json!({ "projectId": p.id }))).unwrap_err();
+        assert_eq!(e.code, IpcErrorCode::ToolFailed, "{e:?}");
+        git_identity(&p);
+        projects::blueprint_repin(&p.t.app, req(json!({ "projectId": p.id }))).unwrap();
+    }
+}
