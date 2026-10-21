@@ -681,6 +681,8 @@ pub fn interrupted(app: &App) -> Result<Vec<RunSummary>, IpcError> {
         let _ = prune_tails(app);
         // SR-53: sensor events 30 days after their run ended.
         let _ = crate::sensor::prune_events(app);
+        // ADR-018 §5: templates no project pins, 90 days after their last use.
+        let _ = prune_templates(app);
     }
     Ok(out)
 }
@@ -1023,6 +1025,32 @@ pub fn prune_tails(app: &App) -> Result<usize, IpcError> {
         }
     }
     Ok(n)
+}
+
+/// ADR-018 §5, files.md rows 20 and 21: the template pass of the startup pruner. A template some
+/// registered project pins (its approved lock copy or its repo lock) has its "last used" time
+/// refreshed; one nobody pins goes with its parse caches 90 days after it was last used. If any
+/// lock can't be read nothing is called unused and nothing is deleted. Returns what the pass did.
+///
+/// # Errors
+/// `Io`.
+pub fn prune_templates(app: &App) -> Result<foreman_core::retention::TemplatePass, IpcError> {
+    let root = app.app_root()?;
+    let (reg, _) = app.registry()?;
+    let mut in_use = std::collections::BTreeSet::new();
+    for e in &reg.projects {
+        let project = Root::open(
+            std::path::Path::new(&e.path),
+            foreman_core::store::RootKind::Project,
+        )
+        .ok();
+        let shas =
+            foreman_core::retention::pinned_templates(&root, project.as_ref(), &e.project_id)
+                .map_err(|err| IpcError::io(err.to_string()))?;
+        in_use.extend(shas);
+    }
+    foreman_core::retention::prune_templates(&root, &in_use, app.os().now())
+        .map_err(|err| IpcError::io(err.to_string()))
 }
 
 /// Run records and their size: Settings → Data.

@@ -32,7 +32,7 @@ use crate::state::App;
 /// `bin/foreman-sensor-` (files.md §2 row 24).
 pub const BIN_PREFIX: &str = "foreman-sensor-";
 /// Days a run's events are kept after it ended (SR-53).
-pub const EVENT_DAYS: i64 = 30;
+pub const EVENT_DAYS: i64 = foreman_core::retention::EVENT_DAYS;
 
 /// The warning a run without the sensor shows when the binary didn't match (AC-F011-02).
 pub const HASH_WARNING: &str = "The session sensor didn't match its expected hash, so this run has no sensor. Foreman asks you when Claude is idle, and Capture from session is off.";

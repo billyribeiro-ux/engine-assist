@@ -248,6 +248,67 @@ pub fn file_len(root: &Root, rel: &str) -> Result<Option<u64>, StoreError> {
     }
 }
 
+/// When an app-data regular file was last modified, in seconds since the epoch (never following a
+/// link). Missing is `None`.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused, is not a regular file, or can't be read.
+pub fn modified_secs(root: &Root, rel: &str) -> Result<Option<u64>, StoreError> {
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Ok(None);
+    };
+    match rustix::fs::statat(&dir, name.as_str(), AtFlags::SYMLINK_NOFOLLOW) {
+        Err(e) if e == rustix::io::Errno::NOENT => Ok(None),
+        Err(e) => Err(StoreError::io(rel, e)),
+        Ok(st) => {
+            if rustix::fs::FileType::from_raw_mode(super::stat_mode(&st))
+                != rustix::fs::FileType::RegularFile
+            {
+                return Err(StoreError::NotRegular(rel.to_owned()));
+            }
+            Ok(Some(super::stat_mtime_secs(&st)))
+        }
+    }
+}
+
+/// Sets the access and modification times of one app-data regular file to `secs` (seconds since
+/// the epoch), through the no-symlink walk and without following a link. Only the times change;
+/// the content and mode stay. Retention uses it as "last used" (a template a project still pins is
+/// refreshed at each startup scan, so 90 days of no refresh means 90 days unused; files.md row 20).
+/// Missing is fine. Returns whether a file was touched.
+///
+/// # Errors
+/// [`StoreError`] when the path is refused, is not a regular file, or the call fails.
+pub fn touch(root: &Root, rel: &str, secs: u64) -> Result<bool, StoreError> {
+    let p = crate::pathpolicy::check_app_data(rel)?;
+    let Some((dir, name)) = parent_of(root, &p)? else {
+        return Ok(false);
+    };
+    match rustix::fs::statat(&dir, name.as_str(), AtFlags::SYMLINK_NOFOLLOW) {
+        Err(e) if e == rustix::io::Errno::NOENT => return Ok(false),
+        Err(e) => return Err(StoreError::io(rel, e)),
+        Ok(st) => {
+            if rustix::fs::FileType::from_raw_mode(super::stat_mode(&st))
+                != rustix::fs::FileType::RegularFile
+            {
+                return Err(StoreError::NotRegular(rel.to_owned()));
+            }
+        }
+    }
+    let t = rustix::fs::Timespec {
+        tv_sec: i64::try_from(secs).unwrap_or(i64::MAX),
+        tv_nsec: 0,
+    };
+    let times = rustix::fs::Timestamps {
+        last_access: t,
+        last_modification: t,
+    };
+    rustix::fs::utimensat(&dir, name.as_str(), &times, AtFlags::SYMLINK_NOFOLLOW)
+        .map_err(|e| StoreError::io(rel, e))?;
+    Ok(true)
+}
+
 /// Size rotation for an app-data log (ADR-018 §6, files.md §2 row 25: `name`, `name.1` …
 /// `name.<keep>`): `name.<keep-1>` replaces `name.<keep>`, and so on down, then `name` becomes
 /// `name.1`. Renames happen inside the folder reached by the no-symlink walk; a missing file is

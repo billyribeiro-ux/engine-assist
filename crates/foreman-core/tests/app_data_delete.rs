@@ -137,6 +137,99 @@ mod store_delete {
     }
 }
 
+/// Mac check 6 (ADR-011, SR-53; `docs/progress.md` Mac checks): what the symlink-safe deletes do on
+/// APFS, which is normalization-insensitive and (by default) case-insensitive, has its own
+/// `unlinkat`/`utimensat` behavior, and litters folders with Finder files. Linux can't show any of
+/// it, so the module exists on macOS only; run `cargo test -p foreman-core --test app_data_delete
+/// apfs`.
+#[cfg(target_os = "macos")]
+mod apfs {
+    use super::*;
+    use foreman_core::store::app_dirs::{modified_secs, touch};
+
+    /// The volume's case sensitivity, probed rather than assumed.
+    fn case_insensitive(d: &tempfile::TempDir) -> bool {
+        let a = d.path().join("CaseProbe");
+        std::fs::write(&a, "x").unwrap();
+        d.path().join("caseprobe").exists()
+    }
+
+    #[test]
+    fn name_variants_follow_the_volume() {
+        let (d, root) = app();
+        let insensitive = case_insensitive(&d);
+        put(&d, "approvals/p.json", "{}");
+        // A case variant reaches the same entry on a case-insensitive volume and none otherwise;
+        // in both cases the delete stays inside the app-data folder.
+        let hit = remove_file(&root, "approvals/P.json").unwrap();
+        assert_eq!(hit, insensitive, "case-insensitive volume: {insensitive}");
+        assert_eq!(exists(&d, "approvals/p.json"), !insensitive);
+        // A decomposed name (NFD) and its precomposed spelling (NFC) are one entry on APFS, which
+        // preserves what was written and matches either spelling.
+        let nfd = "approvals/e\u{301}.json";
+        let nfc = "approvals/\u{e9}.json";
+        put(&d, nfd, "{}");
+        assert!(tree_size(&root, "approvals").unwrap() >= 2);
+        assert!(remove_file(&root, nfc).unwrap() || remove_file(&root, nfd).unwrap());
+        assert!(remove_tree(&root, "approvals").unwrap());
+        assert!(!exists(&d, "approvals"));
+    }
+
+    #[test]
+    fn finder_litter_and_open_files_go_with_the_tree() {
+        let (d, root) = app();
+        put(&d, "runs/a/run.json", "1");
+        put(&d, "runs/.DS_Store", "finder");
+        put(&d, "runs/a/._run.json", "appledouble");
+        let open = std::fs::File::open(d.path().join("app/runs/a/run.json")).unwrap();
+        assert!(remove_tree(&root, "runs").unwrap());
+        assert!(!exists(&d, "runs"));
+        // The unlinked file stays readable through the open handle (unlinkat semantics).
+        drop(open);
+    }
+
+    #[test]
+    fn sparse_files_count_their_logical_size() {
+        let (d, root) = app();
+        put(&d, "events/e/big", "");
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .open(d.path().join("app/events/e/big"))
+            .unwrap();
+        f.set_len(8 * 1024 * 1024).unwrap();
+        assert_eq!(tree_size(&root, "events").unwrap(), 8 * 1024 * 1024);
+        assert!(remove_tree(&root, "events").unwrap());
+    }
+
+    #[test]
+    fn touch_sets_whole_seconds_without_following_a_link() {
+        let (d, root) = app();
+        put(&d, "templates/x.md", "text");
+        assert!(touch(&root, "templates/x.md", 1_700_000_000).unwrap());
+        assert_eq!(
+            modified_secs(&root, "templates/x.md").unwrap(),
+            Some(1_700_000_000)
+        );
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("app/templates/x.md")).unwrap(),
+            "text"
+        );
+        let outside = d.path().join("outside.md");
+        std::fs::write(&outside, "precious").unwrap();
+        let before = std::fs::metadata(&outside).unwrap().modified().unwrap();
+        symlink(&outside, d.path().join("app/templates/link.md")).unwrap();
+        assert!(matches!(
+            touch(&root, "templates/link.md", 1_600_000_000),
+            Err(StoreError::NotRegular(_))
+        ));
+        assert_eq!(
+            std::fs::metadata(&outside).unwrap().modified().unwrap(),
+            before,
+            "the link's target is never touched"
+        );
+    }
+}
+
 mod user_export {
     use super::*;
 

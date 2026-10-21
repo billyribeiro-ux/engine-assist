@@ -127,6 +127,98 @@ mod retention {
         assert_eq!(v.runs_counted, 2);
     }
 
+    /// ADR-018 §5, files.md rows 20 and 21: the startup pruner deletes a template no project pins
+    /// (with its parse caches) once it has been unused for 90 days, and keeps the pinned one,
+    /// whatever its age, refreshing the time that means "last used".
+    #[test]
+    fn unused_template_pruned_after_90_days() {
+        use std::time::{Duration, SystemTime};
+        let p = ProjectApp::new(json!({}));
+        let now = 1_792_400_400_u64;
+        let age = |rel: &str, days: u64| {
+            let f = p.t.app_data().join(rel);
+            std::fs::File::options()
+                .write(true)
+                .open(f)
+                .unwrap()
+                .set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(now - days * 86_400))
+                .unwrap();
+        };
+        let templates: Vec<String> = std::fs::read_dir(p.t.app_data().join("templates"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        let pinned = templates
+            .iter()
+            .find(|n| n.ends_with(".md"))
+            .expect("the project pinned a template")
+            .clone();
+        for n in &templates {
+            age(&format!("templates/{n}"), 400);
+        }
+        let stale = "c".repeat(64);
+        put(&p, &format!("templates/{stale}.md"), "unused text");
+        put(&p, &format!("templates/{stale}.p3.json"), "{}");
+        age(&format!("templates/{stale}.md"), 91);
+        age(&format!("templates/{stale}.p3.json"), 91);
+        let young = "d".repeat(64);
+        put(&p, &format!("templates/{young}.md"), "recent text");
+        age(&format!("templates/{young}.md"), 89);
+
+        p.t.os.set_now(at(i64::try_from(now).unwrap()));
+        let pass = runs::prune_templates(&p.t.app).unwrap();
+        assert_eq!(pass.removed, 2, "{pass:?}");
+        let dir = p.t.app_data().join("templates");
+        assert!(!dir.join(format!("{stale}.md")).exists());
+        assert!(!dir.join(format!("{stale}.p3.json")).exists());
+        assert!(dir.join(format!("{young}.md")).exists(), "89 days: kept");
+        assert!(dir.join(&pinned).exists(), "pinned: kept however old");
+        let m = std::fs::metadata(dir.join(&pinned))
+            .unwrap()
+            .modified()
+            .unwrap();
+        assert_eq!(
+            m.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+            now,
+            "a pinned template's last use is now"
+        );
+        // The project still opens from the kept text.
+        assert!(
+            foreman_app::ipc::commands::projects::project_open(
+                &p.t.app,
+                req(json!({ "projectId": p.id }))
+            )
+            .is_ok()
+        );
+    }
+
+    /// If a project's lock can't be read, nothing is called unused: no deletes at all.
+    #[test]
+    fn unreadable_lock_prunes_nothing() {
+        use std::time::{Duration, SystemTime};
+        let p = ProjectApp::new(json!({}));
+        let stale = "e".repeat(64);
+        put(&p, &format!("templates/{stale}.md"), "unused text");
+        std::fs::File::options()
+            .write(true)
+            .open(p.t.app_data().join(format!("templates/{stale}.md")))
+            .unwrap()
+            .set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000))
+            .unwrap();
+        put(
+            &p,
+            &format!("approvals/{}/blueprint.lock.json", p.id),
+            "{ not json",
+        );
+        p.t.os.set_now(at(1_792_400_400));
+        assert!(runs::prune_templates(&p.t.app).is_err());
+        assert!(
+            p.t.app_data()
+                .join(format!("templates/{stale}.md"))
+                .exists()
+        );
+    }
+
     /// SR-53: the first scan at startup prunes (the same pass that finds interrupted runs).
     #[test]
     fn startup_scan_prunes() {
@@ -135,6 +227,14 @@ mod retention {
         let old = copy(&p, "1.1");
         p.t.os.set_now(at(1_792_400_400));
         put(&p, &format!("runs/{old}/output.log"), "x");
+        let stale = "f".repeat(64);
+        put(&p, &format!("templates/{stale}.md"), "unused");
+        std::fs::File::options()
+            .write(true)
+            .open(p.t.app_data().join(format!("templates/{stale}.md")))
+            .unwrap()
+            .set_modified(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap();
         runs::interrupted(&p.t.app).unwrap();
         assert!(
             !p.t.app_data()
@@ -142,6 +242,12 @@ mod retention {
                 .join(&old)
                 .join("output.log")
                 .exists()
+        );
+        assert!(
+            !p.t.app_data()
+                .join(format!("templates/{stale}.md"))
+                .exists(),
+            "the same scan prunes templates no project pins"
         );
     }
 }
